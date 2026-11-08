@@ -684,7 +684,6 @@ fun LyricsUI(
             val selectionPadding = with(density) { constraints.maxHeight.toDp() / 2 }
             val playbackAnchorOffsetPx =
                 constraints.maxHeight * (styleSettings.currentLinePosition / 100f)
-            val bottomFlyInOffsetPx = with(density) { LyricUIConstants.BOTTOM_FLY_IN_OFFSET.roundToPx() }
             val keepAliveZone = LyricUIConstants.KEEP_ALIVE_ZONE
             // Jiggle: lines below the current one spring into place (Lyrics settings > Jiggle effect).
             val jiggleSpec =
@@ -804,8 +803,8 @@ fun LyricsUI(
                             durationMillis = lineMoveDurationMillis,
                             delayMillis = staggerDelayMillis,
                             jiggle = if (jiggleLine) jiggleSpec else null,
-                            initialOffsetY =
-                                if (index > playingIndex) bottomFlyInOffsetPx else 0,
+                            // No fly-in from the bottom: the page slide is the only opening animation.
+                            initialOffsetY = 0,
                         )
 
                     if (line.isInterlude()) {

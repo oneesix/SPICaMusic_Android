@@ -383,6 +383,13 @@ fun ExpandedPlayerScreen(
     val pagerState = rememberPagerState(initialPage = initialPage, pageCount = { PAGE_COUNT })
     val amplitudeCache = remember { linkedMapOf<String, List<Int>>() }
 
+    // The player page plays its "expand" enter animation only the first time. Coming back from the lyrics it is
+    // simply there, so the slide is the only animation.
+    var playerPageRevealedOnce by remember { mutableStateOf(false) }
+    LaunchedEffect(isPlayerPageRevealed) {
+        if (isPlayerPageRevealed) playerPageRevealedOnce = true
+    }
+
     // 0 = player, 1 = lyrics. The lyrics slide in from the right; the swipes drive the same value.
     val surfaceProgress = remember { Animatable(if (playerSurface == PlayerSurface.Lyrics) 1f else 0f) }
     var surfaceWidthPx by remember { mutableFloatStateOf(0f) }
@@ -566,6 +573,7 @@ fun ExpandedPlayerScreen(
                                         visible = isPlayerPageRevealed,
                                         delayMillis = 225,
                                         enter = Nav3Transitions.expand().targetContentEnter,
+                                        skipFirstEnter = playerPageRevealedOnce,
                                     ) {
                                         PlayerPage(
                                             playerViewModel = viewModel,

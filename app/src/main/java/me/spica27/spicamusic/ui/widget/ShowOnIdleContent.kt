@@ -44,11 +44,13 @@ fun ShowOnIdleContent(
     enter: EnterTransition = fadeIn(),
     exit: ExitTransition = fadeOut(),
     label: String = "AnimatedVisibility",
+    /** Already visible on the first frame (no enter animation) when [visible]: for content shown again. */
+    skipFirstEnter: Boolean = false,
     content:
         @Composable()
         AnimatedVisibilityScope.() -> Unit,
 ) {
-    var showState by remember { mutableStateOf(false) }
+    var showState by remember { mutableStateOf(skipFirstEnter && visible) }
 
     DisposableEffect(visible) {
         val handler = Handler(Looper.getMainLooper())
