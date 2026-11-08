@@ -96,6 +96,8 @@ fun GlowParticleSeekBar(
     onProgressChangeFinished: (() -> Unit)? = null,
     enabled: Boolean = true,
     animationsEnabled: Boolean = true,
+    /** false: no particle trail behind the glowing head (the glow itself stays). */
+    showParticles: Boolean = true,
     glowColor: Color = MaterialTheme.colorScheme.primary,
     trackColor: Color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.16f),
 ) {
@@ -164,13 +166,15 @@ fun GlowParticleSeekBar(
                 val stroke = (3f + emphasis * 1.2f).dp.toPx()
                 val timeNanos = elapsedTime.value
                 val animationPhase = (timeNanos % GLOW_PERIOD_NANOS).toFloat() / GLOW_PERIOD_NANOS
-                particles.update(
-                    timeNanos = timeNanos,
-                    emitterX = head.x / density,
-                    trackWidth = size.width / density,
-                    emissionDirection = direction,
-                    emitting = animationsEnabled && enabled,
-                )
+                if (showParticles) {
+                    particles.update(
+                        timeNanos = timeNanos,
+                        emitterX = head.x / density,
+                        trackWidth = size.width / density,
+                        emissionDirection = direction,
+                        emitting = animationsEnabled && enabled,
+                    )
+                }
 
                 drawLine(trackColor, start, end, stroke, StrokeCap.Round, alpha = opacity)
                 if (playedLength > 0f) {
@@ -196,7 +200,7 @@ fun GlowParticleSeekBar(
                 } else {
                     drawGlowFallback(head, haloBrush, emphasis, opacity)
                 }
-                drawParticles(particles, color)
+                if (showParticles) drawParticles(particles, color)
 
                 val highlightLength = min(14.dp.toPx(), playedLength)
                 if (highlightLength > 0f) {

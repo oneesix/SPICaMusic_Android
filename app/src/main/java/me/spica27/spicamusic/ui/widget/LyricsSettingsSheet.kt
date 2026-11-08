@@ -47,6 +47,7 @@ fun LyricsSettingsSheet(
             TransliterationSection(settings = settings, onUpdate = onUpdate)
             BlurAndOpacitySection(settings = settings, onUpdate = onUpdate)
             JiggleSection(settings = settings, onUpdate = onUpdate)
+            EnhanceHeaderSection(settings = settings, onUpdate = onUpdate)
         }
     }
 }
@@ -296,4 +297,284 @@ private fun JiggleSection(
             onValueChange = { v -> onUpdate { it.copy(jiggleDelayMs = v) } },
         )
     }
+}
+
+@Composable
+private fun EnhanceHeaderSection(
+    settings: LyricsStyleSettings,
+    onUpdate: ((LyricsStyleSettings) -> LyricsStyleSettings) -> Unit,
+) {
+    LyricsSettingsSection(stringResource(R.string.lyr_set_section_header))
+
+    LyricsSettingsToggle(
+        label = stringResource(R.string.lyr_set_header_enable),
+        description = stringResource(R.string.lyr_set_header_enable_desc),
+        checked = settings.enhanceHeader,
+        onCheckedChange = { v -> onUpdate { it.copy(enhanceHeader = v) } },
+    )
+    // Off = the original header, so the options below only appear when it is on.
+    if (!settings.enhanceHeader) return
+
+    val dp: (Int) -> String = { "$it dp" }
+    val sp: (Int) -> String = { "$it sp" }
+    val percent: (Int) -> String = { "$it%" }
+
+    LyricsSettingsSlider(
+        label = stringResource(R.string.lyr_set_header_album),
+        description = stringResource(R.string.lyr_set_header_album_desc),
+        value = settings.headerAlbumSize,
+        range = LyricsStyleSettings.HEADER_ALBUM_RANGE,
+        step = 1,
+        valueText = dp,
+        onValueChange = { v -> onUpdate { it.copy(headerAlbumSize = v) } },
+    )
+    LyricsSettingsToggle(
+        label = stringResource(R.string.lyr_set_header_outline),
+        description = stringResource(R.string.lyr_set_header_outline_desc),
+        checked = settings.headerOutlineEnabled,
+        onCheckedChange = { v -> onUpdate { it.copy(headerOutlineEnabled = v) } },
+    )
+    if (settings.headerOutlineEnabled) {
+        LyricsSettingsSlider(
+            label = stringResource(R.string.lyr_set_header_outline_weight),
+            description = stringResource(R.string.lyr_set_header_outline_weight_desc),
+            value = settings.headerOutlineWeight,
+            range = LyricsStyleSettings.HEADER_OUTLINE_WEIGHT_RANGE,
+            step = 1,
+            valueText = { String.format(java.util.Locale.US, "%.1f dp", it / 2f) },
+            onValueChange = { v -> onUpdate { it.copy(headerOutlineWeight = v) } },
+        )
+        LyricsSettingsSlider(
+            label = stringResource(R.string.lyr_set_header_outline_opacity),
+            description = stringResource(R.string.lyr_set_header_outline_opacity_desc),
+            value = settings.headerOutlineOpacity,
+            range = LyricsStyleSettings.HEADER_OUTLINE_OPACITY_RANGE,
+            step = 1,
+            valueText = percent,
+            onValueChange = { v -> onUpdate { it.copy(headerOutlineOpacity = v) } },
+        )
+    }
+    LyricsSettingsSlider(
+        label = stringResource(R.string.lyr_set_header_title),
+        description = stringResource(R.string.lyr_set_header_title_desc),
+        value = settings.headerTitleSize,
+        range = LyricsStyleSettings.HEADER_TITLE_RANGE,
+        step = 1,
+        valueText = sp,
+        onValueChange = { v -> onUpdate { it.copy(headerTitleSize = v) } },
+    )
+    LyricsSettingsSlider(
+        label = stringResource(R.string.lyr_set_header_artist),
+        description = stringResource(R.string.lyr_set_header_artist_desc),
+        value = settings.headerArtistSize,
+        range = LyricsStyleSettings.HEADER_ARTIST_RANGE,
+        step = 1,
+        valueText = sp,
+        onValueChange = { v -> onUpdate { it.copy(headerArtistSize = v) } },
+    )
+    LyricsSettingsSlider(
+        label = stringResource(R.string.lyr_set_header_buttons),
+        description = stringResource(R.string.lyr_set_header_buttons_desc),
+        value = settings.headerButtonSize,
+        range = LyricsStyleSettings.HEADER_BUTTON_RANGE,
+        step = 1,
+        valueText = dp,
+        onValueChange = { v -> onUpdate { it.copy(headerButtonSize = v) } },
+    )
+    LyricsSettingsSlider(
+        label = stringResource(R.string.lyr_set_header_line_weight),
+        description = stringResource(R.string.lyr_set_header_line_weight_desc),
+        value = settings.headerLineWeight,
+        range = LyricsStyleSettings.HEADER_LINE_WEIGHT_RANGE,
+        step = 1,
+        valueText = { String.format(java.util.Locale.US, "%.1f dp", it / 2f) },
+        onValueChange = { v -> onUpdate { it.copy(headerLineWeight = v) } },
+    )
+    LyricsSettingsSlider(
+        label = stringResource(R.string.lyr_set_header_line_opacity),
+        description = stringResource(R.string.lyr_set_header_line_opacity_desc),
+        value = settings.headerLineOpacity,
+        range = LyricsStyleSettings.HEADER_LINE_OPACITY_RANGE,
+        step = 1,
+        valueText = percent,
+        onValueChange = { v -> onUpdate { it.copy(headerLineOpacity = v) } },
+    )
+    LyricsSettingsSlider(
+        label = stringResource(R.string.lyr_set_header_bottom_padding),
+        description = stringResource(R.string.lyr_set_header_bottom_padding_desc),
+        value = settings.headerBottomPadding,
+        range = LyricsStyleSettings.HEADER_BOTTOM_PADDING_RANGE,
+        step = 1,
+        valueText = dp,
+        onValueChange = { v -> onUpdate { it.copy(headerBottomPadding = v) } },
+    )
+    LyricsSettingsToggle(
+        label = stringResource(R.string.lyr_set_header_blur),
+        description = stringResource(R.string.lyr_set_header_blur_desc),
+        checked = settings.headerBlurEnabled,
+        onCheckedChange = { v -> onUpdate { it.copy(headerBlurEnabled = v) } },
+    )
+    if (settings.headerBlurEnabled) {
+        LyricsSettingsSlider(
+            label = stringResource(R.string.lyr_set_header_blur_amount),
+            description = stringResource(R.string.lyr_set_header_blur_amount_desc),
+            value = settings.headerBlurAmount,
+            range = LyricsStyleSettings.HEADER_BLUR_RANGE,
+            step = 1,
+            valueText = dp,
+            onValueChange = { v -> onUpdate { it.copy(headerBlurAmount = v) } },
+        )
+    }
+    // Soft edge works with blur on (the blur fades out) and off (the lyrics fade in).
+    LyricsSettingsToggle(
+        label = stringResource(R.string.lyr_set_header_soft_edge),
+        description = stringResource(R.string.lyr_set_header_soft_edge_desc),
+        checked = settings.headerSoftEdge,
+        onCheckedChange = { v -> onUpdate { it.copy(headerSoftEdge = v) } },
+    )
+    if (settings.headerSoftEdge) {
+        LyricsSettingsSlider(
+            label = stringResource(R.string.lyr_set_header_edge_fade),
+            description = stringResource(R.string.lyr_set_header_edge_fade_desc),
+            value = settings.headerEdgeFade,
+            range = LyricsStyleSettings.HEADER_EDGE_FADE_RANGE,
+            step = 1,
+            valueText = dp,
+            onValueChange = { v -> onUpdate { it.copy(headerEdgeFade = v) } },
+        )
+    }
+
+    // ---- Bottom bar (translation / transliteration buttons + player pill) ----
+    LyricsSettingsSection(stringResource(R.string.lyr_set_section_dock))
+    LyricsSettingsToggle(
+        label = stringResource(R.string.lyr_set_dock_blur),
+        description = stringResource(R.string.lyr_set_dock_blur_desc),
+        checked = settings.dockBlurEnabled,
+        onCheckedChange = { v -> onUpdate { it.copy(dockBlurEnabled = v) } },
+    )
+    if (settings.dockBlurEnabled) {
+        LyricsSettingsSlider(
+            label = stringResource(R.string.lyr_set_dock_blur_amount),
+            description = stringResource(R.string.lyr_set_dock_blur_amount_desc),
+            value = settings.dockBlurAmount,
+            range = LyricsStyleSettings.DOCK_BLUR_RANGE,
+            step = 1,
+            valueText = dp,
+            onValueChange = { v -> onUpdate { it.copy(dockBlurAmount = v) } },
+        )
+        LyricsSettingsChips(
+            label = stringResource(R.string.lyr_set_dock_style),
+            description = stringResource(R.string.lyr_set_dock_style_desc),
+            options = listOf(false, true),
+            selected = settings.dockSpreadBlur,
+            optionLabel = {
+                if (it) {
+                    stringResource(R.string.lyr_set_dock_style_spread)
+                } else {
+                    stringResource(R.string.lyr_set_dock_style_normal)
+                }
+            },
+            onSelect = { v -> onUpdate { it.copy(dockSpreadBlur = v) } },
+        )
+        // Spread only: the blur fades out above the bar (same idea as the header's soft edge).
+        if (settings.dockSpreadBlur) {
+            LyricsSettingsToggle(
+                label = stringResource(R.string.lyr_set_dock_soft_edge),
+                description = stringResource(R.string.lyr_set_dock_soft_edge_desc),
+                checked = settings.dockSoftEdge,
+                onCheckedChange = { v -> onUpdate { it.copy(dockSoftEdge = v) } },
+            )
+            if (settings.dockSoftEdge) {
+                LyricsSettingsSlider(
+                    label = stringResource(R.string.lyr_set_dock_edge_fade),
+                    description = stringResource(R.string.lyr_set_dock_edge_fade_desc),
+                    value = settings.dockEdgeFade,
+                    range = LyricsStyleSettings.DOCK_EDGE_FADE_RANGE,
+                    step = 1,
+                    valueText = dp,
+                    onValueChange = { v -> onUpdate { it.copy(dockEdgeFade = v) } },
+                )
+            }
+        }
+    }
+    LyricsSettingsSlider(
+        label = stringResource(R.string.lyr_set_dock_size),
+        description = stringResource(R.string.lyr_set_dock_size_desc),
+        value = settings.dockSize,
+        range = LyricsStyleSettings.DOCK_SIZE_RANGE,
+        step = 1,
+        valueText = dp,
+        onValueChange = { v -> onUpdate { it.copy(dockSize = v) } },
+    )
+    LyricsSettingsSlider(
+        label = stringResource(R.string.lyr_set_dock_bottom_padding),
+        description = stringResource(R.string.lyr_set_dock_bottom_padding_desc),
+        value = settings.dockBottomPadding,
+        range = LyricsStyleSettings.DOCK_BOTTOM_PADDING_RANGE,
+        step = 1,
+        valueText = dp,
+        onValueChange = { v -> onUpdate { it.copy(dockBottomPadding = v) } },
+    )
+    LyricsSettingsSlider(
+        label = stringResource(R.string.lyr_set_dock_pill_padding),
+        description = stringResource(R.string.lyr_set_dock_pill_padding_desc),
+        value = settings.dockPillPadding,
+        range = LyricsStyleSettings.DOCK_PILL_PADDING_RANGE,
+        step = 1,
+        valueText = dp,
+        onValueChange = { v -> onUpdate { it.copy(dockPillPadding = v) } },
+    )
+    LyricsSettingsSlider(
+        label = stringResource(R.string.lyr_set_dock_gap_left),
+        description = stringResource(R.string.lyr_set_dock_gap_left_desc),
+        value = settings.dockGapLeft,
+        range = LyricsStyleSettings.DOCK_GAP_RANGE,
+        step = 1,
+        valueText = dp,
+        onValueChange = { v -> onUpdate { it.copy(dockGapLeft = v) } },
+    )
+    LyricsSettingsSlider(
+        label = stringResource(R.string.lyr_set_dock_gap_right),
+        description = stringResource(R.string.lyr_set_dock_gap_right_desc),
+        value = settings.dockGapRight,
+        range = LyricsStyleSettings.DOCK_GAP_RANGE,
+        step = 1,
+        valueText = dp,
+        onValueChange = { v -> onUpdate { it.copy(dockGapRight = v) } },
+    )
+
+    LyricsSettingsResetButton(
+        text = stringResource(R.string.lyr_set_reset_header),
+        onClick = {
+            val d = LyricsStyleSettings()
+            onUpdate {
+                it.copy(
+                    headerAlbumSize = d.headerAlbumSize,
+                    headerTitleSize = d.headerTitleSize,
+                    headerArtistSize = d.headerArtistSize,
+                    headerButtonSize = d.headerButtonSize,
+                    headerLineWeight = d.headerLineWeight,
+                    headerLineOpacity = d.headerLineOpacity,
+                    headerBottomPadding = d.headerBottomPadding,
+                    headerBlurEnabled = d.headerBlurEnabled,
+                    headerBlurAmount = d.headerBlurAmount,
+                    headerSoftEdge = d.headerSoftEdge,
+                    headerEdgeFade = d.headerEdgeFade,
+                    headerOutlineEnabled = d.headerOutlineEnabled,
+                    headerOutlineWeight = d.headerOutlineWeight,
+                    headerOutlineOpacity = d.headerOutlineOpacity,
+                    dockBlurEnabled = d.dockBlurEnabled,
+                    dockBlurAmount = d.dockBlurAmount,
+                    dockSize = d.dockSize,
+                    dockBottomPadding = d.dockBottomPadding,
+                    dockPillPadding = d.dockPillPadding,
+                    dockGapLeft = d.dockGapLeft,
+                    dockGapRight = d.dockGapRight,
+                    dockSpreadBlur = d.dockSpreadBlur,
+                    dockSoftEdge = d.dockSoftEdge,
+                    dockEdgeFade = d.dockEdgeFade,
+                )
+            }
+        },
+    )
 }

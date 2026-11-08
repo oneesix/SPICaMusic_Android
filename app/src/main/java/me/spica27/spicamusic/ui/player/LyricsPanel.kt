@@ -57,6 +57,8 @@ fun LyricsPanel(
     displayMode: LyricsDisplayMode = LyricsDisplayMode.Fullscreen,
     displayOptions: LyricsDisplayOptions = LyricsDisplayOptions(),
     toolbarBottomInset: Dp = 0.dp,
+    /** false: the host (e.g. the fullscreen lyrics header) shows the toolbar and settings itself. */
+    showToolbar: Boolean = true,
 ) {
     // Activity 作用域共享实例：与 mini 歌词同源，
     // 此处切换歌词源 / 调整偏移量会同步反映到 mini 歌词
@@ -122,7 +124,16 @@ fun LyricsPanel(
                 val displayed = uiState.displayed!!
                 // 面板每帧随 currentTime 重组，若在此每帧 copyOf 会全量拷贝整份歌词。
                 // 按 items 身份缓存：只有歌词本身变化才重建。
-                val lyricList = remember(displayed) { ImmutableList.copyOf(displayed.items) }
+                // 译文 / 音译开关（歌词页底栏的左右按钮）：关闭时过滤掉对应行。
+                val lyricList =
+                    remember(displayed, styleSettings.showTranslation, styleSettings.showTransliteration) {
+                        ImmutableList.copyOf(
+                            displayed.items.withExtras(
+                                showTranslation = styleSettings.showTranslation,
+                                showTransliteration = styleSettings.showTransliteration,
+                            ),
+                        )
+                    }
                 LyricsUI(
                     modifier = Modifier.fillMaxSize(),
                     lyric = lyricList,
@@ -146,33 +157,35 @@ fun LyricsPanel(
             }
         }
 
-        // 浮动工具栏（右下角）：切换入口常驻，保证无内嵌/在线时仍可进入选择本地文件
-        FloatingLyricsToolbar(
-            offsetEnabled = !uiState.lyricsSuppressed,
-            onOpenLyricsSettings = { showLyricsSettings = true },
-            offsetMs = uiState.lyricsOffsetMs,
-            onOffsetChange = { viewModel.updateOffset(it) },
-            onOpenLyricsSwitcher = {
-                viewModel.openPanel()
-                backStack.add(LyricsSourceRoute)
-            },
-            modifier =
-                Modifier
-                    .align(Alignment.BottomEnd)
-                    .padding(
-                        end = if (displayMode == LyricsDisplayMode.Compact) 12.dp else 16.dp,
-                        bottom =
-                            (if (displayMode == LyricsDisplayMode.Compact) 12.dp else 24.dp) +
-                                toolbarBottomInset,
-                    ),
-        )
-
-        if (showLyricsSettings) {
-            LyricsSettingsSheet(
-                settings = styleSettings,
-                onUpdate = styleViewModel::update,
-                onDismiss = { showLyricsSettings = false },
+        if (showToolbar) {
+            // 浮动工具栏（右下角）：切换入口常驻，保证无内嵌/在线时仍可进入选择本地文件
+            FloatingLyricsToolbar(
+                offsetEnabled = !uiState.lyricsSuppressed,
+                onOpenLyricsSettings = { showLyricsSettings = true },
+                offsetMs = uiState.lyricsOffsetMs,
+                onOffsetChange = { viewModel.updateOffset(it) },
+                onOpenLyricsSwitcher = {
+                    viewModel.openPanel()
+                    backStack.add(LyricsSourceRoute)
+                },
+                modifier =
+                    Modifier
+                        .align(Alignment.BottomEnd)
+                        .padding(
+                            end = if (displayMode == LyricsDisplayMode.Compact) 12.dp else 16.dp,
+                            bottom =
+                                (if (displayMode == LyricsDisplayMode.Compact) 12.dp else 24.dp) +
+                                    toolbarBottomInset,
+                        ),
             )
+
+            if (showLyricsSettings) {
+                LyricsSettingsSheet(
+                    settings = styleSettings,
+                    onUpdate = styleViewModel::update,
+                    onDismiss = { showLyricsSettings = false },
+                )
+            }
         }
     }
 }

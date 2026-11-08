@@ -24,6 +24,8 @@ fun Song.toMediaItem(): MediaItem =
             MediaMetadata.Builder().setTitle(displayName).setDisplayTitle(displayName)
                 .setArtist(artist)
                 .setSubtitle(artist)
+                .setAlbumTitle(album.takeIf { it.isNotBlank() })
+                .setReleaseYear(year.takeIf { it > 0 })
                 .setExtras(Bundle().apply {
                     putLong("mediaStoreId", mediaStoreId)
                     putString("path", path)

@@ -24,6 +24,19 @@ class PreferencesManager(
         val THEME_COLOR_STYLE = stringPreferencesKey("theme_color_style")
         val KEEP_SCREEN_ON = booleanPreferencesKey("keep_screen_on")
         val DYNAMIC_SPECTRUM_BACKGROUND = stringPreferencesKey("dynamic_spectrum_background")
+        // ---- Verse Flow 外观（Auto / Light / Dark、饱和度、鲜艳度、高亮色相）----
+        val VERSE_THEME_MODE = stringPreferencesKey("verse_theme_mode")
+        val VERSE_THEME_SATURATION = intPreferencesKey("verse_theme_saturation")
+        val VERSE_THEME_VIBRANCY = intPreferencesKey("verse_theme_vibrancy")
+        val VERSE_THEME_HUE = intPreferencesKey("verse_theme_hue")
+
+        // ---- Verse Flow 歌词页色块（blobs）----
+        val VERSE_MESH_COUNT = intPreferencesKey("verse_mesh_count")
+        val VERSE_MESH_SIZE = intPreferencesKey("verse_mesh_size")
+        val VERSE_MESH_OPACITY = intPreferencesKey("verse_mesh_opacity")
+        val VERSE_MESH_MOTION = intPreferencesKey("verse_mesh_motion")
+        val VERSE_MESH_COLOR = intPreferencesKey("verse_mesh_color")
+        val VERSE_MESH_ANIMATED = booleanPreferencesKey("verse_mesh_animated")
         val DYNAMIC_COVER_TYPE = stringPreferencesKey("dynamic_cover_type")
         val PROGRESS_BAR_STYLE = stringPreferencesKey("progress_bar_style")
         val EQ_ENABLED = booleanPreferencesKey("eq_enabled")
@@ -58,6 +71,33 @@ class PreferencesManager(
         val LYRIC_JIGGLE_STRENGTH = intPreferencesKey("lyric_jiggle_strength")
         val LYRIC_JIGGLE_DURATION_MS = intPreferencesKey("lyric_jiggle_duration_ms")
         val LYRIC_JIGGLE_DELAY_MS = intPreferencesKey("lyric_jiggle_delay_ms")
+        val LYRIC_HEADER_ENHANCED = booleanPreferencesKey("lyric_header_enhanced")
+        val LYRIC_HEADER_ALBUM_SIZE = intPreferencesKey("lyric_header_album_size")
+        val LYRIC_HEADER_TITLE_SIZE = intPreferencesKey("lyric_header_title_size")
+        val LYRIC_HEADER_ARTIST_SIZE = intPreferencesKey("lyric_header_artist_size")
+        val LYRIC_HEADER_BUTTON_SIZE = intPreferencesKey("lyric_header_button_size")
+        val LYRIC_HEADER_LINE_WEIGHT = intPreferencesKey("lyric_header_line_weight")
+        val LYRIC_HEADER_LINE_OPACITY = intPreferencesKey("lyric_header_line_opacity")
+        val LYRIC_HEADER_BOTTOM_PADDING = intPreferencesKey("lyric_header_bottom_padding")
+        val LYRIC_HEADER_BLUR_ENABLED = booleanPreferencesKey("lyric_header_blur_enabled")
+        val LYRIC_HEADER_BLUR_AMOUNT = intPreferencesKey("lyric_header_blur_amount")
+        val LYRIC_HEADER_SOFT_EDGE = booleanPreferencesKey("lyric_header_soft_edge")
+        val LYRIC_HEADER_EDGE_FADE = intPreferencesKey("lyric_header_edge_fade")
+        val LYRIC_HEADER_OUTLINE_ENABLED = booleanPreferencesKey("lyric_header_outline_enabled")
+        val LYRIC_HEADER_OUTLINE_WEIGHT = intPreferencesKey("lyric_header_outline_weight")
+        val LYRIC_HEADER_OUTLINE_OPACITY = intPreferencesKey("lyric_header_outline_opacity")
+        val LYRIC_SHOW_TRANSLATION = booleanPreferencesKey("lyric_show_translation")
+        val LYRIC_SHOW_TRANSLITERATION = booleanPreferencesKey("lyric_show_transliteration")
+        val LYRIC_DOCK_BLUR_ENABLED = booleanPreferencesKey("lyric_dock_blur_enabled")
+        val LYRIC_DOCK_BLUR_AMOUNT = intPreferencesKey("lyric_dock_blur_amount")
+        val LYRIC_DOCK_SIZE = intPreferencesKey("lyric_dock_size")
+        val LYRIC_DOCK_BOTTOM_PADDING = intPreferencesKey("lyric_dock_bottom_padding")
+        val LYRIC_DOCK_PILL_PADDING = intPreferencesKey("lyric_dock_pill_padding")
+        val LYRIC_DOCK_GAP_LEFT = intPreferencesKey("lyric_dock_gap_left")
+        val LYRIC_DOCK_GAP_RIGHT = intPreferencesKey("lyric_dock_gap_right")
+        val LYRIC_DOCK_SPREAD_BLUR = booleanPreferencesKey("lyric_dock_spread_blur")
+        val LYRIC_DOCK_SOFT_EDGE = booleanPreferencesKey("lyric_dock_soft_edge")
+        val LYRIC_DOCK_EDGE_FADE = intPreferencesKey("lyric_dock_edge_fade")
     }
 
 
@@ -86,6 +126,33 @@ class PreferencesManager(
                     jiggleStrength = p[Keys.LYRIC_JIGGLE_STRENGTH] ?: d.jiggleStrength,
                     jiggleDurationMs = p[Keys.LYRIC_JIGGLE_DURATION_MS] ?: d.jiggleDurationMs,
                     jiggleDelayMs = p[Keys.LYRIC_JIGGLE_DELAY_MS] ?: d.jiggleDelayMs,
+                    enhanceHeader = p[Keys.LYRIC_HEADER_ENHANCED] ?: d.enhanceHeader,
+                    headerAlbumSize = p[Keys.LYRIC_HEADER_ALBUM_SIZE] ?: d.headerAlbumSize,
+                    headerTitleSize = p[Keys.LYRIC_HEADER_TITLE_SIZE] ?: d.headerTitleSize,
+                    headerArtistSize = p[Keys.LYRIC_HEADER_ARTIST_SIZE] ?: d.headerArtistSize,
+                    headerButtonSize = p[Keys.LYRIC_HEADER_BUTTON_SIZE] ?: d.headerButtonSize,
+                    headerLineWeight = p[Keys.LYRIC_HEADER_LINE_WEIGHT] ?: d.headerLineWeight,
+                    headerLineOpacity = p[Keys.LYRIC_HEADER_LINE_OPACITY] ?: d.headerLineOpacity,
+                    headerBottomPadding = p[Keys.LYRIC_HEADER_BOTTOM_PADDING] ?: d.headerBottomPadding,
+                    headerBlurEnabled = p[Keys.LYRIC_HEADER_BLUR_ENABLED] ?: d.headerBlurEnabled,
+                    headerBlurAmount = p[Keys.LYRIC_HEADER_BLUR_AMOUNT] ?: d.headerBlurAmount,
+                    headerSoftEdge = p[Keys.LYRIC_HEADER_SOFT_EDGE] ?: d.headerSoftEdge,
+                    headerEdgeFade = p[Keys.LYRIC_HEADER_EDGE_FADE] ?: d.headerEdgeFade,
+                    headerOutlineEnabled = p[Keys.LYRIC_HEADER_OUTLINE_ENABLED] ?: d.headerOutlineEnabled,
+                    headerOutlineWeight = p[Keys.LYRIC_HEADER_OUTLINE_WEIGHT] ?: d.headerOutlineWeight,
+                    headerOutlineOpacity = p[Keys.LYRIC_HEADER_OUTLINE_OPACITY] ?: d.headerOutlineOpacity,
+                    showTranslation = p[Keys.LYRIC_SHOW_TRANSLATION] ?: d.showTranslation,
+                    showTransliteration = p[Keys.LYRIC_SHOW_TRANSLITERATION] ?: d.showTransliteration,
+                    dockBlurEnabled = p[Keys.LYRIC_DOCK_BLUR_ENABLED] ?: d.dockBlurEnabled,
+                    dockBlurAmount = p[Keys.LYRIC_DOCK_BLUR_AMOUNT] ?: d.dockBlurAmount,
+                    dockSize = p[Keys.LYRIC_DOCK_SIZE] ?: d.dockSize,
+                    dockBottomPadding = p[Keys.LYRIC_DOCK_BOTTOM_PADDING] ?: d.dockBottomPadding,
+                    dockPillPadding = p[Keys.LYRIC_DOCK_PILL_PADDING] ?: d.dockPillPadding,
+                    dockGapLeft = p[Keys.LYRIC_DOCK_GAP_LEFT] ?: d.dockGapLeft,
+                    dockGapRight = p[Keys.LYRIC_DOCK_GAP_RIGHT] ?: d.dockGapRight,
+                    dockSpreadBlur = p[Keys.LYRIC_DOCK_SPREAD_BLUR] ?: d.dockSpreadBlur,
+                    dockSoftEdge = p[Keys.LYRIC_DOCK_SOFT_EDGE] ?: d.dockSoftEdge,
+                    dockEdgeFade = p[Keys.LYRIC_DOCK_EDGE_FADE] ?: d.dockEdgeFade,
                 ).sanitized()
             }.distinctUntilChanged()
 
@@ -114,6 +181,33 @@ class PreferencesManager(
                     jiggleStrength = p[Keys.LYRIC_JIGGLE_STRENGTH] ?: d.jiggleStrength,
                     jiggleDurationMs = p[Keys.LYRIC_JIGGLE_DURATION_MS] ?: d.jiggleDurationMs,
                     jiggleDelayMs = p[Keys.LYRIC_JIGGLE_DELAY_MS] ?: d.jiggleDelayMs,
+                    enhanceHeader = p[Keys.LYRIC_HEADER_ENHANCED] ?: d.enhanceHeader,
+                    headerAlbumSize = p[Keys.LYRIC_HEADER_ALBUM_SIZE] ?: d.headerAlbumSize,
+                    headerTitleSize = p[Keys.LYRIC_HEADER_TITLE_SIZE] ?: d.headerTitleSize,
+                    headerArtistSize = p[Keys.LYRIC_HEADER_ARTIST_SIZE] ?: d.headerArtistSize,
+                    headerButtonSize = p[Keys.LYRIC_HEADER_BUTTON_SIZE] ?: d.headerButtonSize,
+                    headerLineWeight = p[Keys.LYRIC_HEADER_LINE_WEIGHT] ?: d.headerLineWeight,
+                    headerLineOpacity = p[Keys.LYRIC_HEADER_LINE_OPACITY] ?: d.headerLineOpacity,
+                    headerBottomPadding = p[Keys.LYRIC_HEADER_BOTTOM_PADDING] ?: d.headerBottomPadding,
+                    headerBlurEnabled = p[Keys.LYRIC_HEADER_BLUR_ENABLED] ?: d.headerBlurEnabled,
+                    headerBlurAmount = p[Keys.LYRIC_HEADER_BLUR_AMOUNT] ?: d.headerBlurAmount,
+                    headerSoftEdge = p[Keys.LYRIC_HEADER_SOFT_EDGE] ?: d.headerSoftEdge,
+                    headerEdgeFade = p[Keys.LYRIC_HEADER_EDGE_FADE] ?: d.headerEdgeFade,
+                    headerOutlineEnabled = p[Keys.LYRIC_HEADER_OUTLINE_ENABLED] ?: d.headerOutlineEnabled,
+                    headerOutlineWeight = p[Keys.LYRIC_HEADER_OUTLINE_WEIGHT] ?: d.headerOutlineWeight,
+                    headerOutlineOpacity = p[Keys.LYRIC_HEADER_OUTLINE_OPACITY] ?: d.headerOutlineOpacity,
+                    showTranslation = p[Keys.LYRIC_SHOW_TRANSLATION] ?: d.showTranslation,
+                    showTransliteration = p[Keys.LYRIC_SHOW_TRANSLITERATION] ?: d.showTransliteration,
+                    dockBlurEnabled = p[Keys.LYRIC_DOCK_BLUR_ENABLED] ?: d.dockBlurEnabled,
+                    dockBlurAmount = p[Keys.LYRIC_DOCK_BLUR_AMOUNT] ?: d.dockBlurAmount,
+                    dockSize = p[Keys.LYRIC_DOCK_SIZE] ?: d.dockSize,
+                    dockBottomPadding = p[Keys.LYRIC_DOCK_BOTTOM_PADDING] ?: d.dockBottomPadding,
+                    dockPillPadding = p[Keys.LYRIC_DOCK_PILL_PADDING] ?: d.dockPillPadding,
+                    dockGapLeft = p[Keys.LYRIC_DOCK_GAP_LEFT] ?: d.dockGapLeft,
+                    dockGapRight = p[Keys.LYRIC_DOCK_GAP_RIGHT] ?: d.dockGapRight,
+                    dockSpreadBlur = p[Keys.LYRIC_DOCK_SPREAD_BLUR] ?: d.dockSpreadBlur,
+                    dockSoftEdge = p[Keys.LYRIC_DOCK_SOFT_EDGE] ?: d.dockSoftEdge,
+                    dockEdgeFade = p[Keys.LYRIC_DOCK_EDGE_FADE] ?: d.dockEdgeFade,
                 )
             val n = transform(current).sanitized()
             p[Keys.LYRIC_FONT_STYLE] = n.fontStyle
@@ -133,6 +227,33 @@ class PreferencesManager(
             p[Keys.LYRIC_JIGGLE_STRENGTH] = n.jiggleStrength
             p[Keys.LYRIC_JIGGLE_DURATION_MS] = n.jiggleDurationMs
             p[Keys.LYRIC_JIGGLE_DELAY_MS] = n.jiggleDelayMs
+            p[Keys.LYRIC_HEADER_ENHANCED] = n.enhanceHeader
+            p[Keys.LYRIC_HEADER_ALBUM_SIZE] = n.headerAlbumSize
+            p[Keys.LYRIC_HEADER_TITLE_SIZE] = n.headerTitleSize
+            p[Keys.LYRIC_HEADER_ARTIST_SIZE] = n.headerArtistSize
+            p[Keys.LYRIC_HEADER_BUTTON_SIZE] = n.headerButtonSize
+            p[Keys.LYRIC_HEADER_LINE_WEIGHT] = n.headerLineWeight
+            p[Keys.LYRIC_HEADER_LINE_OPACITY] = n.headerLineOpacity
+            p[Keys.LYRIC_HEADER_BOTTOM_PADDING] = n.headerBottomPadding
+            p[Keys.LYRIC_HEADER_BLUR_ENABLED] = n.headerBlurEnabled
+            p[Keys.LYRIC_HEADER_BLUR_AMOUNT] = n.headerBlurAmount
+            p[Keys.LYRIC_HEADER_SOFT_EDGE] = n.headerSoftEdge
+            p[Keys.LYRIC_HEADER_EDGE_FADE] = n.headerEdgeFade
+            p[Keys.LYRIC_HEADER_OUTLINE_ENABLED] = n.headerOutlineEnabled
+            p[Keys.LYRIC_HEADER_OUTLINE_WEIGHT] = n.headerOutlineWeight
+            p[Keys.LYRIC_HEADER_OUTLINE_OPACITY] = n.headerOutlineOpacity
+            p[Keys.LYRIC_SHOW_TRANSLATION] = n.showTranslation
+            p[Keys.LYRIC_SHOW_TRANSLITERATION] = n.showTransliteration
+            p[Keys.LYRIC_DOCK_BLUR_ENABLED] = n.dockBlurEnabled
+            p[Keys.LYRIC_DOCK_BLUR_AMOUNT] = n.dockBlurAmount
+            p[Keys.LYRIC_DOCK_SIZE] = n.dockSize
+            p[Keys.LYRIC_DOCK_BOTTOM_PADDING] = n.dockBottomPadding
+            p[Keys.LYRIC_DOCK_PILL_PADDING] = n.dockPillPadding
+            p[Keys.LYRIC_DOCK_GAP_LEFT] = n.dockGapLeft
+            p[Keys.LYRIC_DOCK_GAP_RIGHT] = n.dockGapRight
+            p[Keys.LYRIC_DOCK_SPREAD_BLUR] = n.dockSpreadBlur
+            p[Keys.LYRIC_DOCK_SOFT_EDGE] = n.dockSoftEdge
+            p[Keys.LYRIC_DOCK_EDGE_FADE] = n.dockEdgeFade
         }
     }
 

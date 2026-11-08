@@ -15,6 +15,16 @@ class SettingsUseCases(
         val THEME_COLOR_STYLE = PreferencesManager.Keys.THEME_COLOR_STYLE
         val KEEP_SCREEN_ON = PreferencesManager.Keys.KEEP_SCREEN_ON
         val DYNAMIC_SPECTRUM_BACKGROUND = PreferencesManager.Keys.DYNAMIC_SPECTRUM_BACKGROUND
+        val VERSE_THEME_MODE = PreferencesManager.Keys.VERSE_THEME_MODE
+        val VERSE_THEME_SATURATION = PreferencesManager.Keys.VERSE_THEME_SATURATION
+        val VERSE_THEME_VIBRANCY = PreferencesManager.Keys.VERSE_THEME_VIBRANCY
+        val VERSE_THEME_HUE = PreferencesManager.Keys.VERSE_THEME_HUE
+        val VERSE_MESH_COUNT = PreferencesManager.Keys.VERSE_MESH_COUNT
+        val VERSE_MESH_SIZE = PreferencesManager.Keys.VERSE_MESH_SIZE
+        val VERSE_MESH_OPACITY = PreferencesManager.Keys.VERSE_MESH_OPACITY
+        val VERSE_MESH_MOTION = PreferencesManager.Keys.VERSE_MESH_MOTION
+        val VERSE_MESH_COLOR = PreferencesManager.Keys.VERSE_MESH_COLOR
+        val VERSE_MESH_ANIMATED = PreferencesManager.Keys.VERSE_MESH_ANIMATED
         val DYNAMIC_COVER_TYPE = PreferencesManager.Keys.DYNAMIC_COVER_TYPE
         val PROGRESS_BAR_STYLE = PreferencesManager.Keys.PROGRESS_BAR_STYLE
         val EQ_ENABLED = PreferencesManager.Keys.EQ_ENABLED
@@ -34,6 +44,18 @@ class SettingsUseCases(
         value: Boolean,
     ) {
         preferencesManager.setBoolean(key, value)
+    }
+
+    fun getInt(
+        key: Preferences.Key<Int>,
+        defaultValue: Int = 0,
+    ): Flow<Int> = preferencesManager.getInt(key, defaultValue)
+
+    suspend fun setInt(
+        key: Preferences.Key<Int>,
+        value: Int,
+    ) {
+        preferencesManager.setInt(key, value)
     }
 
     fun getString(
