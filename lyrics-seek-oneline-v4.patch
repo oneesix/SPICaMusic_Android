@@ -1,0 +1,190 @@
+diff --git a/app/src/main/java/me/spica27/spicamusic/ui/widget/LyricUI.kt b/app/src/main/java/me/spica27/spicamusic/ui/widget/LyricUI.kt
+index 1572f7c..574529c 100644
+--- a/app/src/main/java/me/spica27/spicamusic/ui/widget/LyricUI.kt
++++ b/app/src/main/java/me/spica27/spicamusic/ui/widget/LyricUI.kt
+@@ -58,7 +58,6 @@ import androidx.compose.runtime.remember
+ import androidx.compose.runtime.rememberUpdatedState
+ import androidx.compose.runtime.setValue
+ import androidx.compose.runtime.snapshotFlow
+-import androidx.compose.runtime.withFrameNanos
+ import androidx.compose.ui.Alignment
+ import androidx.compose.ui.Modifier
+ import androidx.compose.ui.draw.clip
+@@ -116,7 +115,6 @@ import me.spica27.spicamusic.core.preferences.TransliterationPosition
+ import me.spica27.spicamusic.ui.theme.Shapes
+ import java.util.Locale
+ import kotlin.math.abs
+-import kotlin.math.floor
+ import kotlin.math.max
+ import kotlin.math.min
+ import kotlin.math.roundToInt
+@@ -253,10 +251,6 @@ private val LineBlurSpec = tween<Float>(durationMillis = 450, easing = LyricLine
+ 
+ // While the progress bar is dragged the lines change look quickly so they keep up with the bar.
+ private val BarSeekScaleSpec = tween<Float>(durationMillis = 140, easing = LyricLineScaleEasing)
+-private val BarSeekAlphaSpec = tween<Float>(durationMillis = 100)
+-
+-/** How fast the lyrics catch up with the dragged bar (time constant in seconds): smaller = tighter. */
+-private const val BAR_SEEK_FOLLOW_SECONDS = 0.05f
+ 
+ /** Delay of a jiggling line `distanceBelow` lines under the current one: grows per line, easing off for far lines. */
+ private fun jiggleDelayMillis(
+@@ -609,12 +603,9 @@ fun LyricsUI(
+     val seekPreviewProviderState = rememberUpdatedState(seekPreviewTimeProvider)
+     val isBarSeekingState = remember { derivedStateOf { seekPreviewProviderState.value() != null } }
+     val isBarSeeking by isBarSeekingState
+-    // Fractional line position of the bar's time: 4.5 = halfway between line 4 and line 5.
+-    val barSeekPosition by remember(lyricLines) {
+-        derivedStateOf { seekPreviewProviderState.value()?.let { lineFractionAt(lyricLines, it) } }
+-    }
++    // The line sung at the bar's time: the only line shown while the bar is dragged.
+     val barSeekIndex by remember(lyricLines) {
+-        derivedStateOf { barSeekPosition?.roundToInt()?.coerceIn(0, lyricLines.lastIndex) }
++        derivedStateOf { seekPreviewProviderState.value()?.let { lineIndexAt(lyricLines, it) } }
+     }
+     // 首次显示精确定位，后续切换使用动画滚动。
+     var hasSyncedInitialPosition by remember(lyricLines) { mutableStateOf(false) }
+@@ -623,8 +614,9 @@ fun LyricsUI(
+     val currentTimeState =
+         remember {
+             object : State<Long> {
++                // While the bar is dragged, the line (and its word highlight) shows the bar's time.
+                 override val value: Long
+-                    get() = currentTimeProviderState.value()
++                    get() = seekPreviewProviderState.value() ?: currentTimeProviderState.value()
+             }
+         }
+     // 滚动按时间表提前开始，逐字高亮仍使用真实时间。
+@@ -727,23 +719,18 @@ fun LyricsUI(
+                 }
+             }
+ 
+-            // Progress bar dragged: every frame the lyrics glide towards the bar's time (nothing is restarted
+-            // or animated per bar move), so they follow it as smoothly as a finger scroll.
++            // Progress bar dragged: only the line at the bar's time is shown, jumped to the current-line
++            // position. Nothing scrolls or animates, so it cannot lag behind the bar.
+             LaunchedEffect(isBarSeeking, lyricLines) {
+                 if (!isBarSeeking) return@LaunchedEffect
+                 hasSyncedInitialPosition = true
+-                val anchorPx = (playbackAnchorOffsetPx + keepAliveZonePx).roundToInt()
+-                var shown = barSeekPosition ?: return@LaunchedEffect
+-                var lastFrameNanos = withFrameNanos { it }
+-                while (true) {
+-                    val frameNanos = withFrameNanos { it }
+-                    val target = barSeekPosition ?: break
+-                    val dt = ((frameNanos - lastFrameNanos) / 1_000_000_000f).coerceIn(0.001f, 0.1f)
+-                    lastFrameNanos = frameNanos
+-                    shown += (target - shown) * (1f - kotlin.math.exp(-dt / BAR_SEEK_FOLLOW_SECONDS))
+-                    if (abs(target - shown) < 0.002f) shown = target
++                snapshotFlow { barSeekIndex }.collectLatest { index ->
++                    if (index == null) return@collectLatest
+                     isAutoScrolling = true
+-                    lazyListState.scrollToLyricPosition(position = shown, anchorOffsetPx = anchorPx)
++                    lazyListState.snapToLyricIndex(
++                        targetIndex = index,
++                        anchorOffsetPx = (playbackAnchorOffsetPx + keepAliveZonePx).roundToInt(),
++                    )
+                 }
+             }
+ 
+@@ -784,7 +771,9 @@ fun LyricsUI(
+                         index == highlightedIndex ||
+                             (!showSeekOverlay && !isBarSeeking && index in activeLineIndices)
+                     val distanceFromActive = if (isActive) 0 else calculateDistance(index, highlightedIndex)
+-                    val lineAlpha = calculateLineAlpha(distanceFromActive, styleSettings.unsungOpacity)
++                    // Bar dragged: every line except the one at the bar's time is hidden.
++                    val lineAlpha =
++                        if (isBarSeeking && !isActive) 0f else calculateLineAlpha(distanceFromActive, styleSettings.unsungOpacity)
+                     // 动画值仅在图层绘制阶段读取，避免动画期间重组可见行。
+                     val scaleState =
+                         animateFloatAsState(
+@@ -805,7 +794,7 @@ fun LyricsUI(
+                             label = "lyricAlpha",
+                             animationSpec =
+                                 if (isBarSeeking) {
+-                                    BarSeekAlphaSpec
++                                    if (isActive) ActiveAlphaSpec else snap()
+                                 } else if (distanceFromActive == 0) {
+                                     ActiveAlphaSpec
+                                 } else {
+@@ -821,7 +810,10 @@ fun LyricsUI(
+                         )
+ 
+                     val isBelowPlaying = playingIndex in lyricLines.indices && index > playingIndex
+-                    val jiggleLine = styleSettings.jiggleEnabled && isBelowPlaying && !isBarSeeking
++                    // Strength or duration at 0 means no jiggle at all.
++                    val jiggleLine =
++                        styleSettings.jiggleEnabled && isBelowPlaying && !isBarSeeking &&
++                            styleSettings.jiggleStrength > 0 && styleSettings.jiggleDurationMs > 0
+                     // Each jiggling line waits a little longer than the one above it; the wait levels off for far lines.
+                     val staggerDelayMillis =
+                         if (jiggleLine) jiggleDelayMillis(index - playingIndex, styleSettings.jiggleDelayMs) else 0
+@@ -2603,49 +2595,18 @@ private suspend fun LazyListState.syncToLyricIndex(
+     }
+ }
+ 
+-/** Scrolls at once so the fractional lyric position (4.5 = halfway between line 4 and 5) sits on the anchor. */
+-private suspend fun LazyListState.scrollToLyricPosition(
+-    position: Float,
+-    anchorOffsetPx: Int,
+-) {
+-    if (anchorOffsetPx < 0) return
+-    val base = floor(position).toInt().coerceAtLeast(0)
+-    val fraction = (position - base).coerceIn(0f, 1f)
+-    var current = layoutInfo.visibleItemsInfo.firstOrNull { it.index == base }
+-    if (current == null) {
+-        // Far from the visible lines: jump next to the target first, then fine-tune below.
+-        scrollToItem(base, -anchorOffsetPx)
+-        current =
+-            withTimeoutOrNull(500L) {
+-                snapshotFlow { layoutInfo.visibleItemsInfo.firstOrNull { it.index == base } }.first { it != null }
+-            } ?: return
+-    }
+-    val next = layoutInfo.visibleItemsInfo.firstOrNull { it.index == base + 1 }
+-    val step = if (next != null) next.offset - current.offset else current.size
+-    val itemOffset = current.offset + fraction * step
+-    val distance = itemOffset - (layoutInfo.viewportStartOffset + anchorOffsetPx)
+-    if (abs(distance) >= 0.5f) {
+-        scrollBy(distance)
+-    }
+-}
+-
+-/** Fractional line position at [timeMs]: 4.5 = halfway between line 4 and line 5. */
+-private fun lineFractionAt(
++/** Index of the line sung at [timeMs]: the last line that has started (the first line before any has). */
++private fun lineIndexAt(
+     lines: List<LyricItem>,
+     timeMs: Long,
+-): Float {
+-    if (lines.isEmpty() || timeMs <= lines.first().time) return 0f
++): Int {
+     var low = 0
+     var high = lines.lastIndex
+     while (low < high) {
+         val mid = (low + high + 1) / 2
+         if (lines[mid].time <= timeMs) low = mid else high = mid - 1
+     }
+-    if (low >= lines.lastIndex) return lines.lastIndex.toFloat()
+-    val start = lines[low].time
+-    val end = lines[low + 1].time
+-    val fraction = if (end > start) ((timeMs - start).toFloat() / (end - start)).coerceIn(0f, 1f) else 0f
+-    return low + fraction
++    return low
+ }
+ 
+ /** 将歌词时间格式化为分:秒。 */
+diff --git a/core-preferences/src/main/java/me/spica27/spicamusic/core/preferences/LyricsStyleSettings.kt b/core-preferences/src/main/java/me/spica27/spicamusic/core/preferences/LyricsStyleSettings.kt
+index 79f7049..942d929 100644
+--- a/core-preferences/src/main/java/me/spica27/spicamusic/core/preferences/LyricsStyleSettings.kt
++++ b/core-preferences/src/main/java/me/spica27/spicamusic/core/preferences/LyricsStyleSettings.kt
+@@ -147,8 +147,8 @@ data class LyricsStyleSettings(
+         val BLUR_RANGE = 0..200
+         val MOVE_RANGE = 200..1500
+         val POSITION_RANGE = 5..70
+-        val JIGGLE_STRENGTH_RANGE = 10..100
+-        val JIGGLE_DURATION_RANGE = 500..2500
++        val JIGGLE_STRENGTH_RANGE = 0..100
++        val JIGGLE_DURATION_RANGE = 0..2500
+         val JIGGLE_DELAY_RANGE = 0..150
+         val HEADER_ALBUM_RANGE = 40..96
+         val HEADER_TITLE_RANGE = 14..32
