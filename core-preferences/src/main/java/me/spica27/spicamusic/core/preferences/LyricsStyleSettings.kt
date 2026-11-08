@@ -147,8 +147,8 @@ data class LyricsStyleSettings(
         val BLUR_RANGE = 0..200
         val MOVE_RANGE = 200..1500
         val POSITION_RANGE = 5..70
-        val JIGGLE_STRENGTH_RANGE = 10..100
-        val JIGGLE_DURATION_RANGE = 500..2500
+        val JIGGLE_STRENGTH_RANGE = 0..100
+        val JIGGLE_DURATION_RANGE = 0..2500
         val JIGGLE_DELAY_RANGE = 0..150
         val HEADER_ALBUM_RANGE = 40..96
         val HEADER_TITLE_RANGE = 14..32
