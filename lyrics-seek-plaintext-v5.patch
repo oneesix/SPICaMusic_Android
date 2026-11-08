@@ -1,0 +1,203 @@
+diff --git a/app/src/main/java/me/spica27/spicamusic/ui/widget/LyricUI.kt b/app/src/main/java/me/spica27/spicamusic/ui/widget/LyricUI.kt
+index 574529c..d2c1ec3 100644
+--- a/app/src/main/java/me/spica27/spicamusic/ui/widget/LyricUI.kt
++++ b/app/src/main/java/me/spica27/spicamusic/ui/widget/LyricUI.kt
+@@ -5,7 +5,6 @@ import androidx.compose.animation.core.CubicBezierEasing
+ import androidx.compose.animation.EnterExitState
+ import androidx.compose.animation.core.animateFloat
+ import androidx.compose.animation.core.animateFloatAsState
+-import androidx.compose.animation.core.snap
+ import androidx.compose.animation.core.tween
+ import androidx.compose.animation.expandVertically
+ import androidx.compose.animation.fadeIn
+@@ -249,9 +248,6 @@ private val ActiveAlphaSpec = tween<Float>(durationMillis = 0)
+ private val InactiveAlphaSpec = tween<Float>(durationMillis = 450, easing = LyricLineAlphaEasing)
+ private val LineBlurSpec = tween<Float>(durationMillis = 450, easing = LyricLineAlphaEasing)
+ 
+-// While the progress bar is dragged the lines change look quickly so they keep up with the bar.
+-private val BarSeekScaleSpec = tween<Float>(durationMillis = 140, easing = LyricLineScaleEasing)
+-
+ /** Delay of a jiggling line `distanceBelow` lines under the current one: grows per line, easing off for far lines. */
+ private fun jiggleDelayMillis(
+     distanceBelow: Int,
+@@ -614,9 +610,12 @@ fun LyricsUI(
+     val currentTimeState =
+         remember {
+             object : State<Long> {
+-                // While the bar is dragged, the line (and its word highlight) shows the bar's time.
++                // While the progress bar is dragged the lyrics clock stands still, so no line does any
++                // word-by-word or progress work for a moving bar (and nothing is invalidated every frame).
++                private var lastLiveTime = 0L
++
+                 override val value: Long
+-                    get() = seekPreviewProviderState.value() ?: currentTimeProviderState.value()
++                    get() = if (isBarSeekingState.value) lastLiveTime else currentTimeProviderState.value().also { lastLiveTime = it }
+             }
+         }
+     // 滚动按时间表提前开始，逐字高亮仍使用真实时间。
+@@ -719,22 +718,7 @@ fun LyricsUI(
+                 }
+             }
+ 
+-            // Progress bar dragged: only the line at the bar's time is shown, jumped to the current-line
+-            // position. Nothing scrolls or animates, so it cannot lag behind the bar.
+-            LaunchedEffect(isBarSeeking, lyricLines) {
+-                if (!isBarSeeking) return@LaunchedEffect
+-                hasSyncedInitialPosition = true
+-                snapshotFlow { barSeekIndex }.collectLatest { index ->
+-                    if (index == null) return@collectLatest
+-                    isAutoScrolling = true
+-                    lazyListState.snapToLyricIndex(
+-                        targetIndex = index,
+-                        anchorOffsetPx = (playbackAnchorOffsetPx + keepAliveZonePx).roundToInt(),
+-                    )
+-                }
+-            }
+-
+-            val highlightedIndex = barSeekIndex ?: if (showSeekOverlay) previewIndex else playingIndex
++            val highlightedIndex = if (showSeekOverlay) previewIndex else playingIndex
+             // 当前行切换时长及下方各行的错峰延迟。
+             val lineMoveDurationMillis = styleSettings.moveDurationMs
+ 
+@@ -742,6 +726,8 @@ fun LyricsUI(
+                 modifier =
+                     Modifier
+                         .fillMaxSize()
++                        // Hidden (not drawn) while the bar is dragged: only the plain line below shows.
++                        .graphicsLayer { alpha = if (isBarSeekingState.value) 0f else 1f }
+                         .clipToBounds()
+                         .layout { measurable, constraints ->
+                             val extraHeightPx = (keepAliveZone * 2).roundToPx()
+@@ -769,50 +755,33 @@ fun LyricsUI(
+                 ) { index, line ->
+                     val isActive =
+                         index == highlightedIndex ||
+-                            (!showSeekOverlay && !isBarSeeking && index in activeLineIndices)
++                            (!showSeekOverlay && index in activeLineIndices)
+                     val distanceFromActive = if (isActive) 0 else calculateDistance(index, highlightedIndex)
+-                    // Bar dragged: every line except the one at the bar's time is hidden.
+-                    val lineAlpha =
+-                        if (isBarSeeking && !isActive) 0f else calculateLineAlpha(distanceFromActive, styleSettings.unsungOpacity)
++                    val lineAlpha = calculateLineAlpha(distanceFromActive, styleSettings.unsungOpacity)
+                     // 动画值仅在图层绘制阶段读取，避免动画期间重组可见行。
+                     val scaleState =
+                         animateFloatAsState(
+                             targetValue = if (distanceFromActive == 0) style.activeScale else LyricUIConstants.INACTIVE_SCALE,
+                             label = "lyricScale",
+-                            animationSpec =
+-                                if (isBarSeeking) {
+-                                    BarSeekScaleSpec
+-                                } else if (distanceFromActive == 0) {
+-                                    ActiveScaleSpec
+-                                } else {
+-                                    InactiveScaleSpec
+-                                },
++                            animationSpec = if (distanceFromActive == 0) ActiveScaleSpec else InactiveScaleSpec,
+                         )
+                     val alphaState =
+                         animateFloatAsState(
+                             targetValue = lineAlpha,
+                             label = "lyricAlpha",
+-                            animationSpec =
+-                                if (isBarSeeking) {
+-                                    if (isActive) ActiveAlphaSpec else snap()
+-                                } else if (distanceFromActive == 0) {
+-                                    ActiveAlphaSpec
+-                                } else {
+-                                    InactiveAlphaSpec
+-                                },
++                            animationSpec = if (distanceFromActive == 0) ActiveAlphaSpec else InactiveAlphaSpec,
+                         )
+                     val blurRadius by
+                         animateFloatAsState(
+-                            // No blur at all while the progress bar is dragged.
+-                            targetValue = if (isBarSeeking) 0f else calculateBlurDp(distanceFromActive, styleSettings.blur),
+-                            animationSpec = if (isBarSeeking) snap() else LineBlurSpec,
++                            targetValue = calculateBlurDp(distanceFromActive, styleSettings.blur),
++                            animationSpec = LineBlurSpec,
+                             label = "lyricBlur",
+                         )
+ 
+                     val isBelowPlaying = playingIndex in lyricLines.indices && index > playingIndex
+                     // Strength or duration at 0 means no jiggle at all.
+                     val jiggleLine =
+-                        styleSettings.jiggleEnabled && isBelowPlaying && !isBarSeeking &&
++                        styleSettings.jiggleEnabled && isBelowPlaying &&
+                             styleSettings.jiggleStrength > 0 && styleSettings.jiggleDurationMs > 0
+                     // Each jiggling line waits a little longer than the one above it; the wait levels off for far lines.
+                     val staggerDelayMillis =
+@@ -831,8 +800,7 @@ fun LyricsUI(
+                         Modifier.linePlacement(
+                             lookaheadScope = this@LookaheadScope,
+                             itemKey = line.key,
+-                            // Dragging the progress bar: lines stick to the scroll, like a finger scroll.
+-                            isManualScrolling = isManualScrolling || isBarSeeking,
++                            isManualScrolling = isManualScrolling,
+                             durationMillis = lineMoveDurationMillis,
+                             delayMillis = staggerDelayMillis,
+                             jiggle = if (jiggleLine) jiggleSpec else null,
+@@ -908,6 +876,15 @@ fun LyricsUI(
+                 }
+             }
+ 
++            if (isBarSeeking) {
++                BarSeekLine(
++                    lines = lyricLines,
++                    indexProvider = { barSeekIndex },
++                    style = style,
++                    modifier = Modifier.padding(top = with(density) { playbackAnchorOffsetPx.toDp() }),
++                )
++            }
++
+             if (showSeekOverlay) {
+                 Box(
+                     modifier =
+@@ -939,6 +916,48 @@ fun LyricsUI(
+ 
+ // ==================== 辅助组件 ====================
+ 
++/**
++ * Shown while the progress bar is dragged: the plain text of the line at the bar's time with its
++ * timestamp below. No word progress, blur, scale or fade, so dragging stays light.
++ */
++@Composable
++private fun BarSeekLine(
++    lines: List<LyricItem>,
++    indexProvider: () -> Int?,
++    style: LyricsUIStyle,
++    modifier: Modifier = Modifier,
++) {
++    val line = indexProvider()?.let { lines.getOrNull(it) } ?: return
++    val text =
++        when {
++            line.isInterlude() -> "\u2022 \u2022 \u2022"
++            line is LyricItem.WordsLyric ->
++                line.content?.takeIf { it.isNotBlank() } ?: line.words.joinToString(separator = "") { it.content }
++            line is LyricItem.NormalLyric -> line.content
++            else -> ""
++        }
++    val color = MaterialTheme.colorScheme.onSurface
++    Column(
++        modifier =
++            modifier
++                .fillMaxWidth()
++                .padding(horizontal = LyricUIConstants.SEEK_PREVIEW_END_PADDING.dp)
++                .padding(horizontal = style.horizontalPadding, vertical = style.verticalPadding),
++    ) {
++        Text(
++            text = text,
++            style = if (line is LyricItem.WordsLyric) style.wordsTextStyle else style.mainTextStyle,
++            color = color,
++        )
++        Text(
++            text = formatLyricTime(line.time),
++            style = MaterialTheme.typography.labelMedium,
++            color = color.copy(alpha = 0.6f),
++            modifier = Modifier.padding(top = 4.dp),
++        )
++    }
++}
++
+ /** 展示无时间戳的纯文本歌词。 */
+ @Composable
+ private fun PlainLyricsList(
