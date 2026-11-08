@@ -591,6 +591,9 @@ fun ExpandedPlayerScreen(
                             seekPositionProvider = {
                                 if (animationsEnabled) seekValueState.floatValue else positionHolder.seekPosition
                             },
+                            seekPreviewTimeProvider = {
+                                if (isSeekingState) seekValueState.floatValue.toLong() else null
+                            },
                             durationMs = duration,
                             onSeekChange = {
                                 isSeekingState = true

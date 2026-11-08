@@ -59,6 +59,8 @@ fun LyricsPanel(
     toolbarBottomInset: Dp = 0.dp,
     /** false: the host (e.g. the fullscreen lyrics header) shows the toolbar and settings itself. */
     showToolbar: Boolean = true,
+    /** Time (ms) the progress bar is dragged to, or null when not dragging. The lyrics follow it. */
+    seekPreviewTimeProvider: () -> Long? = { null },
 ) {
     // Activity 作用域共享实例：与 mini 歌词同源，
     // 此处切换歌词源 / 调整偏移量会同步反映到 mini 歌词
@@ -144,6 +146,9 @@ fun LyricsPanel(
                     isSynced = displayed.isSynced,
                     onSeekToTime = { posMs ->
                         viewModel.seekTo(posMs - uiState.lyricsOffsetMs)
+                    },
+                    seekPreviewTimeProvider = {
+                        seekPreviewTimeProvider()?.let { it + lyricsOffsetState.value }
                     },
                 )
             }

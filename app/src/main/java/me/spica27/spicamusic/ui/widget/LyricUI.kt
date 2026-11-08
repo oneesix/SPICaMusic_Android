@@ -2,9 +2,11 @@ package me.spica27.spicamusic.ui.widget
 
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.CubicBezierEasing
+import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.EnterExitState
 import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.snap
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.expandVertically
 import androidx.compose.animation.fadeIn
@@ -16,6 +18,7 @@ import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
+import androidx.compose.foundation.gestures.animateScrollBy
 import androidx.compose.foundation.gestures.scrollBy
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -114,6 +117,7 @@ import me.spica27.spicamusic.core.preferences.TransliterationPosition
 import me.spica27.spicamusic.ui.theme.Shapes
 import java.util.Locale
 import kotlin.math.abs
+import kotlin.math.floor
 import kotlin.math.max
 import kotlin.math.min
 import kotlin.math.roundToInt
@@ -564,6 +568,8 @@ fun LyricsUI(
     styleSettings: LyricsStyleSettings = LyricsStyleSettings(),
     isSynced: Boolean = true,
     onSeekToTime: (Long) -> Unit = {},
+    /** Time the player's progress bar is dragged to (null = not dragging). The lyrics follow it. */
+    seekPreviewTimeProvider: () -> Long? = { null },
 ) {
     val sortedLines = remember(lyric) { lyric.sortedBy { it.time } }
 
@@ -593,6 +599,17 @@ fun LyricsUI(
         derivedStateOf { lazyListState.isScrollInProgress && !isAutoScrolling }
     }
     var showSeekOverlay by remember { mutableStateOf(false) }
+    // While the progress bar is dragged the lyrics follow the bar's time instead of the player's.
+    val seekPreviewProviderState = rememberUpdatedState(seekPreviewTimeProvider)
+    val isBarSeekingState = remember { derivedStateOf { seekPreviewProviderState.value() != null } }
+    val isBarSeeking by isBarSeekingState
+    // Fractional line position of the bar's time: 4.5 = halfway between line 4 and line 5.
+    val barSeekPosition by remember(lyricLines) {
+        derivedStateOf { seekPreviewProviderState.value()?.let { lineFractionAt(lyricLines, it) } }
+    }
+    val barSeekIndex by remember(lyricLines) {
+        derivedStateOf { barSeekPosition?.roundToInt()?.coerceIn(0, lyricLines.lastIndex) }
+    }
     // 首次显示精确定位，后续切换使用动画滚动。
     var hasSyncedInitialPosition by remember(lyricLines) { mutableStateOf(false) }
     // 将时间读取延后到派生状态和绘制阶段，避免驱动整个组件重组。
@@ -646,6 +663,8 @@ fun LyricsUI(
 
     LaunchedEffect(lazyListState) {
         snapshotFlow { lazyListState.isScrollInProgress }.collectLatest { inProgress ->
+            // The progress bar drives the scrolling while it is dragged: not a manual scroll.
+            if (isBarSeekingState.value) return@collectLatest
             if (inProgress && !isAutoScrolling) {
                 // 用户手动定位后，后续切换直接使用动画滚动。
                 hasSyncedInitialPosition = true
@@ -677,9 +696,9 @@ fun LyricsUI(
                 }
             val keepAliveZonePx = with(density) { keepAliveZone.toPx() }
 
-            LaunchedEffect(playingIndex, showSeekOverlay, lyricLines) {
+            LaunchedEffect(playingIndex, showSeekOverlay, isBarSeeking, lyricLines) {
                 val target = playingIndex
-                if (showSeekOverlay || target == Int.MAX_VALUE || target !in lyricLines.indices) {
+                if (showSeekOverlay || isBarSeeking || target == Int.MAX_VALUE || target !in lyricLines.indices) {
                     return@LaunchedEffect
                 }
                 isAutoScrolling = true
@@ -702,7 +721,21 @@ fun LyricsUI(
                 }
             }
 
-            val highlightedIndex = if (showSeekOverlay) previewIndex else playingIndex
+            // Progress bar dragged: scroll the lyrics to the bar's time, smoothly and continuously.
+            LaunchedEffect(isBarSeeking, lyricLines) {
+                if (!isBarSeeking) return@LaunchedEffect
+                hasSyncedInitialPosition = true
+                snapshotFlow { barSeekPosition }.collectLatest { position ->
+                    if (position == null) return@collectLatest
+                    isAutoScrolling = true
+                    lazyListState.scrollToLyricPosition(
+                        position = position,
+                        anchorOffsetPx = (playbackAnchorOffsetPx + keepAliveZonePx).roundToInt(),
+                    )
+                }
+            }
+
+            val highlightedIndex = barSeekIndex ?: if (showSeekOverlay) previewIndex else playingIndex
             // 当前行切换时长及下方各行的错峰延迟。
             val lineMoveDurationMillis = styleSettings.moveDurationMs
 
@@ -737,7 +770,7 @@ fun LyricsUI(
                 ) { index, line ->
                     val isActive =
                         index == highlightedIndex ||
-                            (!showSeekOverlay && index in activeLineIndices)
+                            (!showSeekOverlay && !isBarSeeking && index in activeLineIndices)
                     val distanceFromActive = if (isActive) 0 else calculateDistance(index, highlightedIndex)
                     val lineAlpha = calculateLineAlpha(distanceFromActive, styleSettings.unsungOpacity)
                     // 动画值仅在图层绘制阶段读取，避免动画期间重组可见行。
@@ -755,13 +788,14 @@ fun LyricsUI(
                         )
                     val blurRadius by
                         animateFloatAsState(
-                            targetValue = calculateBlurDp(distanceFromActive, styleSettings.blur),
-                            animationSpec = LineBlurSpec,
+                            // No blur at all while the progress bar is dragged.
+                            targetValue = if (isBarSeeking) 0f else calculateBlurDp(distanceFromActive, styleSettings.blur),
+                            animationSpec = if (isBarSeeking) snap() else LineBlurSpec,
                             label = "lyricBlur",
                         )
 
                     val isBelowPlaying = playingIndex in lyricLines.indices && index > playingIndex
-                    val jiggleLine = styleSettings.jiggleEnabled && isBelowPlaying
+                    val jiggleLine = styleSettings.jiggleEnabled && isBelowPlaying && !isBarSeeking
                     // Each jiggling line waits a little longer than the one above it; the wait levels off for far lines.
                     val staggerDelayMillis =
                         if (jiggleLine) jiggleDelayMillis(index - playingIndex, styleSettings.jiggleDelayMs) else 0
@@ -779,7 +813,8 @@ fun LyricsUI(
                         Modifier.linePlacement(
                             lookaheadScope = this@LookaheadScope,
                             itemKey = line.key,
-                            isManualScrolling = isManualScrolling,
+                            // Dragging the progress bar: lines stick to the scroll, like a finger scroll.
+                            isManualScrolling = isManualScrolling || isBarSeeking,
                             durationMillis = lineMoveDurationMillis,
                             delayMillis = staggerDelayMillis,
                             jiggle = if (jiggleLine) jiggleSpec else null,
@@ -2540,6 +2575,51 @@ private suspend fun LazyListState.syncToLyricIndex(
             scrollBy(residual)
         }
     }
+}
+
+/** Smoothly scrolls so the fractional lyric position (4.5 = halfway between line 4 and 5) sits on the anchor. */
+private suspend fun LazyListState.scrollToLyricPosition(
+    position: Float,
+    anchorOffsetPx: Int,
+) {
+    if (anchorOffsetPx < 0) return
+    val base = floor(position).toInt().coerceAtLeast(0)
+    val fraction = (position - base).coerceIn(0f, 1f)
+    var current = layoutInfo.visibleItemsInfo.firstOrNull { it.index == base }
+    if (current == null) {
+        // Far from the visible lines: jump next to the target first, then fine-tune below.
+        scrollToItem(base, -anchorOffsetPx)
+        current =
+            withTimeoutOrNull(500L) {
+                snapshotFlow { layoutInfo.visibleItemsInfo.firstOrNull { it.index == base } }.first { it != null }
+            } ?: return
+    }
+    val next = layoutInfo.visibleItemsInfo.firstOrNull { it.index == base + 1 }
+    val step = if (next != null) next.offset - current.offset else current.size
+    val itemOffset = current.offset + fraction * step
+    val distance = itemOffset - (layoutInfo.viewportStartOffset + anchorOffsetPx)
+    if (abs(distance) >= 0.5f) {
+        animateScrollBy(distance, tween(durationMillis = 90, easing = LinearEasing))
+    }
+}
+
+/** Fractional line position at [timeMs]: 4.5 = halfway between line 4 and line 5. */
+private fun lineFractionAt(
+    lines: List<LyricItem>,
+    timeMs: Long,
+): Float {
+    if (lines.isEmpty() || timeMs <= lines.first().time) return 0f
+    var low = 0
+    var high = lines.lastIndex
+    while (low < high) {
+        val mid = (low + high + 1) / 2
+        if (lines[mid].time <= timeMs) low = mid else high = mid - 1
+    }
+    if (low >= lines.lastIndex) return lines.lastIndex.toFloat()
+    val start = lines[low].time
+    val end = lines[low + 1].time
+    val fraction = if (end > start) ((timeMs - start).toFloat() / (end - start)).coerceIn(0f, 1f) else 0f
+    return low + fraction
 }
 
 /** 将歌词时间格式化为分:秒。 */

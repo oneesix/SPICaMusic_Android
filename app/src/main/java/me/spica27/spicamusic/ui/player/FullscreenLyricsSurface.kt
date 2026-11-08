@@ -100,9 +100,11 @@ internal fun FullscreenLyricsSurface(
     /** Album name (shown in upper case) and release year (year only) in the artist line. */
     album: String?,
     releaseYear: Int?,
-    /** true while the progress bar is being dragged: the title turns into the time. */
+    /** true while the progress bar is being dragged: the artist line turns into "Seeking". */
     isSeeking: Boolean,
     seekPositionProvider: () -> Float,
+    /** Time (ms) the bar is dragged to, or null when not dragging: the lyrics follow it. */
+    seekPreviewTimeProvider: () -> Long?,
     durationMs: Long,
     onSeekChange: (Float) -> Unit,
     onSeekFinished: () -> Unit,
@@ -147,6 +149,7 @@ internal fun FullscreenLyricsSurface(
             toolbarBottomInset = LyricsToolbarBottomInset,
             // 工具栏已移到顶栏右侧（三点按钮）
             showToolbar = false,
+            seekPreviewTimeProvider = seekPreviewTimeProvider,
         )
 
         // Blur layer behind the header: strong behind the whole header, then it fades out softly
@@ -218,7 +221,7 @@ private fun FullscreenLyricsHeader(
     /** Album name (shown in upper case) and release year (year only) in the artist line. */
     album: String?,
     releaseYear: Int?,
-    /** true while the progress bar is being dragged: the title turns into the time. */
+    /** true while the progress bar is being dragged: the artist line turns into "Seeking". */
     isSeeking: Boolean,
     seekPositionProvider: () -> Float,
     durationMs: Long,
@@ -322,47 +325,39 @@ private fun FullscreenLyricsHeader(
                         modifier = Modifier.weight(1f),
                         horizontalAlignment = Alignment.CenterHorizontally,
                     ) {
-                        // While the progress bar is dragged the title shows the time instead.
+                        Text(
+                            text = title,
+                            style = MaterialTheme.typography.titleLarge,
+                            fontSize = titleSize,
+                            lineHeight = titleSize * 1.25f,
+                            fontWeight = FontWeight.Bold,
+                            textAlign = TextAlign.Center,
+                            color = MaterialTheme.colorScheme.onSurface,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                            modifier = Modifier.fillMaxWidth(),
+                        )
+                        Spacer(modifier = Modifier.height(2.dp))
+                        // While the progress bar is dragged the artist line shows "Seeking" (same size).
                         AnimatedContent(
                             targetState = isSeeking,
                             modifier = Modifier.fillMaxWidth(),
                             contentAlignment = Alignment.Center,
                             transitionSpec = { fadeIn(tween(160)) togetherWith fadeOut(tween(120)) },
-                            label = "lyrics_title_or_time",
+                            label = "lyrics_info_or_seeking",
                         ) { seeking ->
-                            if (seeking) {
-                                LyricsSeekTimeText(
-                                    seekPositionProvider = seekPositionProvider,
-                                    durationMs = durationMs,
-                                    fontSize = titleSize,
-                                )
-                            } else {
-                                Text(
-                                    text = title,
-                                    style = MaterialTheme.typography.titleLarge,
-                                    fontSize = titleSize,
-                                    lineHeight = titleSize * 1.25f,
-                                    fontWeight = FontWeight.Bold,
-                                    textAlign = TextAlign.Center,
-                                    color = MaterialTheme.colorScheme.onSurface,
-                                    maxLines = 1,
-                                    overflow = TextOverflow.Ellipsis,
-                                    modifier = Modifier.fillMaxWidth(),
-                                )
-                            }
+                            Text(
+                                text = if (seeking) stringResource(R.string.lyrics_seeking) else infoLine,
+                                style = MaterialTheme.typography.bodyMedium,
+                                fontSize = artistSize,
+                                lineHeight = artistSize * 1.3f,
+                                textAlign = TextAlign.Center,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                                modifier = Modifier.fillMaxWidth(),
+                            )
                         }
-                        Spacer(modifier = Modifier.height(2.dp))
-                        Text(
-                            text = infoLine,
-                            style = MaterialTheme.typography.bodyMedium,
-                            fontSize = artistSize,
-                            lineHeight = artistSize * 1.3f,
-                            textAlign = TextAlign.Center,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis,
-                                    modifier = Modifier.fillMaxWidth(),
-                        )
                     }
                     dotsButton()
                 }
