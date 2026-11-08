@@ -1,0 +1,68 @@
+diff --git a/app/src/main/java/me/spica27/spicamusic/ui/player/ExpandedPlayerScreen.kt b/app/src/main/java/me/spica27/spicamusic/ui/player/ExpandedPlayerScreen.kt
+index 970c75b..21f6c33 100644
+--- a/app/src/main/java/me/spica27/spicamusic/ui/player/ExpandedPlayerScreen.kt
++++ b/app/src/main/java/me/spica27/spicamusic/ui/player/ExpandedPlayerScreen.kt
+@@ -383,6 +383,13 @@ fun ExpandedPlayerScreen(
+     val pagerState = rememberPagerState(initialPage = initialPage, pageCount = { PAGE_COUNT })
+     val amplitudeCache = remember { linkedMapOf<String, List<Int>>() }
+ 
++    // The player page plays its "expand" enter animation only the first time. Coming back from the lyrics it is
++    // simply there, so the slide is the only animation.
++    var playerPageRevealedOnce by remember { mutableStateOf(false) }
++    LaunchedEffect(isPlayerPageRevealed) {
++        if (isPlayerPageRevealed) playerPageRevealedOnce = true
++    }
++
+     // 0 = player, 1 = lyrics. The lyrics slide in from the right; the swipes drive the same value.
+     val surfaceProgress = remember { Animatable(if (playerSurface == PlayerSurface.Lyrics) 1f else 0f) }
+     var surfaceWidthPx by remember { mutableFloatStateOf(0f) }
+@@ -566,6 +573,7 @@ fun ExpandedPlayerScreen(
+                                         visible = isPlayerPageRevealed,
+                                         delayMillis = 225,
+                                         enter = Nav3Transitions.expand().targetContentEnter,
++                                        skipFirstEnter = playerPageRevealedOnce,
+                                     ) {
+                                         PlayerPage(
+                                             playerViewModel = viewModel,
+diff --git a/app/src/main/java/me/spica27/spicamusic/ui/widget/LyricUI.kt b/app/src/main/java/me/spica27/spicamusic/ui/widget/LyricUI.kt
+index d2c1ec3..b3f51c5 100644
+--- a/app/src/main/java/me/spica27/spicamusic/ui/widget/LyricUI.kt
++++ b/app/src/main/java/me/spica27/spicamusic/ui/widget/LyricUI.kt
+@@ -684,7 +684,6 @@ fun LyricsUI(
+             val selectionPadding = with(density) { constraints.maxHeight.toDp() / 2 }
+             val playbackAnchorOffsetPx =
+                 constraints.maxHeight * (styleSettings.currentLinePosition / 100f)
+-            val bottomFlyInOffsetPx = with(density) { LyricUIConstants.BOTTOM_FLY_IN_OFFSET.roundToPx() }
+             val keepAliveZone = LyricUIConstants.KEEP_ALIVE_ZONE
+             // Jiggle: lines below the current one spring into place (Lyrics settings > Jiggle effect).
+             val jiggleSpec =
+@@ -804,8 +803,8 @@ fun LyricsUI(
+                             durationMillis = lineMoveDurationMillis,
+                             delayMillis = staggerDelayMillis,
+                             jiggle = if (jiggleLine) jiggleSpec else null,
+-                            initialOffsetY =
+-                                if (index > playingIndex) bottomFlyInOffsetPx else 0,
++                            // No fly-in from the bottom: the page slide is the only opening animation.
++                            initialOffsetY = 0,
+                         )
+ 
+                     if (line.isInterlude()) {
+diff --git a/app/src/main/java/me/spica27/spicamusic/ui/widget/ShowOnIdleContent.kt b/app/src/main/java/me/spica27/spicamusic/ui/widget/ShowOnIdleContent.kt
+index aa7717c..9a1a803 100644
+--- a/app/src/main/java/me/spica27/spicamusic/ui/widget/ShowOnIdleContent.kt
++++ b/app/src/main/java/me/spica27/spicamusic/ui/widget/ShowOnIdleContent.kt
+@@ -44,11 +44,13 @@ fun ShowOnIdleContent(
+     enter: EnterTransition = fadeIn(),
+     exit: ExitTransition = fadeOut(),
+     label: String = "AnimatedVisibility",
++    /** Already visible on the first frame (no enter animation) when [visible]: for content shown again. */
++    skipFirstEnter: Boolean = false,
+     content:
+         @Composable()
+         AnimatedVisibilityScope.() -> Unit,
+ ) {
+-    var showState by remember { mutableStateOf(false) }
++    var showState by remember { mutableStateOf(skipFirstEnter && visible) }
+ 
+     DisposableEffect(visible) {
+         val handler = Handler(Looper.getMainLooper())
