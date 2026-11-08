@@ -114,6 +114,8 @@ internal fun FullscreenLyricsSurface(
     onPreviousClick: () -> Unit,
     onNextClick: () -> Unit,
     modifier: Modifier = Modifier,
+    /** Extra modifier on the top bar (a swipe there goes back to the player). */
+    headerModifier: Modifier = Modifier,
 ) {
     val styleViewModel: LyricsStyleViewModel = koinActivityViewModel()
     val style by styleViewModel.style.collectAsStateWithLifecycle()
@@ -179,7 +181,7 @@ internal fun FullscreenLyricsSurface(
             onSeekFinished = onSeekFinished,
             progressAnimationsEnabled = progressAnimationsEnabled,
             onBarHeightChange = { barHeightPx = it },
-            modifier = Modifier.align(Alignment.TopCenter),
+            modifier = Modifier.align(Alignment.TopCenter).then(headerModifier),
         )
 
         // Bottom bar, "spread" blur: one blur layer behind the whole bar that fades out above it.

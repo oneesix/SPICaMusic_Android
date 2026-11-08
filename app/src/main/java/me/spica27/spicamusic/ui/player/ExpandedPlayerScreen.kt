@@ -7,6 +7,8 @@ import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.ContentTransform
 import androidx.compose.animation.animateContentSize
+import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.AnimationVector1D
 import androidx.compose.animation.core.EaseOutCubic
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateFloatAsState
@@ -20,6 +22,7 @@ import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
 import androidx.compose.foundation.basicMarquee
 import androidx.compose.foundation.gestures.Orientation
+import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.Arrangement
@@ -74,15 +77,23 @@ import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawWithContent
+import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.BlendMode
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.CompositingStrategy
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.luminance
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontWeight
@@ -156,6 +167,7 @@ const val DEFAULT_PAGE = 0
 const val QUEUE_PAGE = 1
 private const val PLAYER_SURFACE_ENTER_DURATION_MILLIS = 240
 private const val PLAYER_SURFACE_EXIT_DURATION_MILLIS = 160
+private const val SURFACE_SLIDE_DURATION_MILLIS = 420
 private const val HERO_REVEAL_THRESHOLD = 0.08f
 private const val META_REVEAL_THRESHOLD = 0.18f
 private const val MINI_LYRIC_REVEAL_THRESHOLD = 0.24f
@@ -168,6 +180,53 @@ private val EmptyFftDrawData = FloatArray(0)
 private enum class PlayerSurface {
     Player,
     Lyrics,
+}
+
+/**
+ * Horizontal swipe that drives the player/lyrics slide; the page follows the finger.
+ * [fromLyrics] = false (album cover): swipe right to left opens the lyrics; let go past a third to open.
+ * [fromLyrics] = true (lyrics top bar): swipe right to left (past a quarter of the width) or left to right
+ * (follows the finger) goes back to the player.
+ */
+@Composable
+private fun Modifier.surfaceSwipe(
+    fromLyrics: Boolean,
+    widthPx: () -> Float,
+    progress: Animatable<Float, AnimationVector1D>,
+    onSettle: (PlayerSurface) -> Unit,
+): Modifier {
+    val scope = rememberCoroutineScope()
+    val currentOnSettle by rememberUpdatedState(onSettle)
+    return pointerInput(fromLyrics) {
+        var dragX = 0f
+
+        fun progressFor(dx: Float): Float {
+            val w = widthPx().coerceAtLeast(1f)
+            return if (fromLyrics) 1f - (dx / w).coerceIn(0f, 1f) else (-dx / w).coerceIn(0f, 1f)
+        }
+        detectHorizontalDragGestures(
+            onDragStart = { dragX = 0f },
+            onDragEnd = {
+                val w = widthPx().coerceAtLeast(1f)
+                val toLyrics =
+                    if (fromLyrics) {
+                        !((dragX < 0f && -dragX > w * 0.25f) || (dragX > 0f && progressFor(dragX) < 0.67f))
+                    } else {
+                        progressFor(dragX) > 0.33f
+                    }
+                currentOnSettle(if (toLyrics) PlayerSurface.Lyrics else PlayerSurface.Player)
+            },
+            onDragCancel = {
+                currentOnSettle(if (fromLyrics) PlayerSurface.Lyrics else PlayerSurface.Player)
+            },
+            onHorizontalDrag = { change, dragAmount ->
+                change.consume()
+                dragX += dragAmount
+                val p = progressFor(dragX)
+                scope.launch { progress.snapTo(p) }
+            },
+        )
+    }
 }
 
 private fun playerSurfaceTransform(reducedMotion: Boolean): ContentTransform =
@@ -324,6 +383,34 @@ fun ExpandedPlayerScreen(
     val pagerState = rememberPagerState(initialPage = initialPage, pageCount = { PAGE_COUNT })
     val amplitudeCache = remember { linkedMapOf<String, List<Int>>() }
 
+    // 0 = player, 1 = lyrics. The lyrics slide in from the right; the swipes drive the same value.
+    val surfaceProgress = remember { Animatable(if (playerSurface == PlayerSurface.Lyrics) 1f else 0f) }
+    var surfaceWidthPx by remember { mutableFloatStateOf(0f) }
+    val playerLayerVisible by remember { derivedStateOf { surfaceProgress.value < 0.999f } }
+    val lyricsLayerVisible by remember { derivedStateOf { surfaceProgress.value > 0.001f } }
+    val surfaceReducedMotion = LocalReducedMotion.current
+    LaunchedEffect(playerSurface) {
+        val target = if (playerSurface == PlayerSurface.Lyrics) 1f else 0f
+        if (surfaceReducedMotion) {
+            surfaceProgress.snapTo(target)
+        } else {
+            surfaceProgress.animateTo(target, tween(durationMillis = SURFACE_SLIDE_DURATION_MILLIS, easing = EaseOutCubic))
+        }
+    }
+    // A finished swipe: change the surface, or slide back if it stays the same (cancelled swipe).
+    val settleSurface: (PlayerSurface) -> Unit = { target ->
+        if (playerSurface == target) {
+            coroutineScope.launch {
+                surfaceProgress.animateTo(
+                    if (target == PlayerSurface.Lyrics) 1f else 0f,
+                    tween(durationMillis = SURFACE_SLIDE_DURATION_MILLIS, easing = EaseOutCubic),
+                )
+            }
+        } else {
+            playerSurface = target
+        }
+    }
+
     BackHandler(isFullyExpanded && animationsEnabled) {
         when {
             playerSurface == PlayerSurface.Lyrics -> playerSurface = PlayerSurface.Player
@@ -435,18 +522,25 @@ fun ExpandedPlayerScreen(
                 )
             }
 
-            // 播放器与全屏歌词是同一播放器容器中的两种前景模式，而非两个导航目的地。
-            AnimatedContent(
-                targetState = playerSurface,
-                modifier = Modifier.fillMaxSize(),
-                transitionSpec = {
-                    Nav3Transitions.zoom()
-                },
-                contentKey = { it },
-                label = "playerSurface",
-            ) { surface ->
-                when (surface) {
-                    PlayerSurface.Player -> {
+            // Player and lyrics are two layers of one container. A single progress value slides them: the
+            // lyrics come in from the right (0 = player, 1 = lyrics); the swipes drive the same value.
+            Box(
+                modifier =
+                    Modifier
+                        .fillMaxSize()
+                        .onSizeChanged { surfaceWidthPx = it.width.toFloat() },
+            ) {
+                if (playerLayerVisible) {
+                    Box(
+                        modifier =
+                            Modifier
+                                .fillMaxSize()
+                                .graphicsLayer {
+                                    val p = surfaceProgress.value
+                                    translationX = -p * size.width * 0.28f
+                                    alpha = 1f - 0.6f * p
+                                },
+                    ) {
                         VerticalPager(
                             modifier = Modifier.fillMaxSize(),
                             state = pagerState,
@@ -532,6 +626,13 @@ fun ExpandedPlayerScreen(
                                             animationsEnabled = animationsEnabled,
                                             amplitudeCache = amplitudeCache,
                                             modifier = Modifier.fillMaxSize(),
+                                            coverSwipeModifier =
+                                                Modifier.surfaceSwipe(
+                                                    fromLyrics = false,
+                                                    widthPx = { surfaceWidthPx },
+                                                    progress = surfaceProgress,
+                                                    onSettle = settleSurface,
+                                                ),
                                         )
                                     }
                                 }
@@ -566,8 +667,36 @@ fun ExpandedPlayerScreen(
                             }
                         }
                     }
+                }
 
-                    PlayerSurface.Lyrics -> {
+                if (lyricsLayerVisible) {
+                    Box(
+                        modifier =
+                            Modifier
+                                .fillMaxSize()
+                                .graphicsLayer {
+                                    val p = surfaceProgress.value
+                                    translationX = (1f - p) * size.width
+                                    compositingStrategy =
+                                        if (p < 1f) CompositingStrategy.Offscreen else CompositingStrategy.Auto
+                                }.drawWithContent {
+                                    drawContent()
+                                    // Soft fade on the left edge while sliding, so the page blends into the player.
+                                    val fade = 36.dp.toPx() * (1f - surfaceProgress.value)
+                                    if (fade > 0.5f) {
+                                        drawRect(
+                                            brush =
+                                                Brush.horizontalGradient(
+                                                    colors = listOf(Color.Transparent, Color.Black),
+                                                    startX = 0f,
+                                                    endX = fade,
+                                                ),
+                                            size = Size(fade, size.height),
+                                            blendMode = BlendMode.DstIn,
+                                        )
+                                    }
+                                },
+                    ) {
                         FullscreenLyricsSurface(
                             title =
                                 currentMediaItem
@@ -611,6 +740,13 @@ fun ExpandedPlayerScreen(
                             onPreviousClick = { viewModel.skipToPrevious() },
                             onNextClick = { viewModel.skipToNext() },
                             modifier = Modifier.fillMaxSize(),
+                            headerModifier =
+                                Modifier.surfaceSwipe(
+                                    fromLyrics = true,
+                                    widthPx = { surfaceWidthPx },
+                                    progress = surfaceProgress,
+                                    onSettle = settleSurface,
+                                ),
                         )
                     }
                 }
@@ -695,6 +831,8 @@ private fun PlayerPage(
     amplitudeCache: MutableMap<String, List<Int>>,
     modifier: Modifier = Modifier,
     isSeekingState: Boolean = false,
+    /** Swipe on the album cover (right to left) opens the lyrics. */
+    coverSwipeModifier: Modifier = Modifier,
 ) {
     // 读取动态封面设置
     val preferencesManager: PreferencesManager = koinInject()
@@ -749,6 +887,7 @@ private fun PlayerPage(
                 Modifier
                     .fillMaxWidth()
                     .weight(1f)
+                    .then(coverSwipeModifier)
                     .padding(vertical = Spacing.Medium),
             contentAlignment = Alignment.Center,
         ) {
