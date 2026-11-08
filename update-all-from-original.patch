@@ -1,0 +1,3846 @@
+diff --git a/app/src/main/java/me/spica27/spicamusic/ui/player/ExpandedPlayerScreen.kt b/app/src/main/java/me/spica27/spicamusic/ui/player/ExpandedPlayerScreen.kt
+index 8203882..a31fb6a 100644
+--- a/app/src/main/java/me/spica27/spicamusic/ui/player/ExpandedPlayerScreen.kt
++++ b/app/src/main/java/me/spica27/spicamusic/ui/player/ExpandedPlayerScreen.kt
+@@ -105,6 +105,7 @@ import me.spica27.spicamusic.App
+ import me.spica27.spicamusic.R
+ import me.spica27.spicamusic.artwork.artwork
+ import me.spica27.spicamusic.common.entity.DynamicCoverType
++import me.spica27.spicamusic.common.entity.DynamicSpectrumBackground
+ import me.spica27.spicamusic.common.entity.ProgressBarStyle
+ import me.spica27.spicamusic.core.preferences.PreferencesManager
+ import me.spica27.spicamusic.feature.library.domain.ArtistUseCases
+@@ -122,7 +123,11 @@ import me.spica27.spicamusic.ui.theme.LocalReducedMotion
+ import me.spica27.spicamusic.ui.theme.Shapes
+ import me.spica27.spicamusic.ui.theme.Spacing
+ import me.spica27.spicamusic.ui.widget.AudioCover
++import me.spica27.spicamusic.ui.settings.SettingsViewModel
+ import me.spica27.spicamusic.ui.widget.FluidMusicBackground
++import me.spica27.spicamusic.ui.widget.VerseFlowBackground
++import me.spica27.spicamusic.ui.widget.VerseFlowThemeScope
++import me.spica27.spicamusic.ui.widget.rememberVerseTheme
+ import me.spica27.spicamusic.ui.widget.ShowOnIdleContent
+ import me.spica27.spicamusic.ui.widget.audio_seekbar.AudioDynamicWaveSlider
+ import me.spica27.spicamusic.ui.widget.audio_seekbar.AudioWaveSlider
+@@ -135,6 +140,7 @@ import me.spica27.spicamusic.ui.widget.rememberIOSOverScrollEffect
+ import me.spica27.spicamusic.utils.Nav3Transitions
+ import me.spica27.spicamusic.utils.rememberDominantColorFromUri
+ import org.koin.compose.koinInject
++import org.koin.compose.viewmodel.koinViewModel
+ import timber.log.Timber
+ import java.io.File
+ import java.util.Locale
+@@ -355,6 +361,23 @@ fun ExpandedPlayerScreen(
+             uri = currentMediaItem?.mediaMetadata?.artworkUri,
+             fallbackColor = MaterialTheme.colorScheme.primary,
+         )
++    // Verse Flow 背景：与 HTML 播放器一致的渐变背景 + 同步改变文字颜色
++    val settingsViewModel: SettingsViewModel = koinViewModel()
++    val backgroundValue by settingsViewModel.dynamicSpectrumBackground.collectAsStateWithLifecycle()
++    val verseMode by settingsViewModel.verseThemeMode.collectAsStateWithLifecycle()
++    val verseSaturation by settingsViewModel.verseSaturation.collectAsStateWithLifecycle()
++    val verseVibrancy by settingsViewModel.verseVibrancy.collectAsStateWithLifecycle()
++    val verseHue by settingsViewModel.verseHue.collectAsStateWithLifecycle()
++    val verseMesh by settingsViewModel.verseMesh.collectAsStateWithLifecycle()
++    val isVerseFlow = backgroundValue == DynamicSpectrumBackground.VerseFlow.value
++    val verseTheme =
++        rememberVerseTheme(
++            coverUri = if (isVerseFlow) currentMediaItem?.mediaMetadata?.artworkUri else null,
++            mode = verseMode,
++            saturationPercent = verseSaturation,
++            vibrancyPercent = verseVibrancy,
++            hueShift = verseHue,
++        )
+     val hazeState = rememberHazeState()
+     val lyricsScrimAlpha =
+         animateFloatAsState(
+@@ -364,197 +387,249 @@ fun ExpandedPlayerScreen(
+         )
+     val lyricsScrimColor = MaterialTheme.colorScheme.scrim.copy(alpha = 0.14f)
+ 
+-    Box(
+-        modifier =
+-            modifier
+-                .graphicsLayer {
+-                    alpha = progressProvider()
+-                }.background(MaterialTheme.colorScheme.surface)
+-                .fillMaxSize(),
+-    ) {
+-        // 仅在页面可见且应用在前台时启用动态背景。
+-        FluidMusicBackground(
+-            modifier =
+-                Modifier
+-                    .fillMaxSize()
+-                    // 队列顶栏在关闭玻璃时仍需采样动态背景，用于渐变模糊。
+-                    .hazeSource(hazeState),
+-            coverColor = coverColor,
+-            isDarkMode = MaterialTheme.colorScheme.surface.luminance() < 0.5f,
+-            coverUri = { currentMediaItem?.mediaMetadata?.artworkUri },
+-            enabled = animationsEnabled && isAppInForeground,
+-        )
+-
+-        // 歌词模式只压暗同一份动态背景，不创建第二个背景实例。
++    PlayerThemeScope(isVerseFlow = isVerseFlow, theme = verseTheme) {
+         Box(
+             modifier =
+-                Modifier
+-                    .fillMaxSize()
+-                    .graphicsLayer { alpha = lyricsScrimAlpha.value }
+-                    .background(lyricsScrimColor),
+-        )
++                modifier
++                    .graphicsLayer {
++                        alpha = progressProvider()
++                    }.background(MaterialTheme.colorScheme.surface)
++                    .fillMaxSize(),
++        ) {
++            if (isVerseFlow) {
++                // 与 HTML 完全一致的渐变背景（歌词页额外显示漂移的 mesh）
++                VerseFlowBackground(
++                    theme = verseTheme,
++                    showMesh = playerSurface == PlayerSurface.Lyrics,
++                    mesh = verseMesh,
++                    meshAnimated = animationsEnabled && isAppInForeground,
++                    modifier =
++                        Modifier
++                            .fillMaxSize()
++                            .hazeSource(hazeState),
++                )
++            } else {
++                // 仅在页面可见且应用在前台时启用动态背景。
++                FluidMusicBackground(
++                    modifier =
++                        Modifier
++                            .fillMaxSize()
++                            // 队列顶栏在关闭玻璃时仍需采样动态背景，用于渐变模糊。
++                            .hazeSource(hazeState),
++                    coverColor = coverColor,
++                    isDarkMode = MaterialTheme.colorScheme.surface.luminance() < 0.5f,
++                    coverUri = { currentMediaItem?.mediaMetadata?.artworkUri },
++                    enabled = animationsEnabled && isAppInForeground,
++                )
+ 
+-        // 播放器与全屏歌词是同一播放器容器中的两种前景模式，而非两个导航目的地。
+-        AnimatedContent(
+-            targetState = playerSurface,
+-            modifier = Modifier.fillMaxSize(),
+-            transitionSpec = {
+-                Nav3Transitions.zoom()
+-            },
+-            contentKey = { it },
+-            label = "playerSurface",
+-        ) { surface ->
+-            when (surface) {
+-                PlayerSurface.Player -> {
+-                    VerticalPager(
+-                        modifier = Modifier.fillMaxSize(),
+-                        state = pagerState,
+-                        key = { page -> page },
+-                        overscrollEffect = rememberIOSOverScrollEffect(orientation = Orientation.Vertical),
+-                        flingBehavior =
+-                            PagerDefaults.flingBehavior(
+-                                state = pagerState,
+-                                snapPositionalThreshold = .2f,
+-                            ),
+-                    ) { page ->
+-                        if (page == DEFAULT_PAGE) {
+-                            Column(
+-                                modifier =
+-                                    Modifier
+-                                        .fillMaxSize()
+-                                        .statusBarsPadding(),
+-                                horizontalAlignment = Alignment.CenterHorizontally,
+-                            ) {
+-                                dragHandle()
++                // 歌词模式只压暗同一份动态背景，不创建第二个背景实例。
++                Box(
++                    modifier =
++                        Modifier
++                            .fillMaxSize()
++                            // The source must wrap the dimming (alpha + colour) so the blurred header
++                            // is dimmed exactly like the rest of the lyrics page.
++                            .hazeSource(hazeState, zIndex = 0.5f)
++                            .graphicsLayer { alpha = lyricsScrimAlpha.value }
++                            .background(lyricsScrimColor),
++                )
++            }
++
++            // 播放器与全屏歌词是同一播放器容器中的两种前景模式，而非两个导航目的地。
++            AnimatedContent(
++                targetState = playerSurface,
++                modifier = Modifier.fillMaxSize(),
++                transitionSpec = {
++                    Nav3Transitions.zoom()
++                },
++                contentKey = { it },
++                label = "playerSurface",
++            ) { surface ->
++                when (surface) {
++                    PlayerSurface.Player -> {
++                        VerticalPager(
++                            modifier = Modifier.fillMaxSize(),
++                            state = pagerState,
++                            key = { page -> page },
++                            overscrollEffect = rememberIOSOverScrollEffect(orientation = Orientation.Vertical),
++                            flingBehavior =
++                                PagerDefaults.flingBehavior(
++                                    state = pagerState,
++                                    snapPositionalThreshold = .2f,
++                                ),
++                        ) { page ->
++                            if (page == DEFAULT_PAGE) {
++                                Column(
++                                    modifier =
++                                        Modifier
++                                            .fillMaxSize()
++                                            .statusBarsPadding(),
++                                    horizontalAlignment = Alignment.CenterHorizontally,
++                                ) {
++                                    dragHandle()
++                                    ShowOnIdleContent(
++                                        modifier = Modifier.weight(1f),
++                                        visible = isPlayerPageRevealed,
++                                        delayMillis = 225,
++                                        enter = Nav3Transitions.expand().targetContentEnter,
++                                    ) {
++                                        PlayerPage(
++                                            playerViewModel = viewModel,
++                                            hazeState = hazeState,
++                                            isSeekingState = isSeekingState,
++                                            currentMediaItem = { currentMediaItem },
++                                            audioQualityInfo = audioQualityInfo,
++                                            realPositionProvider = {
++                                                if (animationsEnabled) {
++                                                    positionState.value.toFloat()
++                                                } else {
++                                                    positionHolder.realPosition
++                                                }
++                                            },
++                                            seekPositionProvider = {
++                                                if (animationsEnabled) {
++                                                    seekValueState.floatValue
++                                                } else {
++                                                    positionHolder.seekPosition
++                                                }
++                                            },
++                                            duration = duration,
++                                            isPlaying = isPlaying,
++                                            isLike = songLikeState,
++                                            playMode = playMode,
++                                            onValueChange = {
++                                                isSeekingState = true
++                                                seekValueState.floatValue = it * duration
++                                                positionHolder.seekPosition = seekValueState.floatValue
++                                            },
++                                            onValueChangeFinished = {
++                                                viewModel.seekTo(seekValueState.floatValue.toLong())
++                                                isSeekingState = false
++                                            },
++                                            onPlayPauseClick = { viewModel.togglePlayPause() },
++                                            onPreviousClick = { viewModel.skipToPrevious() },
++                                            onNextClick = { viewModel.skipToNext() },
++                                            onPlayModeClick = { viewModel.togglePlayMode() },
++                                            onFavoriteClick = { viewModel.toggleLikeCurrentSong() },
++                                            onSleepTimerClick = { backStack.add(SleepTimerRoute) },
++                                            onArtistClick = { route -> backStack.add(route) },
++                                            onLyricsClick = { playerSurface = PlayerSurface.Lyrics },
++                                            sleepTimer = sleepTimer,
++                                            onPlaylistClick = {
++                                                coroutineScope.launch {
++                                                    pagerState.animateScrollToPage(
++                                                        QUEUE_PAGE,
++                                                        animationSpec =
++                                                            tween(
++                                                                durationMillis = 320,
++                                                                easing = EaseOutEmphasized,
++                                                            ),
++                                                    )
++                                                }
++                                            },
++                                            progressProvider = progressProvider,
++                                            isAppInForeground = isAppInForeground,
++                                            animationsEnabled = animationsEnabled,
++                                            amplitudeCache = amplitudeCache,
++                                            modifier = Modifier.fillMaxSize(),
++                                        )
++                                    }
++                                }
++                            } else {
+                                 ShowOnIdleContent(
+-                                    modifier = Modifier.weight(1f),
+-                                    visible = isPlayerPageRevealed,
++                                    true,
++                                    modifier = Modifier.fillMaxSize(),
+                                     delayMillis = 225,
+-                                    enter = Nav3Transitions.expand().targetContentEnter,
++                                    enter = Nav3Transitions.slideUp().targetContentEnter,
+                                 ) {
+-                                    PlayerPage(
+-                                        playerViewModel = viewModel,
+-                                        hazeState = hazeState,
+-                                        isSeekingState = isSeekingState,
+-                                        currentMediaItem = { currentMediaItem },
+-                                        audioQualityInfo = audioQualityInfo,
+-                                        realPositionProvider = {
+-                                            if (animationsEnabled) {
+-                                                positionState.value.toFloat()
+-                                            } else {
+-                                                positionHolder.realPosition
+-                                            }
+-                                        },
+-                                        seekPositionProvider = {
+-                                            if (animationsEnabled) {
+-                                                seekValueState.floatValue
+-                                            } else {
+-                                                positionHolder.seekPosition
+-                                            }
+-                                        },
+-                                        duration = duration,
+-                                        isPlaying = isPlaying,
+-                                        isLike = songLikeState,
+-                                        playMode = playMode,
+-                                        onValueChange = {
+-                                            isSeekingState = true
+-                                            seekValueState.floatValue = it * duration
+-                                            positionHolder.seekPosition = seekValueState.floatValue
+-                                        },
+-                                        onValueChangeFinished = {
+-                                            viewModel.seekTo(seekValueState.floatValue.toLong())
+-                                            isSeekingState = false
+-                                        },
+-                                        onPlayPauseClick = { viewModel.togglePlayPause() },
+-                                        onPreviousClick = { viewModel.skipToPrevious() },
+-                                        onNextClick = { viewModel.skipToNext() },
+-                                        onPlayModeClick = { viewModel.togglePlayMode() },
+-                                        onFavoriteClick = { viewModel.toggleLikeCurrentSong() },
+-                                        onSleepTimerClick = { backStack.add(SleepTimerRoute) },
+-                                        onArtistClick = { route -> backStack.add(route) },
+-                                        onLyricsClick = { playerSurface = PlayerSurface.Lyrics },
+-                                        sleepTimer = sleepTimer,
+-                                        onPlaylistClick = {
++                                    CurrPlaylistPage(
++                                        onNavigateBack = {
+                                             coroutineScope.launch {
+                                                 pagerState.animateScrollToPage(
+-                                                    QUEUE_PAGE,
++                                                    DEFAULT_PAGE,
+                                                     animationSpec =
+                                                         tween(
+-                                                            durationMillis = 320,
+-                                                            easing = EaseOutEmphasized,
++                                                            durationMillis = 300,
++                                                            easing = EaseOutCubic,
+                                                         ),
+                                                 )
+                                             }
+                                         },
+-                                        progressProvider = progressProvider,
+-                                        isAppInForeground = isAppInForeground,
+-                                        animationsEnabled = animationsEnabled,
+-                                        amplitudeCache = amplitudeCache,
++                                        navigationIcon = Icons.Rounded.KeyboardArrowDown,
++                                        navigationContentDescription = stringResource(R.string.back_to_player),
++                                        chromeColor = MaterialTheme.colorScheme.surface,
++                                        contentWindowInsets = WindowInsets.systemBars.only(WindowInsetsSides.Vertical),
+                                         modifier = Modifier.fillMaxSize(),
++                                        hazeState = hazeState,
+                                     )
+                                 }
+                             }
+-                        } else {
+-                            ShowOnIdleContent(
+-                                true,
+-                                modifier = Modifier.fillMaxSize(),
+-                                delayMillis = 225,
+-                                enter = Nav3Transitions.slideUp().targetContentEnter,
+-                            ) {
+-                                CurrPlaylistPage(
+-                                    onNavigateBack = {
+-                                        coroutineScope.launch {
+-                                            pagerState.animateScrollToPage(
+-                                                DEFAULT_PAGE,
+-                                                animationSpec =
+-                                                    tween(
+-                                                        durationMillis = 300,
+-                                                        easing = EaseOutCubic,
+-                                                    ),
+-                                            )
+-                                        }
+-                                    },
+-                                    navigationIcon = Icons.Rounded.KeyboardArrowDown,
+-                                    navigationContentDescription = stringResource(R.string.back_to_player),
+-                                    chromeColor = MaterialTheme.colorScheme.surface,
+-                                    contentWindowInsets = WindowInsets.systemBars.only(WindowInsetsSides.Vertical),
+-                                    modifier = Modifier.fillMaxSize(),
+-                                    hazeState = hazeState,
+-                                )
+-                            }
+                         }
+                     }
+-                }
+ 
+-                PlayerSurface.Lyrics -> {
+-                    FullscreenLyricsSurface(
+-                        title =
+-                            currentMediaItem
+-                                ?.mediaMetadata
+-                                ?.title
+-                                ?.toString()
+-                                ?: stringResource(R.string.unknown_song),
+-                        artist =
+-                            currentMediaItem
+-                                ?.mediaMetadata
+-                                ?.artist
+-                                ?.toString()
+-                                ?: stringResource(R.string.unknown_artist),
+-                        artwork = currentMediaItem?.mediaMetadata?.artwork(),
+-                        hazeState = hazeState,
+-                        isPlaying = isPlaying,
+-                        onBack = { playerSurface = PlayerSurface.Player },
+-                        onPlayPauseClick = { viewModel.togglePlayPause() },
+-                        onPreviousClick = { viewModel.skipToPrevious() },
+-                        onNextClick = { viewModel.skipToNext() },
+-                        modifier = Modifier.fillMaxSize(),
+-                    )
++                    PlayerSurface.Lyrics -> {
++                        FullscreenLyricsSurface(
++                            title =
++                                currentMediaItem
++                                    ?.mediaMetadata
++                                    ?.title
++                                    ?.toString()
++                                    ?: stringResource(R.string.unknown_song),
++                            artist =
++                                currentMediaItem
++                                    ?.mediaMetadata
++                                    ?.artist
++                                    ?.toString()
++                                    ?: stringResource(R.string.unknown_artist),
++                            artwork = currentMediaItem?.mediaMetadata?.artwork(),
++                            isLike = songLikeState,
++                            onLikeClick = { viewModel.toggleLikeCurrentSong() },
++                            hazeState = hazeState,
++                            album = currentMediaItem?.mediaMetadata?.albumTitle?.toString(),
++                            releaseYear = currentMediaItem?.mediaMetadata?.releaseYear,
++                            isSeeking = isSeekingState,
++                            seekPositionProvider = {
++                                if (animationsEnabled) seekValueState.floatValue else positionHolder.seekPosition
++                            },
++                            durationMs = duration,
++                            onSeekChange = {
++                                isSeekingState = true
++                                seekValueState.floatValue = it * duration
++                                positionHolder.seekPosition = seekValueState.floatValue
++                            },
++                            onSeekFinished = {
++                                viewModel.seekTo(seekValueState.floatValue.toLong())
++                                isSeekingState = false
++                            },
++                            progressAnimationsEnabled =
++                                isPlaying && isAppInForeground && animationsEnabled && !LocalReducedMotion.current,
++                            isPlaying = isPlaying,
++                            onPlayPauseClick = { viewModel.togglePlayPause() },
++                            onPreviousClick = { viewModel.skipToPrevious() },
++                            onNextClick = { viewModel.skipToNext() },
++                            modifier = Modifier.fillMaxSize(),
++                        )
++                    }
+                 }
+             }
+         }
+     }
+ }
+ 
++/** Verse Flow 开启时，用 HTML 同款配色覆盖 Material 颜色（文字、图标、滑块都跟着变）。 */
++@Composable
++private fun PlayerThemeScope(
++    isVerseFlow: Boolean,
++    theme: me.spica27.spicamusic.ui.widget.VerseTheme,
++    content: @Composable () -> Unit,
++) {
++    if (isVerseFlow) {
++        VerseFlowThemeScope(theme = theme, content = content)
++    } else {
++        content()
++    }
++}
++
+ // 音频信息组件
+ 
+ @Immutable
+diff --git a/app/src/main/java/me/spica27/spicamusic/ui/player/FullscreenLyricsSurface.kt b/app/src/main/java/me/spica27/spicamusic/ui/player/FullscreenLyricsSurface.kt
+index 64eab7b..ca2e1dc 100644
+--- a/app/src/main/java/me/spica27/spicamusic/ui/player/FullscreenLyricsSurface.kt
++++ b/app/src/main/java/me/spica27/spicamusic/ui/player/FullscreenLyricsSurface.kt
+@@ -1,7 +1,17 @@
+ package me.spica27.spicamusic.ui.player
+ 
++import androidx.compose.animation.AnimatedContent
++import androidx.compose.animation.AnimatedVisibility
++import androidx.compose.animation.core.Spring
++import androidx.compose.animation.core.spring
++import androidx.compose.animation.core.tween
++import androidx.compose.animation.expandVertically
++import androidx.compose.animation.fadeIn
++import androidx.compose.animation.fadeOut
++import androidx.compose.animation.shrinkVertically
++import androidx.compose.animation.togetherWith
+ import androidx.compose.foundation.background
+-import androidx.compose.foundation.basicMarquee
++import androidx.compose.foundation.border
+ import androidx.compose.foundation.layout.Arrangement
+ import androidx.compose.foundation.layout.Box
+ import androidx.compose.foundation.layout.Column
+@@ -13,65 +23,188 @@ import androidx.compose.foundation.layout.height
+ import androidx.compose.foundation.layout.padding
+ import androidx.compose.foundation.layout.size
+ import androidx.compose.foundation.layout.statusBarsPadding
+-import androidx.compose.foundation.shape.CircleShape
+ import androidx.compose.material.icons.Icons
+-import androidx.compose.material.icons.filled.ArrowBackIosNew
++import androidx.compose.material.icons.rounded.Favorite
++import androidx.compose.material.icons.rounded.FavoriteBorder
++import androidx.compose.material.icons.rounded.MoreHoriz
+ import androidx.compose.material3.Icon
+-import androidx.compose.material3.IconButton
+-import androidx.compose.material3.IconButtonDefaults
+ import androidx.compose.material3.MaterialTheme
+ import androidx.compose.material3.Text
+ import androidx.compose.runtime.Composable
++import androidx.compose.runtime.getValue
++import androidx.compose.runtime.mutableStateOf
++import androidx.compose.runtime.mutableIntStateOf
++import androidx.compose.runtime.remember
++import androidx.compose.runtime.setValue
+ import androidx.compose.ui.Alignment
+ import androidx.compose.ui.Modifier
+ import androidx.compose.ui.draw.clip
++import androidx.compose.ui.draw.drawWithContent
++import androidx.compose.ui.graphics.BlendMode
++import androidx.compose.ui.graphics.Brush
+ import androidx.compose.ui.graphics.Color
++import androidx.compose.ui.graphics.CompositingStrategy
++import androidx.compose.ui.graphics.graphicsLayer
++import androidx.compose.ui.layout.onSizeChanged
++import androidx.compose.ui.platform.LocalDensity
+ import androidx.compose.ui.res.stringResource
+ import androidx.compose.ui.text.font.FontWeight
++import androidx.compose.ui.text.style.TextAlign
++import androidx.compose.ui.text.style.TextOverflow
++import androidx.compose.ui.unit.TextUnit
++import androidx.compose.ui.unit.Dp
+ import androidx.compose.ui.unit.dp
++import androidx.compose.ui.unit.sp
++import androidx.lifecycle.compose.collectAsStateWithLifecycle
++import dev.chrisbanes.haze.ExperimentalHazeApi
++import dev.chrisbanes.haze.HazeInput
++import dev.chrisbanes.haze.HazePerformanceMode
+ import dev.chrisbanes.haze.HazeState
++import dev.chrisbanes.haze.blur.HazeBlurStyle
++import dev.chrisbanes.haze.blur.HazeColorEffect
++import dev.chrisbanes.haze.blur.hazeBlur
++import dev.chrisbanes.haze.hazeSource
+ import me.spica27.spicamusic.R
+ import me.spica27.spicamusic.artwork.MusicArtwork
+-import me.spica27.spicamusic.ui.glass.LiquidGlassVariant
+-import me.spica27.spicamusic.ui.glass.liquidGlass
++import me.spica27.spicamusic.ui.navigation.LocalBackStack
++import me.spica27.spicamusic.ui.navigation.LyricsSourceRoute
+ import me.spica27.spicamusic.ui.theme.Shapes
+ import me.spica27.spicamusic.ui.theme.Spacing
+ import me.spica27.spicamusic.ui.widget.AudioCover
++import me.spica27.spicamusic.ui.widget.LyricsCircleButton
++import me.spica27.spicamusic.ui.widget.LyricsSettingsSheet
++import me.spica27.spicamusic.ui.widget.LyricsToolbarMenuContent
++import me.spica27.spicamusic.ui.widget.audio_seekbar.GlowParticleSeekBar
++import me.spica27.spicamusic.ui.widget.rememberLyricsEdgePadding
++import org.koin.compose.viewmodel.koinActivityViewModel
++import java.util.Locale
+ 
+ private val LyricsToolbarBottomInset = 112.dp
++private val LyricsHeaderCoverSize = 56.dp
++private val LyricsHeaderButtonSize = 44.dp
+ 
+ /**
+  * 展开播放器内部的全屏歌词前景。
+  *
+- * 该组件只负责展示与交互，不拥有导航状态；关闭歌词由播放器宿主处理。
++ * 该组件只负责展示与交互，不拥有导航状态；关闭歌词由播放器宿主的返回手势处理。
+  */
+ @Composable
+ internal fun FullscreenLyricsSurface(
+     title: String,
+     artist: String,
+     artwork: MusicArtwork?,
++    isLike: Boolean,
++    onLikeClick: () -> Unit,
++    /** Shared with the player background: the header blurs background + lyrics together. */
+     hazeState: HazeState,
++    /** Album name (shown in upper case) and release year (year only) in the artist line. */
++    album: String?,
++    releaseYear: Int?,
++    /** true while the progress bar is being dragged: the title turns into the time. */
++    isSeeking: Boolean,
++    seekPositionProvider: () -> Float,
++    durationMs: Long,
++    onSeekChange: (Float) -> Unit,
++    onSeekFinished: () -> Unit,
++    progressAnimationsEnabled: Boolean,
+     isPlaying: Boolean,
+-    onBack: () -> Unit,
+     onPlayPauseClick: () -> Unit,
+     onPreviousClick: () -> Unit,
+     onNextClick: () -> Unit,
+     modifier: Modifier = Modifier,
+ ) {
++    val styleViewModel: LyricsStyleViewModel = koinActivityViewModel()
++    val style by styleViewModel.style.collectAsStateWithLifecycle()
++    // Enhance header: blur ON  -> lyrics scroll behind the blurred header.
++    //                 blur OFF -> lyrics start below the header; the line separates them.
++    val blurBehind = style.enhanceHeader && style.headerBlurEnabled
++    val separated = style.enhanceHeader && !style.headerBlurEnabled
++    // The bottom bar also blurs the lyrics behind it, so the lyrics must be a blur source then.
++    val dockBlur = style.enhanceHeader && style.dockBlurEnabled && style.dockBlurAmount > 0
++    val dockSpread = dockBlur && style.dockSpreadBlur
++    var dockHeightPx by remember { mutableIntStateOf(0) }
++    val dockHeight = with(LocalDensity.current) { dockHeightPx.toDp() }
++    var barHeightPx by remember { mutableIntStateOf(0) }
++    val barHeight = with(LocalDensity.current) { barHeightPx.toDp() }
++
+     Box(modifier = modifier.fillMaxSize()) {
+         LyricsPanel(
+-            modifier = Modifier.fillMaxSize(),
++            modifier =
++                Modifier
++                    .fillMaxSize()
++                    .padding(top = if (separated) barHeight else 0.dp)
++                    // Blur off + soft edge: the lyrics fade in below the header instead of a hard cut.
++                    .then(
++                        if (separated && style.headerSoftEdge && style.headerEdgeFade > 0) {
++                            Modifier.lyricsTopFade(style.headerEdgeFade.dp)
++                        } else {
++                            Modifier
++                        },
++                    )
++                    // zIndex 1: drawn above the background source (zIndex 0) that shares this state, so the
++                    // blurred header shows background + lyrics together and hides the sharp lyrics below it.
++                    .then(if (blurBehind || dockBlur) Modifier.hazeSource(hazeState, zIndex = 1f) else Modifier),
+             toolbarBottomInset = LyricsToolbarBottomInset,
++            // 工具栏已移到顶栏右侧（三点按钮）
++            showToolbar = false,
+         )
+ 
++        // Blur layer behind the header: strong behind the whole header, then it fades out softly
++        // in a band below it (same Haze blur the queue top bar uses, plus a fade mask).
++        if (blurBehind && style.headerBlurAmount > 0) {
++            LyricsHeaderBlurLayer(
++                hazeState = hazeState,
++                blurRadius = style.headerBlurAmount.dp,
++                barHeight = barHeight,
++                fade = if (style.headerSoftEdge) style.headerEdgeFade.dp else 0.dp,
++                modifier = Modifier.align(Alignment.TopCenter),
++            )
++        }
++
+         FullscreenLyricsHeader(
+             title = title,
+             artist = artist,
+             artwork = artwork,
+-            onBack = onBack,
++            isLike = isLike,
++            onLikeClick = onLikeClick,
++            album = album,
++            releaseYear = releaseYear,
++            isSeeking = isSeeking,
++            seekPositionProvider = seekPositionProvider,
++            durationMs = durationMs,
++            onSeekChange = onSeekChange,
++            onSeekFinished = onSeekFinished,
++            progressAnimationsEnabled = progressAnimationsEnabled,
++            onBarHeightChange = { barHeightPx = it },
+             modifier = Modifier.align(Alignment.TopCenter),
+-            hazeState = hazeState,
+         )
++
++        // Bottom bar, "spread" blur: one blur layer behind the whole bar that fades out above it.
++        if (dockSpread) {
++            LyricsHeaderBlurLayer(
++                hazeState = hazeState,
++                blurRadius = style.dockBlurAmount.dp,
++                barHeight = dockHeight,
++                fade = if (style.dockSoftEdge) style.dockEdgeFade.dp else 0.dp,
++                fadeOnTop = true,
++                modifier = Modifier.align(Alignment.BottomCenter),
++            )
++        }
++
++        // Bottom bar: transliteration button | pill (cover, artist + time, play/pause) | translation button
++        if (style.enhanceHeader) {
++            LyricsBottomBar(
++                artist = artist,
++                artwork = artwork,
++                isPlaying = isPlaying,
++                onPlayPauseClick = onPlayPauseClick,
++                seekPositionProvider = seekPositionProvider,
++                durationMs = durationMs,
++                hazeState = hazeState,
++                onHeightChange = { dockHeightPx = it },
++                modifier = Modifier.align(Alignment.BottomCenter),
++            )
++        }
+     }
+ }
+ 
+@@ -80,72 +213,400 @@ private fun FullscreenLyricsHeader(
+     title: String,
+     artist: String,
+     artwork: MusicArtwork?,
+-    onBack: () -> Unit,
++    isLike: Boolean,
++    onLikeClick: () -> Unit,
++    /** Album name (shown in upper case) and release year (year only) in the artist line. */
++    album: String?,
++    releaseYear: Int?,
++    /** true while the progress bar is being dragged: the title turns into the time. */
++    isSeeking: Boolean,
++    seekPositionProvider: () -> Float,
++    durationMs: Long,
++    onSeekChange: (Float) -> Unit,
++    onSeekFinished: () -> Unit,
++    progressAnimationsEnabled: Boolean,
++    onBarHeightChange: (Int) -> Unit,
+     modifier: Modifier = Modifier,
+-    hazeState: HazeState,
+ ) {
+-    Row(
+-        modifier =
+-            modifier
+-                .fillMaxWidth()
+-                .statusBarsPadding()
+-                .padding(horizontal = Spacing.Large, vertical = Spacing.Medium),
+-        verticalAlignment = Alignment.CenterVertically,
+-        horizontalArrangement = Arrangement.spacedBy(Spacing.Medium),
+-    ) {
+-        IconButton(
+-            modifier =
+-                Modifier
+-                    .clip(CircleShape)
+-                    .liquidGlass(
+-                        hazeState,
+-                        variant = LiquidGlassVariant.TopBar,
+-                        shape = CircleShape,
+-                    ),
+-            onClick = onBack,
+-            colors =
+-                IconButtonDefaults.iconButtonColors(
+-                    containerColor = Color.Transparent,
+-                    contentColor = MaterialTheme.colorScheme.onSurface,
+-                ),
++    // 与歌词文字的左边距一致，左右对称
++    val edge = rememberLyricsEdgePadding()
++
++    // 歌词工具栏（偏移 / 歌词设置 / 切换歌词）：原来在右下角，现在从三点按钮向下展开
++    val viewModel: LyricsViewModel = koinActivityViewModel()
++    val uiState by viewModel.uiState.collectAsStateWithLifecycle()
++    val styleViewModel: LyricsStyleViewModel = koinActivityViewModel()
++    val styleSettings by styleViewModel.style.collectAsStateWithLifecycle()
++    val backStack = LocalBackStack.current
++    var menuExpanded by remember { mutableStateOf(false) }
++    var showLyricsSettings by remember { mutableStateOf(false) }
++
++    // Enhance header off = the original header (default sizes, no line, no blur).
++    val enhanced = styleSettings.enhanceHeader
++    val coverSize: Dp = if (enhanced) styleSettings.headerAlbumSize.dp else LyricsHeaderCoverSize
++    val buttonSize: Dp = if (enhanced) styleSettings.headerButtonSize.dp else LyricsHeaderButtonSize
++    val titleSize = (if (enhanced) styleSettings.headerTitleSize else 22).sp
++    val artistSize = (if (enhanced) styleSettings.headerArtistSize else 14).sp
++    val bottomPadding: Dp = if (enhanced) styleSettings.headerBottomPadding.dp else Spacing.Medium
++
++    // Artist • ALBUM • year
++    val infoLine =
++        remember(artist, album, releaseYear) {
++            buildString {
++                append(artist)
++                if (!album.isNullOrBlank()) {
++                    append(" \u2022 ")
++                    append(album.uppercase(Locale.getDefault()))
++                }
++                if (releaseYear != null && releaseYear > 0) {
++                    append(" \u2022 ")
++                    append(releaseYear)
++                }
++            }
++        }
++
++    val likeButton: @Composable () -> Unit = {
++        LyricsCircleButton(
++            onClick = onLikeClick,
++            size = buttonSize,
+         ) {
+             Icon(
+-                imageVector = Icons.Default.ArrowBackIosNew,
+-                contentDescription = stringResource(R.string.back_to_player),
+-                modifier = Modifier.size(20.dp),
++                imageVector = if (isLike) Icons.Rounded.Favorite else Icons.Rounded.FavoriteBorder,
++                contentDescription = stringResource(R.string.favorite),
++                // Same colour as the outline heart; only the filled shape shows it is liked.
++                tint = MaterialTheme.colorScheme.onSurface,
++                modifier = Modifier.size(buttonSize / 2),
+             )
+         }
++    }
++    val dotsButton: @Composable () -> Unit = {
++        LyricsCircleButton(
++            onClick = { menuExpanded = !menuExpanded },
++            size = buttonSize,
++        ) {
++            Icon(
++                imageVector = Icons.Rounded.MoreHoriz,
++                contentDescription =
++                    if (menuExpanded) {
++                        stringResource(R.string.collapse)
++                    } else {
++                        stringResource(R.string.lyrics_tool)
++                    },
++                tint = MaterialTheme.colorScheme.onSurface,
++                modifier = Modifier.size(buttonSize / 2),
++            )
++        }
++    }
+ 
+-        Box(
++    Column(modifier = modifier.fillMaxWidth()) {
++        // The bar (status bar area + row + line). The menu below is not part of it.
++        Column(
+             modifier =
+                 Modifier
+-                    .size(42.dp)
+-                    .clip(Shapes.MediumCornerBasedShape)
+-                    .background(MaterialTheme.colorScheme.surfaceContainerHigh),
++                    .fillMaxWidth()
++                    .onSizeChanged { onBarHeightChange(it.height) }
++                    .statusBarsPadding(),
+         ) {
+-            AudioCover(
+-                artwork = artwork,
+-                modifier = Modifier.fillMaxSize(),
+-            )
++            if (enhanced) {
++                // Enhanced layout: like (left) | title + artist info (centre) | dots (right).
++                // No album art here for now; its size / outline settings are kept for later.
++                Row(
++                    modifier =
++                        Modifier
++                            .fillMaxWidth()
++                            .padding(start = edge, end = edge, top = Spacing.Medium, bottom = bottomPadding),
++                    verticalAlignment = Alignment.CenterVertically,
++                    horizontalArrangement = Arrangement.spacedBy(Spacing.Medium),
++                ) {
++                    likeButton()
++                    Column(
++                        modifier = Modifier.weight(1f),
++                        horizontalAlignment = Alignment.CenterHorizontally,
++                    ) {
++                        // While the progress bar is dragged the title shows the time instead.
++                        AnimatedContent(
++                            targetState = isSeeking,
++                            modifier = Modifier.fillMaxWidth(),
++                            contentAlignment = Alignment.Center,
++                            transitionSpec = { fadeIn(tween(160)) togetherWith fadeOut(tween(120)) },
++                            label = "lyrics_title_or_time",
++                        ) { seeking ->
++                            if (seeking) {
++                                LyricsSeekTimeText(
++                                    seekPositionProvider = seekPositionProvider,
++                                    durationMs = durationMs,
++                                    fontSize = titleSize,
++                                )
++                            } else {
++                                Text(
++                                    text = title,
++                                    style = MaterialTheme.typography.titleLarge,
++                                    fontSize = titleSize,
++                                    lineHeight = titleSize * 1.25f,
++                                    fontWeight = FontWeight.Bold,
++                                    textAlign = TextAlign.Center,
++                                    color = MaterialTheme.colorScheme.onSurface,
++                                    maxLines = 1,
++                                    overflow = TextOverflow.Ellipsis,
++                                    modifier = Modifier.fillMaxWidth(),
++                                )
++                            }
++                        }
++                        Spacer(modifier = Modifier.height(2.dp))
++                        Text(
++                            text = infoLine,
++                            style = MaterialTheme.typography.bodyMedium,
++                            fontSize = artistSize,
++                            lineHeight = artistSize * 1.3f,
++                            textAlign = TextAlign.Center,
++                            color = MaterialTheme.colorScheme.onSurfaceVariant,
++                            maxLines = 1,
++                            overflow = TextOverflow.Ellipsis,
++                                    modifier = Modifier.fillMaxWidth(),
++                        )
++                    }
++                    dotsButton()
++                }
++
++                // The glow-particle progress bar replaces the separator line
++                LyricsHeaderProgressBar(
++                    seekPositionProvider = seekPositionProvider,
++                    durationMs = durationMs,
++                    onSeekChange = onSeekChange,
++                    onSeekFinished = onSeekFinished,
++                    animationsEnabled = progressAnimationsEnabled,
++                    modifier = Modifier.padding(horizontal = edge),
++                )
++            } else {
++                Row(
++                    modifier =
++                        Modifier
++                            .fillMaxWidth()
++                            .padding(start = edge, end = edge, top = Spacing.Medium, bottom = bottomPadding),
++                    verticalAlignment = Alignment.CenterVertically,
++                    horizontalArrangement = Arrangement.spacedBy(Spacing.Medium),
++                ) {
++                    Box(
++                        modifier =
++                            Modifier
++                                .size(coverSize)
++                                .clip(Shapes.MediumCornerBasedShape)
++                                .background(MaterialTheme.colorScheme.surfaceContainerHigh)
++                                // Optional thin outline around the album (drawn above the cover image)
++                                .then(
++                                    if (enhanced && styleSettings.headerOutlineEnabled) {
++                                        Modifier.border(
++                                            width = (styleSettings.headerOutlineWeight / 2f).dp,
++                                            color = MaterialTheme.colorScheme.onSurface.copy(alpha = styleSettings.headerOutlineOpacity / 100f),
++                                            shape = Shapes.MediumCornerBasedShape,
++                                        )
++                                    } else {
++                                        Modifier
++                                    },
++                                ),
++                    ) {
++                        AudioCover(
++                            artwork = artwork,
++                            modifier = Modifier.fillMaxSize(),
++                        )
++                    }
++
++                    Column(modifier = Modifier.weight(1f)) {
++                        Text(
++                            text = title,
++                            style = MaterialTheme.typography.titleLarge,
++                            fontSize = titleSize,
++                            lineHeight = titleSize * 1.25f,
++                            fontWeight = FontWeight.Bold,
++                            color = MaterialTheme.colorScheme.onSurface,
++                            maxLines = 1,
++                            overflow = TextOverflow.Ellipsis,
++                        )
++                        Spacer(modifier = Modifier.height(2.dp))
++                        Text(
++                            text = artist,
++                            style = MaterialTheme.typography.bodyMedium,
++                            fontSize = artistSize,
++                            lineHeight = artistSize * 1.3f,
++                            color = MaterialTheme.colorScheme.onSurfaceVariant,
++                            maxLines = 1,
++                            overflow = TextOverflow.Ellipsis,
++                        )
++                    }
++
++                    Row(
++                        verticalAlignment = Alignment.CenterVertically,
++                        horizontalArrangement = Arrangement.spacedBy(8.dp),
++                    ) {
++                        likeButton()
++                        dotsButton()
++                    }
++                }
++            }
+         }
+ 
+-        Column(modifier = Modifier.weight(1f)) {
+-            Text(
+-                text = title,
+-                style = MaterialTheme.typography.titleMedium,
+-                fontWeight = FontWeight.Bold,
+-                color = MaterialTheme.colorScheme.onSurface,
+-                maxLines = 1,
+-                modifier = Modifier.basicMarquee(),
+-            )
+-            Spacer(modifier = Modifier.height(2.dp))
+-            Text(
+-                text = artist,
+-                style = MaterialTheme.typography.bodySmall,
+-                color = MaterialTheme.colorScheme.onSurfaceVariant,
+-                maxLines = 1,
+-                modifier = Modifier.basicMarquee(),
++        // 从三点按钮下方展开，右边距与顶栏一致
++        AnimatedVisibility(
++            visible = menuExpanded,
++            modifier = Modifier.align(Alignment.End).padding(end = edge),
++            enter =
++                fadeIn(spring(stiffness = Spring.StiffnessMedium)) +
++                    expandVertically(spring(stiffness = Spring.StiffnessMedium)),
++            exit =
++                fadeOut(spring(stiffness = Spring.StiffnessMedium)) +
++                    shrinkVertically(spring(stiffness = Spring.StiffnessMedium)),
++        ) {
++            LyricsToolbarMenuContent(
++                offsetEnabled = !uiState.lyricsSuppressed,
++                offsetMs = uiState.lyricsOffsetMs,
++                onOffsetChange = { viewModel.updateOffset(it) },
++                onOpenLyricsSettings = {
++                    menuExpanded = false
++                    showLyricsSettings = true
++                },
++                onOpenLyricsSwitcher = {
++                    menuExpanded = false
++                    viewModel.openPanel()
++                    backStack.add(LyricsSourceRoute)
++                },
+             )
+         }
+     }
++
++    if (showLyricsSettings) {
++        LyricsSettingsSheet(
++            settings = styleSettings,
++            onUpdate = styleViewModel::update,
++            onDismiss = { showLyricsSettings = false },
++        )
++    }
++}
++
++/** The player's glow-particle seek bar, sized for the header. */
++@Composable
++private fun LyricsHeaderProgressBar(
++    seekPositionProvider: () -> Float,
++    durationMs: Long,
++    onSeekChange: (Float) -> Unit,
++    onSeekFinished: () -> Unit,
++    animationsEnabled: Boolean,
++    modifier: Modifier = Modifier,
++) {
++    // Only this small composable reads the position, so the header does not recompose on every tick.
++    val position = seekPositionProvider()
++    val progress = if (durationMs > 0) (position / durationMs).coerceIn(0f, 1f) else 0f
++    GlowParticleSeekBar(
++        progress = progress,
++        onProgressChange = onSeekChange,
++        onProgressChangeFinished = onSeekFinished,
++        animationsEnabled = animationsEnabled,
++        // No particle trail in the header; the glowing head stays.
++        showParticles = false,
++        modifier = modifier.fillMaxWidth().height(40.dp),
++    )
++}
++
++/** "1:23 / 3:45" shown in place of the title while the progress bar is dragged. */
++@Composable
++private fun LyricsSeekTimeText(
++    seekPositionProvider: () -> Float,
++    durationMs: Long,
++    fontSize: TextUnit,
++) {
++    Text(
++        text = "${formatTime(seekPositionProvider().toLong())} / ${formatTime(durationMs)}",
++        style = MaterialTheme.typography.titleLarge.copy(fontFeatureSettings = "tnum"),
++        fontSize = fontSize,
++        lineHeight = fontSize * 1.25f,
++        fontWeight = FontWeight.Bold,
++        textAlign = TextAlign.Center,
++        color = MaterialTheme.colorScheme.onSurface,
++        maxLines = 1,
++        modifier = Modifier.fillMaxWidth(),
++    )
++}
++
++/**
++ * Blur behind the lyrics header (fade band below) or the bottom bar (fade band above). Height = bar + fade
++ * band; the band is masked out so the blur dissolves smoothly instead of ending at a hard line.
++ */
++@OptIn(ExperimentalHazeApi::class)
++@Composable
++private fun LyricsHeaderBlurLayer(
++    hazeState: HazeState,
++    blurRadius: Dp,
++    barHeight: Dp,
++    fade: Dp,
++    /** false: the fade band is below the bar (header). true: above it (bottom bar). */
++    fadeOnTop: Boolean = false,
++    modifier: Modifier = Modifier,
++) {
++    val style =
++        remember(blurRadius) {
++            HazeBlurStyle {
++                blurRadius(blurRadius)
++                noiseFactor(0f)
++                // Blur only: no tint, no darkening.
++                backgroundColor(Color.Transparent)
++                colorEffects(emptyList())
++                fallbackColorEffect(HazeColorEffect.tint(Color.Transparent))
++                alpha(1f)
++            }
++        }
++    val total = barHeight + fade
++    val solid = if (total > 0.dp) (barHeight / total).coerceIn(0f, 1f) else 1f
++    Box(
++        modifier =
++            modifier
++                .fillMaxWidth()
++                .height(total)
++                .graphicsLayer { compositingStrategy = CompositingStrategy.Offscreen }
++                .drawWithContent {
++                    drawContent()
++                    if (fade > 0.dp) {
++                        // Keep the blur fully opaque over the header, fade it out over the band.
++                        drawRect(
++                            brush =
++                                if (fadeOnTop) {
++                                    Brush.verticalGradient(
++                                        0f to Color.Transparent,
++                                        (1f - solid) to Color.Black,
++                                        1f to Color.Black,
++                                    )
++                                } else {
++                                    Brush.verticalGradient(
++                                        0f to Color.Black,
++                                        solid to Color.Black,
++                                        1f to Color.Transparent,
++                                    )
++                                },
++                            blendMode = BlendMode.DstIn,
++                        )
++                    }
++                }.hazeBlur(
++                    input = HazeInput.Sources(hazeState),
++                    style = style,
++                    performanceMode = HazePerformanceMode.Balanced,
++                    expandLayerBounds = false,
++                ),
++    )
+ }
++
++/** Fades the top [fade] of this content from transparent to opaque. */
++private fun Modifier.lyricsTopFade(fade: Dp): Modifier =
++    this
++        .graphicsLayer { compositingStrategy = CompositingStrategy.Offscreen }
++        .drawWithContent {
++            drawContent()
++            val f = fade.toPx().coerceAtMost(size.height)
++            if (f > 0f && size.height > 0f) {
++                drawRect(
++                    brush =
++                        Brush.verticalGradient(
++                            0f to Color.Transparent,
++                            (f / size.height) to Color.Black,
++                            1f to Color.Black,
++                        ),
++                    blendMode = BlendMode.DstIn,
++                )
++            }
++        }
+diff --git a/app/src/main/java/me/spica27/spicamusic/ui/player/LyricExtras.kt b/app/src/main/java/me/spica27/spicamusic/ui/player/LyricExtras.kt
+new file mode 100644
+index 0000000..d36928d
+--- /dev/null
++++ b/app/src/main/java/me/spica27/spicamusic/ui/player/LyricExtras.kt
+@@ -0,0 +1,74 @@
++package me.spica27.spicamusic.ui.player
++
++import me.spica27.spicamusic.common.entity.LyricItem
++
++/** true when at least one line carries a translation. */
++internal fun List<LyricItem>.hasTranslation(): Boolean =
++    any { item ->
++        when (item) {
++            is LyricItem.NormalLyric -> !item.translation.isNullOrBlank() || item.translationVariants.isNotEmpty()
++            is LyricItem.WordsLyric ->
++                item.translation.isNotEmpty() ||
++                    item.translationVariants.isNotEmpty() ||
++                    item.accompaniment.any { it.translation.isNotEmpty() || it.translationVariants.isNotEmpty() }
++            else -> false
++        }
++    }
++
++/** true when at least one line carries a transliteration (romanised text). */
++internal fun List<LyricItem>.hasTransliteration(): Boolean =
++    any { item ->
++        when (item) {
++            is LyricItem.NormalLyric -> !item.phonetic.isNullOrBlank() || item.transliterations.isNotEmpty()
++            is LyricItem.WordsLyric ->
++                !item.phonetic.isNullOrBlank() ||
++                    item.transliterations.isNotEmpty() ||
++                    item.words.any { !it.phonetic.isNullOrBlank() } ||
++                    item.accompaniment.any { acc ->
++                        !acc.phonetic.isNullOrBlank() ||
++                            acc.transliterations.isNotEmpty() ||
++                            acc.words.any { !it.phonetic.isNullOrBlank() }
++                    }
++            else -> false
++        }
++    }
++
++/** Returns the lyrics without their translation and/or transliteration lines. */
++internal fun List<LyricItem>.withExtras(
++    showTranslation: Boolean,
++    showTransliteration: Boolean,
++): List<LyricItem> {
++    if (showTranslation && showTransliteration) return this
++    return map { item ->
++        when (item) {
++            is LyricItem.NormalLyric ->
++                item.copy(
++                    translation = if (showTranslation) item.translation else null,
++                    translationVariants = if (showTranslation) item.translationVariants else emptyList(),
++                    phonetic = if (showTransliteration) item.phonetic else null,
++                    transliterations = if (showTransliteration) item.transliterations else emptyList(),
++                )
++            is LyricItem.WordsLyric ->
++                item.copy(
++                    translation = if (showTranslation) item.translation else emptyList(),
++                    translationVariants = if (showTranslation) item.translationVariants else emptyList(),
++                    phonetic = if (showTransliteration) item.phonetic else null,
++                    transliterations = if (showTransliteration) item.transliterations else emptyList(),
++                    words =
++                        if (showTransliteration) item.words else item.words.map { it.copy(phonetic = null) },
++                    accompaniment =
++                        item.accompaniment.map { acc ->
++                            acc.copy(
++                                translation = if (showTranslation) acc.translation else emptyList(),
++                                translationVariants = if (showTranslation) acc.translationVariants else emptyList(),
++                                phonetic = if (showTransliteration) acc.phonetic else null,
++                                transliterations = if (showTransliteration) acc.transliterations else emptyList(),
++                                words =
++                                    if (showTransliteration) acc.words else acc.words.map { it.copy(phonetic = null) },
++                            )
++                        },
++                )
++            else -> item
++        }
++    }
++}
+diff --git a/app/src/main/java/me/spica27/spicamusic/ui/player/LyricsBottomBar.kt b/app/src/main/java/me/spica27/spicamusic/ui/player/LyricsBottomBar.kt
+new file mode 100644
+index 0000000..9623288
+--- /dev/null
++++ b/app/src/main/java/me/spica27/spicamusic/ui/player/LyricsBottomBar.kt
+@@ -0,0 +1,315 @@
++package me.spica27.spicamusic.ui.player
++
++import androidx.compose.foundation.background
++import androidx.compose.foundation.clickable
++import androidx.compose.foundation.layout.Arrangement
++import androidx.compose.foundation.layout.Box
++import androidx.compose.foundation.layout.Column
++import androidx.compose.foundation.layout.Row
++import androidx.compose.foundation.layout.Spacer
++import androidx.compose.foundation.layout.fillMaxSize
++import androidx.compose.foundation.layout.fillMaxWidth
++import androidx.compose.foundation.layout.height
++import androidx.compose.foundation.layout.navigationBarsPadding
++import androidx.compose.foundation.layout.padding
++import androidx.compose.foundation.layout.size
++import androidx.compose.foundation.layout.width
++import androidx.compose.foundation.shape.CircleShape
++import androidx.compose.material.icons.Icons
++import androidx.compose.material.icons.rounded.Pause
++import androidx.compose.material.icons.rounded.PlayArrow
++import androidx.compose.material.icons.rounded.Translate
++import androidx.compose.material3.Icon
++import androidx.compose.material3.MaterialTheme
++import androidx.compose.material3.Text
++import androidx.compose.runtime.Composable
++import androidx.compose.runtime.getValue
++import androidx.compose.runtime.remember
++import androidx.compose.ui.Alignment
++import androidx.compose.ui.Modifier
++import androidx.compose.ui.draw.clip
++import androidx.compose.ui.graphics.Color
++import androidx.compose.ui.graphics.lerp
++import androidx.compose.ui.layout.onSizeChanged
++import androidx.compose.ui.res.stringResource
++import androidx.compose.ui.semantics.Role
++import androidx.compose.ui.text.font.FontWeight
++import androidx.compose.ui.text.style.TextAlign
++import androidx.compose.ui.text.style.TextOverflow
++import androidx.compose.ui.unit.Dp
++import androidx.compose.ui.unit.TextUnit
++import androidx.compose.ui.unit.dp
++import androidx.compose.ui.unit.sp
++import androidx.lifecycle.compose.collectAsStateWithLifecycle
++import dev.chrisbanes.haze.ExperimentalHazeApi
++import dev.chrisbanes.haze.HazeInput
++import dev.chrisbanes.haze.HazePerformanceMode
++import dev.chrisbanes.haze.HazeState
++import dev.chrisbanes.haze.blur.HazeBlurStyle
++import dev.chrisbanes.haze.blur.HazeColorEffect
++import dev.chrisbanes.haze.blur.hazeBlur
++import me.spica27.spicamusic.R
++import me.spica27.spicamusic.artwork.MusicArtwork
++import me.spica27.spicamusic.ui.widget.AudioCover
++import me.spica27.spicamusic.ui.widget.rememberLyricsEdgePadding
++import org.koin.compose.viewmodel.koinActivityViewModel
++import java.util.Locale
++
++/**
++ * Bottom bar of the lyrics page:
++ * [transliteration button] [pill: cover | artist + time | play/pause] [translation button].
++ *
++ * The two side buttons turn the transliteration / translation lines on and off. When the lyrics
++ * have no such lines the icon is faded and tapping does nothing.
++ */
++@OptIn(ExperimentalHazeApi::class)
++@Composable
++internal fun LyricsBottomBar(
++    artist: String,
++    artwork: MusicArtwork?,
++    isPlaying: Boolean,
++    onPlayPauseClick: () -> Unit,
++    seekPositionProvider: () -> Float,
++    durationMs: Long,
++    hazeState: HazeState,
++    /** Height of the whole bar in px, so the "spread" blur layer can match it. */
++    onHeightChange: (Int) -> Unit,
++    modifier: Modifier = Modifier,
++) {
++    val viewModel: LyricsViewModel = koinActivityViewModel()
++    val uiState by viewModel.uiState.collectAsStateWithLifecycle()
++    val styleViewModel: LyricsStyleViewModel = koinActivityViewModel()
++    val s by styleViewModel.style.collectAsStateWithLifecycle()
++
++    // Re-evaluated only when the lyrics themselves change.
++    val items = uiState.displayed?.items
++    val hasTransliteration = remember(items) { items?.hasTransliteration() == true }
++    val hasTranslation = remember(items) { items?.hasTranslation() == true }
++
++    val edge = rememberLyricsEdgePadding()
++    val size = s.dockSize.dp
++    val pad = s.dockPillPadding.dp
++    val inner = (size - pad * 2).coerceAtLeast(16.dp)
++
++    val onSurface = MaterialTheme.colorScheme.onSurface
++    val surface = MaterialTheme.colorScheme.surface
++    // Blur on: translucent fill over the blurred lyrics. Blur off: a solid colour, never transparent.
++    val fill = if (s.dockBlurEnabled) onSurface.copy(alpha = 0.14f) else lerp(surface, onSurface, 0.18f)
++    val innerFill = if (s.dockBlurEnabled) onSurface.copy(alpha = 0.16f) else lerp(surface, onSurface, 0.28f)
++
++    val blurAmount = s.dockBlurAmount
++    val blurStyle =
++        remember(blurAmount) {
++            HazeBlurStyle {
++                blurRadius(blurAmount.dp)
++                noiseFactor(0f)
++                backgroundColor(Color.Transparent)
++                colorEffects(emptyList())
++                fallbackColorEffect(HazeColorEffect.tint(Color.Transparent))
++                alpha(1f)
++            }
++        }
++    // Normal: every button and the pill blur on their own. Spread: one blur layer behind the whole bar
++    // (drawn by the lyrics surface), so nothing blurs here.
++    val glass: Modifier =
++        if (s.dockBlurEnabled && blurAmount > 0 && !s.dockSpreadBlur) {
++            Modifier.hazeBlur(
++                input = HazeInput.Sources(hazeState),
++                style = blurStyle,
++                performanceMode = HazePerformanceMode.Balanced,
++                expandLayerBounds = false,
++            )
++        } else {
++            Modifier
++        }
++
++    Row(
++        modifier =
++            modifier
++                .fillMaxWidth()
++                .onSizeChanged { onHeightChange(it.height) }
++                .navigationBarsPadding()
++                .padding(start = edge, end = edge, top = 10.dp, bottom = s.dockBottomPadding.dp),
++        verticalAlignment = Alignment.CenterVertically,
++    ) {
++        // Left: transliteration
++        DockCircleButton(
++            size = size,
++            fill = fill,
++            glass = glass,
++            on = s.showTransliteration && hasTransliteration,
++            available = hasTransliteration,
++            description = stringResource(R.string.lyr_dock_transliteration),
++            onClick = {
++                if (hasTransliteration) {
++                    styleViewModel.update { it.copy(showTransliteration = !it.showTransliteration) }
++                }
++            },
++        ) { tint ->
++            Text(
++                text = "Aa",
++                color = tint,
++                fontWeight = FontWeight.Bold,
++                fontSize = (size.value * 0.33f).sp,
++                maxLines = 1,
++            )
++        }
++
++        Spacer(modifier = Modifier.width(s.dockGapLeft.dp))
++
++        // Middle: pill
++        Row(
++            modifier =
++                Modifier
++                    .weight(1f)
++                    .height(size)
++                    .clip(CircleShape)
++                    .then(glass)
++                    .background(fill)
++                    .padding(pad),
++            verticalAlignment = Alignment.CenterVertically,
++        ) {
++            Box(
++                modifier =
++                    Modifier
++                        .size(inner)
++                        .clip(CircleShape)
++                        .background(onSurface.copy(alpha = 0.08f)),
++            ) {
++                AudioCover(
++                    artwork = artwork,
++                    modifier = Modifier.fillMaxSize(),
++                )
++            }
++
++            Column(
++                modifier =
++                    Modifier
++                        .weight(1f)
++                        .padding(horizontal = 8.dp),
++                horizontalAlignment = Alignment.CenterHorizontally,
++                verticalArrangement = Arrangement.Center,
++            ) {
++                val artistSize = (size.value * 0.27f).sp
++                Text(
++                    text = artist,
++                    style = MaterialTheme.typography.bodyMedium,
++                    fontSize = artistSize,
++                    lineHeight = artistSize * 1.2f,
++                    fontWeight = FontWeight.Bold,
++                    color = onSurface,
++                    textAlign = TextAlign.Center,
++                    maxLines = 1,
++                    overflow = TextOverflow.Ellipsis,
++                    modifier = Modifier.fillMaxWidth(),
++                )
++                LyricsDockTime(
++                    seekPositionProvider = seekPositionProvider,
++                    durationMs = durationMs,
++                    fontSize = (size.value * 0.23f).sp,
++                )
++            }
++
++            Box(
++                modifier =
++                    Modifier
++                        .size(inner)
++                        .clip(CircleShape)
++                        .background(innerFill)
++                        .clickable(role = Role.Button, onClick = onPlayPauseClick),
++                contentAlignment = Alignment.Center,
++            ) {
++                Icon(
++                    imageVector = if (isPlaying) Icons.Rounded.Pause else Icons.Rounded.PlayArrow,
++                    contentDescription = stringResource(if (isPlaying) R.string.pause else R.string.play),
++                    tint = onSurface,
++                    modifier = Modifier.size(inner / 2),
++                )
++            }
++        }
++
++        Spacer(modifier = Modifier.width(s.dockGapRight.dp))
++
++        // Right: translation
++        DockCircleButton(
++            size = size,
++            fill = fill,
++            glass = glass,
++            on = s.showTranslation && hasTranslation,
++            available = hasTranslation,
++            description = stringResource(R.string.lyr_dock_translation),
++            onClick = {
++                if (hasTranslation) {
++                    styleViewModel.update { it.copy(showTranslation = !it.showTranslation) }
++                }
++            },
++        ) { tint ->
++            Icon(
++                imageVector = Icons.Rounded.Translate,
++                contentDescription = null,
++                tint = tint,
++                modifier = Modifier.size(size * 0.46f),
++            )
++        }
++    }
++}
++
++/**
++ * Round button. The circle never changes; only the icon / text does:
++ * on = full strength, off = dimmed, not available = faded more (and tapping does nothing).
++ */
++@Composable
++private fun DockCircleButton(
++    size: Dp,
++    fill: Color,
++    glass: Modifier,
++    on: Boolean,
++    available: Boolean,
++    description: String,
++    onClick: () -> Unit,
++    content: @Composable (tint: Color) -> Unit,
++) {
++    val onSurface = MaterialTheme.colorScheme.onSurface
++    val tint =
++        when {
++            !available -> onSurface.copy(alpha = 0.35f)
++            on -> onSurface
++            else -> onSurface.copy(alpha = 0.55f)
++        }
++    Box(
++        modifier =
++            Modifier
++                .size(size)
++                .clip(CircleShape)
++                .then(glass)
++                .background(fill)
++                .clickable(role = Role.Button, onClickLabel = description, onClick = onClick),
++        contentAlignment = Alignment.Center,
++    ) {
++        content(tint)
++    }
++}
++
++/** "01:30 / 02:55". Only this small composable reads the position, so the bar doesn't recompose per tick. */
++@Composable
++private fun LyricsDockTime(
++    seekPositionProvider: () -> Float,
++    durationMs: Long,
++    fontSize: TextUnit,
++) {
++    Text(
++        text = "${clock(seekPositionProvider().toLong())} / ${clock(durationMs)}",
++        style = MaterialTheme.typography.bodySmall.copy(fontFeatureSettings = "tnum"),
++        fontSize = fontSize,
++        lineHeight = fontSize * 1.2f,
++        color = MaterialTheme.colorScheme.onSurfaceVariant,
++        textAlign = TextAlign.Center,
++        maxLines = 1,
++        modifier = Modifier.fillMaxWidth(),
++    )
++}
++
++private fun clock(ms: Long): String {
++    val total = ms.coerceAtLeast(0L) / 1000L
++    return String.format(Locale.US, "%02d:%02d", total / 60L, total % 60L)
++}
+diff --git a/app/src/main/java/me/spica27/spicamusic/ui/player/LyricsPanel.kt b/app/src/main/java/me/spica27/spicamusic/ui/player/LyricsPanel.kt
+index 6f8da58..7ff4336 100644
+--- a/app/src/main/java/me/spica27/spicamusic/ui/player/LyricsPanel.kt
++++ b/app/src/main/java/me/spica27/spicamusic/ui/player/LyricsPanel.kt
+@@ -57,6 +57,8 @@ fun LyricsPanel(
+     displayMode: LyricsDisplayMode = LyricsDisplayMode.Fullscreen,
+     displayOptions: LyricsDisplayOptions = LyricsDisplayOptions(),
+     toolbarBottomInset: Dp = 0.dp,
++    /** false: the host (e.g. the fullscreen lyrics header) shows the toolbar and settings itself. */
++    showToolbar: Boolean = true,
+ ) {
+     // Activity 作用域共享实例：与 mini 歌词同源，
+     // 此处切换歌词源 / 调整偏移量会同步反映到 mini 歌词
+@@ -122,7 +124,16 @@ fun LyricsPanel(
+                 val displayed = uiState.displayed!!
+                 // 面板每帧随 currentTime 重组，若在此每帧 copyOf 会全量拷贝整份歌词。
+                 // 按 items 身份缓存：只有歌词本身变化才重建。
+-                val lyricList = remember(displayed) { ImmutableList.copyOf(displayed.items) }
++                // 译文 / 音译开关（歌词页底栏的左右按钮）：关闭时过滤掉对应行。
++                val lyricList =
++                    remember(displayed, styleSettings.showTranslation, styleSettings.showTransliteration) {
++                        ImmutableList.copyOf(
++                            displayed.items.withExtras(
++                                showTranslation = styleSettings.showTranslation,
++                                showTransliteration = styleSettings.showTransliteration,
++                            ),
++                        )
++                    }
+                 LyricsUI(
+                     modifier = Modifier.fillMaxSize(),
+                     lyric = lyricList,
+@@ -146,33 +157,35 @@ fun LyricsPanel(
+             }
+         }
+ 
+-        // 浮动工具栏（右下角）：切换入口常驻，保证无内嵌/在线时仍可进入选择本地文件
+-        FloatingLyricsToolbar(
+-            offsetEnabled = !uiState.lyricsSuppressed,
+-            onOpenLyricsSettings = { showLyricsSettings = true },
+-            offsetMs = uiState.lyricsOffsetMs,
+-            onOffsetChange = { viewModel.updateOffset(it) },
+-            onOpenLyricsSwitcher = {
+-                viewModel.openPanel()
+-                backStack.add(LyricsSourceRoute)
+-            },
+-            modifier =
+-                Modifier
+-                    .align(Alignment.BottomEnd)
+-                    .padding(
+-                        end = if (displayMode == LyricsDisplayMode.Compact) 12.dp else 16.dp,
+-                        bottom =
+-                            (if (displayMode == LyricsDisplayMode.Compact) 12.dp else 24.dp) +
+-                                toolbarBottomInset,
+-                    ),
+-        )
+-
+-        if (showLyricsSettings) {
+-            LyricsSettingsSheet(
+-                settings = styleSettings,
+-                onUpdate = styleViewModel::update,
+-                onDismiss = { showLyricsSettings = false },
++        if (showToolbar) {
++            // 浮动工具栏（右下角）：切换入口常驻，保证无内嵌/在线时仍可进入选择本地文件
++            FloatingLyricsToolbar(
++                offsetEnabled = !uiState.lyricsSuppressed,
++                onOpenLyricsSettings = { showLyricsSettings = true },
++                offsetMs = uiState.lyricsOffsetMs,
++                onOffsetChange = { viewModel.updateOffset(it) },
++                onOpenLyricsSwitcher = {
++                    viewModel.openPanel()
++                    backStack.add(LyricsSourceRoute)
++                },
++                modifier =
++                    Modifier
++                        .align(Alignment.BottomEnd)
++                        .padding(
++                            end = if (displayMode == LyricsDisplayMode.Compact) 12.dp else 16.dp,
++                            bottom =
++                                (if (displayMode == LyricsDisplayMode.Compact) 12.dp else 24.dp) +
++                                    toolbarBottomInset,
++                        ),
+             )
++
++            if (showLyricsSettings) {
++                LyricsSettingsSheet(
++                    settings = styleSettings,
++                    onUpdate = styleViewModel::update,
++                    onDismiss = { showLyricsSettings = false },
++                )
++            }
+         }
+     }
+ }
+diff --git a/app/src/main/java/me/spica27/spicamusic/ui/settings/SettingsScene.kt b/app/src/main/java/me/spica27/spicamusic/ui/settings/SettingsScene.kt
+index 1edc343..5ae3c2b 100644
+--- a/app/src/main/java/me/spica27/spicamusic/ui/settings/SettingsScene.kt
++++ b/app/src/main/java/me/spica27/spicamusic/ui/settings/SettingsScene.kt
+@@ -44,11 +44,11 @@ import androidx.compose.material.icons.filled.ExpandMore
+ import androidx.compose.material.icons.filled.GraphicEq
+ import androidx.compose.material.icons.filled.Info
+ import androidx.compose.material.icons.filled.Landscape
++import androidx.compose.material.icons.filled.Palette
+ import androidx.compose.material.icons.filled.Layers
+ import androidx.compose.material.icons.filled.LensBlur
+ import androidx.compose.material.icons.filled.LocationCity
+ import androidx.compose.material.icons.filled.MusicOff
+-import androidx.compose.material.icons.filled.Palette
+ import androidx.compose.material.icons.filled.PowerSettingsNew
+ import androidx.compose.material.icons.filled.Tune
+ import androidx.compose.material.icons.filled.ViewAgenda
+@@ -104,6 +104,13 @@ import me.spica27.spicamusic.ui.theme.ScaleEnterFrom
+ import me.spica27.spicamusic.ui.theme.Shapes
+ import me.spica27.spicamusic.ui.theme.Spacing
+ import me.spica27.spicamusic.ui.theme.entrance
++import me.spica27.spicamusic.ui.widget.LyricsSettingsChips
++import me.spica27.spicamusic.ui.widget.LyricsSettingsResetButton
++import me.spica27.spicamusic.ui.widget.LyricsSettingsSection
++import me.spica27.spicamusic.ui.widget.LyricsSettingsSlider
++import me.spica27.spicamusic.ui.widget.LyricsSettingsToggle
++import me.spica27.spicamusic.ui.widget.VerseMeshSettings
++import me.spica27.spicamusic.ui.widget.VerseThemeMode
+ import me.spica27.spicamusic.ui.widget.clickHighlight
+ import me.spica27.spicamusic.ui.widget.rememberIOSOverScrollEffect
+ import org.koin.compose.viewmodel.koinViewModel
+@@ -121,6 +128,11 @@ fun SettingsScreen() {
+     val bottomBarLayout by viewModel.bottomBarLayout.collectAsStateWithLifecycle()
+     val keepScreenOn by viewModel.keepScreenOn.collectAsStateWithLifecycle()
+     val backgroundValue by viewModel.dynamicSpectrumBackground.collectAsStateWithLifecycle()
++    val verseMode by viewModel.verseThemeMode.collectAsStateWithLifecycle()
++    val verseSaturation by viewModel.verseSaturation.collectAsStateWithLifecycle()
++    val verseVibrancy by viewModel.verseVibrancy.collectAsStateWithLifecycle()
++    val verseHue by viewModel.verseHue.collectAsStateWithLifecycle()
++    val verseMesh by viewModel.verseMesh.collectAsStateWithLifecycle()
+     val coverTapValue by viewModel.dynamicCoverType.collectAsStateWithLifecycle()
+     val progressWaveformValue by viewModel.progressBarStyle.collectAsStateWithLifecycle()
+     val colorStyleValue by viewModel.themeColorStyle.collectAsStateWithLifecycle()
+@@ -251,6 +263,34 @@ fun SettingsScreen() {
+                         onExpandChange = { expandedRowKey = it },
+                         onValueChange = viewModel::setDynamicSpectrumBackground,
+                     )
++                    AnimatedVisibility(
++                        visible = backgroundValue == DynamicSpectrumBackground.VerseFlow.value,
++                        enter =
++                            expandVertically(
++                                animationSpec = tween(durationMillis = 220, easing = EaseOutEmphasized),
++                            ) + fadeIn(tween(durationMillis = 180)),
++                        exit =
++                            shrinkVertically(
++                                animationSpec = tween(durationMillis = 180, easing = EaseOutEmphasized),
++                            ) + fadeOut(tween(durationMillis = 140)),
++                    ) {
++                        VerseAppearanceControls(
++                            mode = verseMode,
++                            saturation = verseSaturation,
++                            vibrancy = verseVibrancy,
++                            hue = verseHue,
++                            onModeChange = viewModel::setVerseThemeMode,
++                            onSaturationChange = viewModel::setVerseSaturation,
++                            onVibrancyChange = viewModel::setVerseVibrancy,
++                            onHueChange = viewModel::setVerseHue,
++                            onReset = viewModel::resetVerseAppearance,
++                        )
++                        VerseBlobControls(
++                            mesh = verseMesh,
++                            onChange = viewModel::updateVerseMesh,
++                            onReset = viewModel::resetVerseMesh,
++                        )
++                    }
+ //                        SettingsItemDivider()
+ //                        InlineSelectRow(
+ //                            rowKey = "cover_tap",
+@@ -945,7 +985,11 @@ private fun rememberBackgroundOptions(): ImmutableList<SettingsOption> {
+     val warpDesc = stringResource(R.string.bg_fluid_warp_desc)
+     val blur = stringResource(R.string.bg_blur_cover)
+     val blurDesc = stringResource(R.string.bg_blur_cover_desc)
++    val verse = stringResource(R.string.bg_verse_flow)
++    val verseDesc = stringResource(R.string.bg_verse_flow_desc)
+     return remember(
++        verse,
++        verseDesc,
+         off,
+         offDesc,
+         topGlow,
+@@ -961,6 +1005,12 @@ private fun rememberBackgroundOptions(): ImmutableList<SettingsOption> {
+     ) {
+         ImmutableList.copyOf(
+             listOf(
++                SettingsOption(
++                    DynamicSpectrumBackground.VerseFlow.value,
++                    verse,
++                    verseDesc,
++                    Icons.Default.Palette,
++                ),
+                 SettingsOption(
+                     DynamicSpectrumBackground.FluidWarp.value,
+                     warp,
+@@ -1089,3 +1139,157 @@ private fun Density.mastheadCollapse(listState: LazyListState): Float =
+     } else {
+         (listState.firstVisibleItemScrollOffset / MastheadCollapseDistance.toPx()).coerceIn(0f, 1f)
+     }
++
++
++/** Verse Flow 外观：Auto / Light / Dark，饱和度、鲜艳度、高亮色（与 HTML 的 Appearance 一致）。 */
++@Composable
++private fun VerseAppearanceControls(
++    mode: String,
++    saturation: Int,
++    vibrancy: Int,
++    hue: Int,
++    onModeChange: (String) -> Unit,
++    onSaturationChange: (Int) -> Unit,
++    onVibrancyChange: (Int) -> Unit,
++    onHueChange: (Int) -> Unit,
++    onReset: () -> Unit,
++) {
++    val auto = stringResource(R.string.verse_hue_auto)
++    Column(
++        modifier =
++            Modifier
++                .fillMaxWidth()
++                .padding(
++                    start = SettingsRowContentInset,
++                    end = Spacing.Large,
++                    top = Spacing.ExtraSmall,
++                    bottom = Spacing.Small,
++                ),
++    ) {
++        LyricsSettingsChips(
++            label = stringResource(R.string.verse_mode),
++            description = stringResource(R.string.verse_mode_desc),
++            options = listOf(VerseThemeMode.AUTO, VerseThemeMode.LIGHT, VerseThemeMode.DARK),
++            selected = mode,
++            optionLabel = {
++                when (it) {
++                    VerseThemeMode.LIGHT -> stringResource(R.string.verse_mode_light)
++                    VerseThemeMode.DARK -> stringResource(R.string.verse_mode_dark)
++                    else -> stringResource(R.string.verse_mode_auto)
++                }
++            },
++            onSelect = onModeChange,
++        )
++        LyricsSettingsSlider(
++            label = stringResource(R.string.verse_saturation),
++            description = stringResource(R.string.verse_saturation_desc),
++            value = saturation,
++            range = 0..200,
++            step = 5,
++            valueText = { "$it%" },
++            onValueChange = onSaturationChange,
++        )
++        LyricsSettingsSlider(
++            label = stringResource(R.string.verse_vibrancy),
++            description = stringResource(R.string.verse_vibrancy_desc),
++            value = vibrancy,
++            range = 0..100,
++            step = 1,
++            valueText = { "$it%" },
++            onValueChange = onVibrancyChange,
++        )
++        LyricsSettingsSlider(
++            label = stringResource(R.string.verse_highlight),
++            description = stringResource(R.string.verse_highlight_desc),
++            value = hue,
++            range = -180..180,
++            step = 5,
++            valueText = { if (it == 0) auto else (if (it > 0) "+" else "") + it + "°" },
++            onValueChange = onHueChange,
++        )
++        LyricsSettingsResetButton(
++            text = stringResource(R.string.verse_reset),
++            onClick = onReset,
++        )
++    }
++}
++
++/** Verse Flow 歌词页色块：数量、大小、不透明度、颜色、动效速度，以及动画开关（关闭后完全静态）。 */
++@Composable
++private fun VerseBlobControls(
++    mesh: VerseMeshSettings,
++    onChange: (VerseMeshSettings) -> Unit,
++    onReset: () -> Unit,
++) {
++    Column(
++        modifier =
++            Modifier
++                .fillMaxWidth()
++                .padding(
++                    start = SettingsRowContentInset,
++                    end = Spacing.Large,
++                    top = Spacing.ExtraSmall,
++                    bottom = Spacing.Small,
++                ),
++    ) {
++        LyricsSettingsSection(title = stringResource(R.string.verse_blobs_section))
++        LyricsSettingsToggle(
++            label = stringResource(R.string.verse_blobs_anim),
++            description = stringResource(R.string.verse_blobs_anim_desc),
++            checked = mesh.animated,
++            onCheckedChange = { onChange(mesh.copy(animated = it)) },
++        )
++        LyricsSettingsSlider(
++            label = stringResource(R.string.verse_blobs_count),
++            description = stringResource(R.string.verse_blobs_count_desc),
++            value = mesh.blobCount,
++            range = 1..4,
++            step = 1,
++            valueText = { "$it" },
++            onValueChange = { onChange(mesh.copy(blobCount = it)) },
++        )
++        LyricsSettingsSlider(
++            label = stringResource(R.string.verse_blobs_size),
++            description = stringResource(R.string.verse_blobs_size_desc),
++            value = mesh.sizePercent,
++            range = 0..100,
++            step = 1,
++            valueText = { "$it%" },
++            onValueChange = { onChange(mesh.copy(sizePercent = it)) },
++        )
++        LyricsSettingsSlider(
++            label = stringResource(R.string.verse_blobs_opacity),
++            description = stringResource(R.string.verse_blobs_opacity_desc),
++            value = mesh.opacityPercent,
++            range = 0..100,
++            step = 1,
++            valueText = { "$it%" },
++            onValueChange = { onChange(mesh.copy(opacityPercent = it)) },
++        )
++        LyricsSettingsSlider(
++            label = stringResource(R.string.verse_blobs_color),
++            description = stringResource(R.string.verse_blobs_color_desc),
++            value = mesh.colorPercent,
++            range = 0..100,
++            step = 1,
++            valueText = { "$it%" },
++            onValueChange = { onChange(mesh.copy(colorPercent = it)) },
++        )
++        // 动画关闭时速度没有意义，直接隐藏
++        if (mesh.animated) {
++            LyricsSettingsSlider(
++                label = stringResource(R.string.verse_blobs_motion),
++                description = stringResource(R.string.verse_blobs_motion_desc),
++                value = mesh.motionSeconds,
++                range = 5..60,
++                step = 1,
++                valueText = { "${it}s" },
++                onValueChange = { onChange(mesh.copy(motionSeconds = it)) },
++            )
++        }
++        LyricsSettingsResetButton(
++            text = stringResource(R.string.verse_blobs_reset),
++            onClick = onReset,
++        )
++    }
++}
+diff --git a/app/src/main/java/me/spica27/spicamusic/ui/settings/SettingsViewModel.kt b/app/src/main/java/me/spica27/spicamusic/ui/settings/SettingsViewModel.kt
+index 477a051..adc3703 100644
+--- a/app/src/main/java/me/spica27/spicamusic/ui/settings/SettingsViewModel.kt
++++ b/app/src/main/java/me/spica27/spicamusic/ui/settings/SettingsViewModel.kt
+@@ -4,6 +4,7 @@ import androidx.compose.runtime.Stable
+ import androidx.lifecycle.ViewModel
+ import androidx.lifecycle.viewModelScope
+ import kotlinx.coroutines.flow.SharingStarted
++import kotlinx.coroutines.flow.combine
+ import kotlinx.coroutines.flow.map
+ import kotlinx.coroutines.flow.stateIn
+ import kotlinx.coroutines.launch
+@@ -13,6 +14,8 @@ import me.spica27.spicamusic.common.entity.DynamicSpectrumBackground
+ import me.spica27.spicamusic.common.entity.ProgressBarStyle
+ import me.spica27.spicamusic.common.entity.ThemeColorStyle
+ import me.spica27.spicamusic.feature.settings.domain.SettingsUseCases
++import me.spica27.spicamusic.ui.widget.VerseMeshSettings
++import me.spica27.spicamusic.ui.widget.VerseThemeMode
+ 
+ /**
+  * 设置页面 ViewModel
+@@ -98,6 +101,93 @@ class SettingsViewModel(
+         }
+     }
+ 
++    // ---- Verse Flow 外观 ----
++    val verseThemeMode =
++        settingsUseCases
++            .getString(SettingsUseCases.Keys.VERSE_THEME_MODE, VerseThemeMode.AUTO)
++            .stateIn(viewModelScope, SharingStarted.Eagerly, VerseThemeMode.AUTO)
++
++    fun setVerseThemeMode(value: String) {
++        viewModelScope.launch { settingsUseCases.setString(SettingsUseCases.Keys.VERSE_THEME_MODE, value) }
++    }
++
++    /** 饱和度 0..200（%），默认 100 */
++    val verseSaturation =
++        settingsUseCases
++            .getInt(SettingsUseCases.Keys.VERSE_THEME_SATURATION, 100)
++            .stateIn(viewModelScope, SharingStarted.Eagerly, 100)
++
++    fun setVerseSaturation(value: Int) {
++        viewModelScope.launch { settingsUseCases.setInt(SettingsUseCases.Keys.VERSE_THEME_SATURATION, value.coerceIn(0, 200)) }
++    }
++
++    /** 鲜艳度 0..100（%），默认 50 */
++    val verseVibrancy =
++        settingsUseCases
++            .getInt(SettingsUseCases.Keys.VERSE_THEME_VIBRANCY, 50)
++            .stateIn(viewModelScope, SharingStarted.Eagerly, 50)
++
++    fun setVerseVibrancy(value: Int) {
++        viewModelScope.launch { settingsUseCases.setInt(SettingsUseCases.Keys.VERSE_THEME_VIBRANCY, value.coerceIn(0, 100)) }
++    }
++
++    /** 高亮色相偏移 -180..180°，0 = Auto */
++    val verseHue =
++        settingsUseCases
++            .getInt(SettingsUseCases.Keys.VERSE_THEME_HUE, 0)
++            .stateIn(viewModelScope, SharingStarted.Eagerly, 0)
++
++    fun setVerseHue(value: Int) {
++        viewModelScope.launch { settingsUseCases.setInt(SettingsUseCases.Keys.VERSE_THEME_HUE, value.coerceIn(-180, 180)) }
++    }
++
++    // ---- Verse Flow 歌词页色块 ----
++    private val meshCount = settingsUseCases.getInt(SettingsUseCases.Keys.VERSE_MESH_COUNT, VerseMeshSettings().blobCount)
++    private val meshSize = settingsUseCases.getInt(SettingsUseCases.Keys.VERSE_MESH_SIZE, VerseMeshSettings().sizePercent)
++    private val meshOpacity = settingsUseCases.getInt(SettingsUseCases.Keys.VERSE_MESH_OPACITY, VerseMeshSettings().opacityPercent)
++    private val meshMotion = settingsUseCases.getInt(SettingsUseCases.Keys.VERSE_MESH_MOTION, VerseMeshSettings().motionSeconds)
++    private val meshColor = settingsUseCases.getInt(SettingsUseCases.Keys.VERSE_MESH_COLOR, VerseMeshSettings().colorPercent)
++    private val meshAnimated = settingsUseCases.getBoolean(SettingsUseCases.Keys.VERSE_MESH_ANIMATED, VerseMeshSettings().animated)
++
++    val verseMesh =
++        combine(
++            combine(meshCount, meshSize, meshOpacity) { c, s, o -> Triple(c, s, o) },
++            combine(meshMotion, meshColor, meshAnimated) { m, col, a -> Triple(m, col, a) },
++        ) { (c, s, o), (m, col, a) ->
++            VerseMeshSettings(
++                blobCount = c.coerceIn(1, 4),
++                sizePercent = s.coerceIn(0, 100),
++                opacityPercent = o.coerceIn(0, 100),
++                motionSeconds = m.coerceIn(5, 60),
++                colorPercent = col.coerceIn(0, 100),
++                animated = a,
++            )
++        }.stateIn(viewModelScope, SharingStarted.Eagerly, VerseMeshSettings())
++
++    /** Only the fields that actually changed are written. */
++    fun updateVerseMesh(new: VerseMeshSettings) {
++        val old = verseMesh.value
++        viewModelScope.launch {
++            if (new.blobCount != old.blobCount) settingsUseCases.setInt(SettingsUseCases.Keys.VERSE_MESH_COUNT, new.blobCount.coerceIn(1, 4))
++            if (new.sizePercent != old.sizePercent) settingsUseCases.setInt(SettingsUseCases.Keys.VERSE_MESH_SIZE, new.sizePercent.coerceIn(0, 100))
++            if (new.opacityPercent != old.opacityPercent) settingsUseCases.setInt(SettingsUseCases.Keys.VERSE_MESH_OPACITY, new.opacityPercent.coerceIn(0, 100))
++            if (new.motionSeconds != old.motionSeconds) settingsUseCases.setInt(SettingsUseCases.Keys.VERSE_MESH_MOTION, new.motionSeconds.coerceIn(5, 60))
++            if (new.colorPercent != old.colorPercent) settingsUseCases.setInt(SettingsUseCases.Keys.VERSE_MESH_COLOR, new.colorPercent.coerceIn(0, 100))
++            if (new.animated != old.animated) settingsUseCases.setBoolean(SettingsUseCases.Keys.VERSE_MESH_ANIMATED, new.animated)
++        }
++    }
++
++    fun resetVerseMesh() = updateVerseMesh(VerseMeshSettings())
++
++    fun resetVerseAppearance() {
++        viewModelScope.launch {
++            settingsUseCases.setString(SettingsUseCases.Keys.VERSE_THEME_MODE, VerseThemeMode.AUTO)
++            settingsUseCases.setInt(SettingsUseCases.Keys.VERSE_THEME_SATURATION, 100)
++            settingsUseCases.setInt(SettingsUseCases.Keys.VERSE_THEME_VIBRANCY, 50)
++            settingsUseCases.setInt(SettingsUseCases.Keys.VERSE_THEME_HUE, 0)
++        }
++    }
++
+     // 动态封面
+     val dynamicCoverType =
+         settingsUseCases
+diff --git a/app/src/main/java/me/spica27/spicamusic/ui/widget/FloatingLyricsToolbar.kt b/app/src/main/java/me/spica27/spicamusic/ui/widget/FloatingLyricsToolbar.kt
+index 5dd4b2a..928b415 100644
+--- a/app/src/main/java/me/spica27/spicamusic/ui/widget/FloatingLyricsToolbar.kt
++++ b/app/src/main/java/me/spica27/spicamusic/ui/widget/FloatingLyricsToolbar.kt
+@@ -78,34 +78,19 @@ fun FloatingLyricsToolbar(
+                         shrinkTowards = Alignment.End,
+                     ),
+         ) {
+-            Column(
+-                horizontalAlignment = Alignment.End,
+-                verticalArrangement = Arrangement.spacedBy(8.dp),
+-            ) {
+-                // 偏移量调节栏
+-                if (offsetEnabled) {
+-                    OffsetAdjustBar(
+-                        offsetMs = offsetMs,
+-                        onOffsetChange = onOffsetChange,
+-                    )
+-                }
+-
+-                // 歌词设置（字体、字号、模糊、跳动等）
+-                LyricsSettingsButton(
+-                    onClick = {
+-                        isExpanded = false
+-                        onOpenLyricsSettings()
+-                    },
+-                )
+-
+-                // 切换歌词来源按钮（常驻：无内嵌/在线时用户仍可进入选择本地文件）
+-                SwitchLyricsButton(
+-                    onClick = {
+-                        isExpanded = false
+-                        onOpenLyricsSwitcher()
+-                    },
+-                )
+-            }
++            LyricsToolbarMenuContent(
++                offsetEnabled = offsetEnabled,
++                offsetMs = offsetMs,
++                onOffsetChange = onOffsetChange,
++                onOpenLyricsSettings = {
++                    isExpanded = false
++                    onOpenLyricsSettings()
++                },
++                onOpenLyricsSwitcher = {
++                    isExpanded = false
++                    onOpenLyricsSwitcher()
++                },
++            )
+         }
+ 
+         // 主按钮（展开/收起）
+@@ -123,6 +108,40 @@ fun FloatingLyricsToolbar(
+     }
+ }
+ 
++/**
++ * 工具栏展开后的内容：偏移量调节、歌词设置、切换歌词来源。
++ * 由浮动工具栏与歌词页顶栏共用。
++ */
++@Composable
++fun LyricsToolbarMenuContent(
++    offsetEnabled: Boolean,
++    offsetMs: Long,
++    onOffsetChange: (Long) -> Unit,
++    onOpenLyricsSettings: () -> Unit,
++    onOpenLyricsSwitcher: () -> Unit,
++    modifier: Modifier = Modifier,
++) {
++    Column(
++        modifier = modifier,
++        horizontalAlignment = Alignment.End,
++        verticalArrangement = Arrangement.spacedBy(8.dp),
++    ) {
++        // 偏移量调节栏
++        if (offsetEnabled) {
++            OffsetAdjustBar(
++                offsetMs = offsetMs,
++                onOffsetChange = onOffsetChange,
++            )
++        }
++
++        // 歌词设置（字体、字号、模糊、跳动等）
++        LyricsSettingsButton(onClick = onOpenLyricsSettings)
++
++        // 切换歌词来源按钮（常驻：无内嵌/在线时用户仍可进入选择本地文件）
++        SwitchLyricsButton(onClick = onOpenLyricsSwitcher)
++    }
++}
++
+ /**
+  * 偏移量调节栏
+  */
+diff --git a/app/src/main/java/me/spica27/spicamusic/ui/widget/FluidMusicBackground.kt b/app/src/main/java/me/spica27/spicamusic/ui/widget/FluidMusicBackground.kt
+index dbd588c..5d9106e 100644
+--- a/app/src/main/java/me/spica27/spicamusic/ui/widget/FluidMusicBackground.kt
++++ b/app/src/main/java/me/spica27/spicamusic/ui/widget/FluidMusicBackground.kt
+@@ -81,6 +81,7 @@ fun FluidMusicBackground(
+     val enable =
+         remember(backgroundMode, enabled) {
+             backgroundMode != DynamicSpectrumBackground.OFF &&
++                backgroundMode != DynamicSpectrumBackground.VerseFlow &&
+                 backgroundMode != DynamicSpectrumBackground.BlurCover &&
+                 enabled
+         }
+@@ -134,7 +135,10 @@ fun FluidMusicBackground(
+             )
+         }
+ 
+-        DynamicSpectrumBackground.OFF ->
++        // Verse Flow 由播放器页面直接绘制（需要同时改变文字颜色），这里不重复绘制
++        DynamicSpectrumBackground.VerseFlow,
++        DynamicSpectrumBackground.OFF,
++        ->
+             Box(modifier = modifier)
+ 
+         DynamicSpectrumBackground.BlurCover -> {
+diff --git a/app/src/main/java/me/spica27/spicamusic/ui/widget/LyricUI.kt b/app/src/main/java/me/spica27/spicamusic/ui/widget/LyricUI.kt
+index a5528cc..d90fb6b 100644
+--- a/app/src/main/java/me/spica27/spicamusic/ui/widget/LyricUI.kt
++++ b/app/src/main/java/me/spica27/spicamusic/ui/widget/LyricUI.kt
+@@ -128,6 +128,16 @@ import kotlin.math.roundToInt
+ 
+ // ==================== 常量 ====================
+ 
++/**
++ * Left/right edge of the fullscreen lyrics text: clamp(16, 5.4% of the width, 26) dp.
++ * The lyrics header uses the same value so header and lyrics line up on both sides.
++ */
++@Composable
++fun rememberLyricsEdgePadding(): Dp {
++    val widthDp = LocalConfiguration.current.screenWidthDp
++    return (widthDp * 0.054f).coerceIn(16f, 26f).dp
++}
++
+ private object LyricUIConstants {
+     const val EMPTY_WORD_PLACEHOLDER = " · · · "
+ 
+diff --git a/app/src/main/java/me/spica27/spicamusic/ui/widget/LyricsSettingsSheet.kt b/app/src/main/java/me/spica27/spicamusic/ui/widget/LyricsSettingsSheet.kt
+index a73f152..310cecd 100644
+--- a/app/src/main/java/me/spica27/spicamusic/ui/widget/LyricsSettingsSheet.kt
++++ b/app/src/main/java/me/spica27/spicamusic/ui/widget/LyricsSettingsSheet.kt
+@@ -47,6 +47,7 @@ fun LyricsSettingsSheet(
+             TransliterationSection(settings = settings, onUpdate = onUpdate)
+             BlurAndOpacitySection(settings = settings, onUpdate = onUpdate)
+             JiggleSection(settings = settings, onUpdate = onUpdate)
++            EnhanceHeaderSection(settings = settings, onUpdate = onUpdate)
+         }
+     }
+ }
+@@ -297,3 +298,283 @@ private fun JiggleSection(
+         )
+     }
+ }
++
++@Composable
++private fun EnhanceHeaderSection(
++    settings: LyricsStyleSettings,
++    onUpdate: ((LyricsStyleSettings) -> LyricsStyleSettings) -> Unit,
++) {
++    LyricsSettingsSection(stringResource(R.string.lyr_set_section_header))
++
++    LyricsSettingsToggle(
++        label = stringResource(R.string.lyr_set_header_enable),
++        description = stringResource(R.string.lyr_set_header_enable_desc),
++        checked = settings.enhanceHeader,
++        onCheckedChange = { v -> onUpdate { it.copy(enhanceHeader = v) } },
++    )
++    // Off = the original header, so the options below only appear when it is on.
++    if (!settings.enhanceHeader) return
++
++    val dp: (Int) -> String = { "$it dp" }
++    val sp: (Int) -> String = { "$it sp" }
++    val percent: (Int) -> String = { "$it%" }
++
++    LyricsSettingsSlider(
++        label = stringResource(R.string.lyr_set_header_album),
++        description = stringResource(R.string.lyr_set_header_album_desc),
++        value = settings.headerAlbumSize,
++        range = LyricsStyleSettings.HEADER_ALBUM_RANGE,
++        step = 1,
++        valueText = dp,
++        onValueChange = { v -> onUpdate { it.copy(headerAlbumSize = v) } },
++    )
++    LyricsSettingsToggle(
++        label = stringResource(R.string.lyr_set_header_outline),
++        description = stringResource(R.string.lyr_set_header_outline_desc),
++        checked = settings.headerOutlineEnabled,
++        onCheckedChange = { v -> onUpdate { it.copy(headerOutlineEnabled = v) } },
++    )
++    if (settings.headerOutlineEnabled) {
++        LyricsSettingsSlider(
++            label = stringResource(R.string.lyr_set_header_outline_weight),
++            description = stringResource(R.string.lyr_set_header_outline_weight_desc),
++            value = settings.headerOutlineWeight,
++            range = LyricsStyleSettings.HEADER_OUTLINE_WEIGHT_RANGE,
++            step = 1,
++            valueText = { String.format(java.util.Locale.US, "%.1f dp", it / 2f) },
++            onValueChange = { v -> onUpdate { it.copy(headerOutlineWeight = v) } },
++        )
++        LyricsSettingsSlider(
++            label = stringResource(R.string.lyr_set_header_outline_opacity),
++            description = stringResource(R.string.lyr_set_header_outline_opacity_desc),
++            value = settings.headerOutlineOpacity,
++            range = LyricsStyleSettings.HEADER_OUTLINE_OPACITY_RANGE,
++            step = 1,
++            valueText = percent,
++            onValueChange = { v -> onUpdate { it.copy(headerOutlineOpacity = v) } },
++        )
++    }
++    LyricsSettingsSlider(
++        label = stringResource(R.string.lyr_set_header_title),
++        description = stringResource(R.string.lyr_set_header_title_desc),
++        value = settings.headerTitleSize,
++        range = LyricsStyleSettings.HEADER_TITLE_RANGE,
++        step = 1,
++        valueText = sp,
++        onValueChange = { v -> onUpdate { it.copy(headerTitleSize = v) } },
++    )
++    LyricsSettingsSlider(
++        label = stringResource(R.string.lyr_set_header_artist),
++        description = stringResource(R.string.lyr_set_header_artist_desc),
++        value = settings.headerArtistSize,
++        range = LyricsStyleSettings.HEADER_ARTIST_RANGE,
++        step = 1,
++        valueText = sp,
++        onValueChange = { v -> onUpdate { it.copy(headerArtistSize = v) } },
++    )
++    LyricsSettingsSlider(
++        label = stringResource(R.string.lyr_set_header_buttons),
++        description = stringResource(R.string.lyr_set_header_buttons_desc),
++        value = settings.headerButtonSize,
++        range = LyricsStyleSettings.HEADER_BUTTON_RANGE,
++        step = 1,
++        valueText = dp,
++        onValueChange = { v -> onUpdate { it.copy(headerButtonSize = v) } },
++    )
++    LyricsSettingsSlider(
++        label = stringResource(R.string.lyr_set_header_line_weight),
++        description = stringResource(R.string.lyr_set_header_line_weight_desc),
++        value = settings.headerLineWeight,
++        range = LyricsStyleSettings.HEADER_LINE_WEIGHT_RANGE,
++        step = 1,
++        valueText = { String.format(java.util.Locale.US, "%.1f dp", it / 2f) },
++        onValueChange = { v -> onUpdate { it.copy(headerLineWeight = v) } },
++    )
++    LyricsSettingsSlider(
++        label = stringResource(R.string.lyr_set_header_line_opacity),
++        description = stringResource(R.string.lyr_set_header_line_opacity_desc),
++        value = settings.headerLineOpacity,
++        range = LyricsStyleSettings.HEADER_LINE_OPACITY_RANGE,
++        step = 1,
++        valueText = percent,
++        onValueChange = { v -> onUpdate { it.copy(headerLineOpacity = v) } },
++    )
++    LyricsSettingsSlider(
++        label = stringResource(R.string.lyr_set_header_bottom_padding),
++        description = stringResource(R.string.lyr_set_header_bottom_padding_desc),
++        value = settings.headerBottomPadding,
++        range = LyricsStyleSettings.HEADER_BOTTOM_PADDING_RANGE,
++        step = 1,
++        valueText = dp,
++        onValueChange = { v -> onUpdate { it.copy(headerBottomPadding = v) } },
++    )
++    LyricsSettingsToggle(
++        label = stringResource(R.string.lyr_set_header_blur),
++        description = stringResource(R.string.lyr_set_header_blur_desc),
++        checked = settings.headerBlurEnabled,
++        onCheckedChange = { v -> onUpdate { it.copy(headerBlurEnabled = v) } },
++    )
++    if (settings.headerBlurEnabled) {
++        LyricsSettingsSlider(
++            label = stringResource(R.string.lyr_set_header_blur_amount),
++            description = stringResource(R.string.lyr_set_header_blur_amount_desc),
++            value = settings.headerBlurAmount,
++            range = LyricsStyleSettings.HEADER_BLUR_RANGE,
++            step = 1,
++            valueText = dp,
++            onValueChange = { v -> onUpdate { it.copy(headerBlurAmount = v) } },
++        )
++    }
++    // Soft edge works with blur on (the blur fades out) and off (the lyrics fade in).
++    LyricsSettingsToggle(
++        label = stringResource(R.string.lyr_set_header_soft_edge),
++        description = stringResource(R.string.lyr_set_header_soft_edge_desc),
++        checked = settings.headerSoftEdge,
++        onCheckedChange = { v -> onUpdate { it.copy(headerSoftEdge = v) } },
++    )
++    if (settings.headerSoftEdge) {
++        LyricsSettingsSlider(
++            label = stringResource(R.string.lyr_set_header_edge_fade),
++            description = stringResource(R.string.lyr_set_header_edge_fade_desc),
++            value = settings.headerEdgeFade,
++            range = LyricsStyleSettings.HEADER_EDGE_FADE_RANGE,
++            step = 1,
++            valueText = dp,
++            onValueChange = { v -> onUpdate { it.copy(headerEdgeFade = v) } },
++        )
++    }
++
++    // ---- Bottom bar (translation / transliteration buttons + player pill) ----
++    LyricsSettingsSection(stringResource(R.string.lyr_set_section_dock))
++    LyricsSettingsToggle(
++        label = stringResource(R.string.lyr_set_dock_blur),
++        description = stringResource(R.string.lyr_set_dock_blur_desc),
++        checked = settings.dockBlurEnabled,
++        onCheckedChange = { v -> onUpdate { it.copy(dockBlurEnabled = v) } },
++    )
++    if (settings.dockBlurEnabled) {
++        LyricsSettingsSlider(
++            label = stringResource(R.string.lyr_set_dock_blur_amount),
++            description = stringResource(R.string.lyr_set_dock_blur_amount_desc),
++            value = settings.dockBlurAmount,
++            range = LyricsStyleSettings.DOCK_BLUR_RANGE,
++            step = 1,
++            valueText = dp,
++            onValueChange = { v -> onUpdate { it.copy(dockBlurAmount = v) } },
++        )
++        LyricsSettingsChips(
++            label = stringResource(R.string.lyr_set_dock_style),
++            description = stringResource(R.string.lyr_set_dock_style_desc),
++            options = listOf(false, true),
++            selected = settings.dockSpreadBlur,
++            optionLabel = {
++                if (it) {
++                    stringResource(R.string.lyr_set_dock_style_spread)
++                } else {
++                    stringResource(R.string.lyr_set_dock_style_normal)
++                }
++            },
++            onSelect = { v -> onUpdate { it.copy(dockSpreadBlur = v) } },
++        )
++        // Spread only: the blur fades out above the bar (same idea as the header's soft edge).
++        if (settings.dockSpreadBlur) {
++            LyricsSettingsToggle(
++                label = stringResource(R.string.lyr_set_dock_soft_edge),
++                description = stringResource(R.string.lyr_set_dock_soft_edge_desc),
++                checked = settings.dockSoftEdge,
++                onCheckedChange = { v -> onUpdate { it.copy(dockSoftEdge = v) } },
++            )
++            if (settings.dockSoftEdge) {
++                LyricsSettingsSlider(
++                    label = stringResource(R.string.lyr_set_dock_edge_fade),
++                    description = stringResource(R.string.lyr_set_dock_edge_fade_desc),
++                    value = settings.dockEdgeFade,
++                    range = LyricsStyleSettings.DOCK_EDGE_FADE_RANGE,
++                    step = 1,
++                    valueText = dp,
++                    onValueChange = { v -> onUpdate { it.copy(dockEdgeFade = v) } },
++                )
++            }
++        }
++    }
++    LyricsSettingsSlider(
++        label = stringResource(R.string.lyr_set_dock_size),
++        description = stringResource(R.string.lyr_set_dock_size_desc),
++        value = settings.dockSize,
++        range = LyricsStyleSettings.DOCK_SIZE_RANGE,
++        step = 1,
++        valueText = dp,
++        onValueChange = { v -> onUpdate { it.copy(dockSize = v) } },
++    )
++    LyricsSettingsSlider(
++        label = stringResource(R.string.lyr_set_dock_bottom_padding),
++        description = stringResource(R.string.lyr_set_dock_bottom_padding_desc),
++        value = settings.dockBottomPadding,
++        range = LyricsStyleSettings.DOCK_BOTTOM_PADDING_RANGE,
++        step = 1,
++        valueText = dp,
++        onValueChange = { v -> onUpdate { it.copy(dockBottomPadding = v) } },
++    )
++    LyricsSettingsSlider(
++        label = stringResource(R.string.lyr_set_dock_pill_padding),
++        description = stringResource(R.string.lyr_set_dock_pill_padding_desc),
++        value = settings.dockPillPadding,
++        range = LyricsStyleSettings.DOCK_PILL_PADDING_RANGE,
++        step = 1,
++        valueText = dp,
++        onValueChange = { v -> onUpdate { it.copy(dockPillPadding = v) } },
++    )
++    LyricsSettingsSlider(
++        label = stringResource(R.string.lyr_set_dock_gap_left),
++        description = stringResource(R.string.lyr_set_dock_gap_left_desc),
++        value = settings.dockGapLeft,
++        range = LyricsStyleSettings.DOCK_GAP_RANGE,
++        step = 1,
++        valueText = dp,
++        onValueChange = { v -> onUpdate { it.copy(dockGapLeft = v) } },
++    )
++    LyricsSettingsSlider(
++        label = stringResource(R.string.lyr_set_dock_gap_right),
++        description = stringResource(R.string.lyr_set_dock_gap_right_desc),
++        value = settings.dockGapRight,
++        range = LyricsStyleSettings.DOCK_GAP_RANGE,
++        step = 1,
++        valueText = dp,
++        onValueChange = { v -> onUpdate { it.copy(dockGapRight = v) } },
++    )
++
++    LyricsSettingsResetButton(
++        text = stringResource(R.string.lyr_set_reset_header),
++        onClick = {
++            val d = LyricsStyleSettings()
++            onUpdate {
++                it.copy(
++                    headerAlbumSize = d.headerAlbumSize,
++                    headerTitleSize = d.headerTitleSize,
++                    headerArtistSize = d.headerArtistSize,
++                    headerButtonSize = d.headerButtonSize,
++                    headerLineWeight = d.headerLineWeight,
++                    headerLineOpacity = d.headerLineOpacity,
++                    headerBottomPadding = d.headerBottomPadding,
++                    headerBlurEnabled = d.headerBlurEnabled,
++                    headerBlurAmount = d.headerBlurAmount,
++                    headerSoftEdge = d.headerSoftEdge,
++                    headerEdgeFade = d.headerEdgeFade,
++                    headerOutlineEnabled = d.headerOutlineEnabled,
++                    headerOutlineWeight = d.headerOutlineWeight,
++                    headerOutlineOpacity = d.headerOutlineOpacity,
++                    dockBlurEnabled = d.dockBlurEnabled,
++                    dockBlurAmount = d.dockBlurAmount,
++                    dockSize = d.dockSize,
++                    dockBottomPadding = d.dockBottomPadding,
++                    dockPillPadding = d.dockPillPadding,
++                    dockGapLeft = d.dockGapLeft,
++                    dockGapRight = d.dockGapRight,
++                    dockSpreadBlur = d.dockSpreadBlur,
++                    dockSoftEdge = d.dockSoftEdge,
++                    dockEdgeFade = d.dockEdgeFade,
++                )
++            }
++        },
++    )
++}
+diff --git a/app/src/main/java/me/spica27/spicamusic/ui/widget/VerseFlowTheme.kt b/app/src/main/java/me/spica27/spicamusic/ui/widget/VerseFlowTheme.kt
+new file mode 100644
+index 0000000..0b1854d
+--- /dev/null
++++ b/app/src/main/java/me/spica27/spicamusic/ui/widget/VerseFlowTheme.kt
+@@ -0,0 +1,662 @@
++package me.spica27.spicamusic.ui.widget
++
++import android.graphics.Bitmap
++import android.graphics.BitmapFactory
++import android.net.Uri
++import androidx.compose.animation.animateColorAsState
++import androidx.compose.animation.core.FastOutSlowInEasing
++import androidx.compose.animation.core.RepeatMode
++import androidx.compose.animation.core.animateFloat
++import androidx.compose.animation.core.infiniteRepeatable
++import androidx.compose.animation.core.rememberInfiniteTransition
++import androidx.compose.animation.core.tween
++import androidx.compose.foundation.Canvas
++import androidx.compose.foundation.layout.Box
++import androidx.compose.foundation.layout.fillMaxSize
++import androidx.compose.material3.MaterialTheme
++import androidx.compose.runtime.Composable
++import androidx.compose.runtime.State
++import androidx.compose.runtime.LaunchedEffect
++import androidx.compose.runtime.getValue
++import androidx.compose.runtime.mutableStateOf
++import androidx.compose.runtime.remember
++import androidx.compose.runtime.setValue
++import androidx.compose.animation.core.animateFloatAsState
++import androidx.compose.ui.Modifier
++import androidx.compose.ui.geometry.Offset
++import androidx.compose.ui.geometry.Size
++import androidx.compose.ui.graphics.Brush
++import androidx.compose.ui.graphics.Color
++import androidx.compose.ui.graphics.drawscope.scale
++import androidx.compose.ui.graphics.lerp
++import androidx.compose.ui.platform.LocalContext
++import kotlinx.coroutines.Dispatchers
++import kotlinx.coroutines.withContext
++import kotlin.math.abs
++import kotlin.math.max
++import kotlin.math.min
++import kotlin.math.pow
++import kotlin.math.sqrt
++
++/** Appearance mode, same values as the HTML player ("auto" | "light" | "dark"). */
++object VerseThemeMode {
++    const val AUTO = "auto"
++    const val LIGHT = "light"
++    const val DARK = "dark"
++}
++
++/**
++ * Lyrics-page blobs ("mesh") options.
++ * Defaults reproduce the HTML: 4 blobs, 95 % of the width, 48 % opacity, 24 s loop.
++ */
++data class VerseMeshSettings(
++    /** 1..4 */
++    val blobCount: Int = 4,
++    /** 0..100 → blob diameter 45 %..145 % of the screen width (50 = the HTML's 95 %) */
++    val sizePercent: Int = 50,
++    /** 0..100 */
++    val opacityPercent: Int = 48,
++    /** Seconds for one drift cycle of the fastest blob (5..60); the others are 1.0–1.5× slower. */
++    val motionSeconds: Int = 24,
++    /** 0..100: how strongly the blobs take the accent colour (50 = the HTML's mix). */
++    val colorPercent: Int = 50,
++    /** false = blobs stay still (no per-frame work at all). */
++    val animated: Boolean = true,
++)
++
++/**
++ * Colours of the player, exactly the set the HTML sets as CSS variables:
++ * c1/c2/c3 = background gradient (top, middle, bottom), c4 = glow in the top-right corner,
++ * fg = text / accent colour, fg2 = secondary text.
++ */
++data class VerseTheme(
++    val c1: Color,
++    val c2: Color,
++    val c3: Color,
++    val c4: Color,
++    val fg: Color,
++    val fg2: Color,
++    val light: Boolean,
++) {
++    companion object {
++        /** HTML DEFAULT_THEME (used when a song has no cover). */
++        val Default =
++            VerseTheme(
++                c1 = Color(0xFF7D1408),
++                c2 = Color(0xFF8F1A09),
++                c3 = Color(0xFF4A0B04),
++                c4 = Color(255, 170, 60).copy(alpha = .25f),
++                fg = Color(0xFFFFC233),
++                fg2 = Color(255, 194, 51).copy(alpha = .8f),
++                light = false,
++            )
++    }
++}
++
++// ---------------------------------------------------------------------------------------------
++// Colour engine (1:1 port of analyzePalette / buildTheme from the HTML)
++// ---------------------------------------------------------------------------------------------
++
++internal class Cluster(
++    val rgb: IntArray,
++    val n: Int,
++    val h: Float,
++    val s: Float,
++    val l: Float,
++    val w: Float,
++) {
++    val score: Float = sqrt(w) * (.22f + s) * (1f - .6f * abs(l - .4f))
++}
++
++/** Opaque handle to the palette of one cover, computed once per cover. */
++class VersePalette internal constructor(
++    internal val clusters: List<Cluster>,
++)
++
++private fun clampF(v: Float, a: Float, b: Float) = min(b, max(a, v))
++
++private fun jsRound(v: Float): Int = kotlin.math.floor(v + .5f).toInt()
++
++private fun rgb2hsl(r0: Int, g0: Int, b0: Int): FloatArray {
++    val r = r0 / 255f
++    val g = g0 / 255f
++    val b = b0 / 255f
++    val mx = max(r, max(g, b))
++    val mn = min(r, min(g, b))
++    var h = 0f
++    var s = 0f
++    val l = (mx + mn) / 2f
++    val d = mx - mn
++    if (d != 0f) {
++        s = d / (1f - abs(2f * l - 1f))
++        h =
++            when (mx) {
++                r -> ((g - b) / d) % 6f
++                g -> (b - r) / d + 2f
++                else -> (r - g) / d + 4f
++            }
++        h *= 60f
++        if (h < 0f) h += 360f
++    }
++    return floatArrayOf(h, s, l)
++}
++
++private fun hsl2rgb(h0: Float, s: Float, l: Float): IntArray {
++    val h = h0 / 360f
++    fun f(n: Int): Int {
++        val k = (n + h * 12f) % 12f
++        val a = s * min(l, 1f - l)
++        val v = l - a * max(-1f, min(min(k - 3f, 9f - k), 1f))
++        return jsRound(v * 255f)
++    }
++    return intArrayOf(f(0), f(8), f(4))
++}
++
++private fun lum(c: IntArray): Float {
++    fun f(v0: Int): Float {
++        val v = v0 / 255f
++        return if (v <= .03928f) v / 12.92f else ((v + .055f) / 1.055f).toDouble().pow(2.4).toFloat()
++    }
++    return .2126f * f(c[0]) + .7152f * f(c[1]) + .0722f * f(c[2])
++}
++
++private fun contrast(a: Float, b: Float) = (max(a, b) + .05f) / (min(a, b) + .05f)
++
++private fun hdiff(a: Float, b: Float): Float {
++    val d = abs(a - b)
++    return min(d, 360f - d)
++}
++
++private fun mixRGB(a: IntArray, b: IntArray, t: Float) = IntArray(3) { jsRound(a[it] + (b[it] - a[it]) * t) }
++
++private fun toColor(c: IntArray, a: Float = 1f) = Color(c[0].coerceIn(0, 255), c[1].coerceIn(0, 255), c[2].coerceIn(0, 255), jsRound(a * 255f).coerceIn(0, 255))
++
++/** k-means palette of the 44x44 cover pixels, sorted by "how good a background/accent this is". */
++internal fun analyzePalette(px: List<IntArray>): VersePalette? {
++    if (px.size < 10) return null
++    val k = 6
++
++    fun dist(a: IntArray, b: IntArray): Float {
++        val x = (a[0] - b[0]).toFloat()
++        val y = (a[1] - b[1]).toFloat()
++        val z = (a[2] - b[2]).toFloat()
++        return x * x + y * y + z * z
++    }
++
++    val mf = FloatArray(3) { i -> px.sumOf { it[i].toDouble() }.toFloat() / px.size }
++    fun dm(p: IntArray): Float {
++        val x = p[0] - mf[0]
++        val y = p[1] - mf[1]
++        val z = p[2] - mf[2]
++        return x * x + y * y + z * z
++    }
++    val cs = ArrayList<FloatArray>()
++    val first = px.reduce { b, p -> if (dm(p) < dm(b)) p else b }
++    cs.add(FloatArray(3) { first[it].toFloat() })
++    fun distF(p: IntArray, c: FloatArray): Float {
++        val x = p[0] - c[0]
++        val y = p[1] - c[1]
++        val z = p[2] - c[2]
++        return x * x + y * y + z * z
++    }
++    while (cs.size < k) {
++        var best: IntArray? = null
++        var bd = -1f
++        for (p in px) {
++            var m = Float.MAX_VALUE
++            for (q in cs) m = min(m, distF(p, q))
++            if (m > bd) {
++                bd = m
++                best = p
++            }
++        }
++        cs.add(FloatArray(3) { best!![it].toFloat() })
++    }
++    var cnt = IntArray(k)
++    repeat(8) {
++        val sum = Array(k) { FloatArray(3) }
++        cnt = IntArray(k)
++        for (p in px) {
++            var bi = 0
++            var bd = Float.MAX_VALUE
++            cs.forEachIndexed { i, c ->
++                val d = distF(p, c)
++                if (d < bd) {
++                    bd = d
++                    bi = i
++                }
++            }
++            cnt[bi]++
++            sum[bi][0] += p[0]
++            sum[bi][1] += p[1]
++            sum[bi][2] += p[2]
++        }
++        cs.forEachIndexed { i, c ->
++            if (cnt[i] > 0) {
++                c[0] = sum[i][0] / cnt[i]
++                c[1] = sum[i][1] / cnt[i]
++                c[2] = sum[i][2] / cnt[i]
++            }
++        }
++    }
++    val total = px.size.toFloat()
++    val cl =
++        cs
++            .mapIndexed { i, c -> IntArray(3) { jsRound(c[it]) } to cnt[i] }
++            .filter { it.second > 0 }
++            .map { (rgb, n) ->
++                val hsl = rgb2hsl(rgb[0], rgb[1], rgb[2])
++                Cluster(rgb, n, hsl[0], hsl[1], hsl[2], n / total)
++            }.sortedByDescending { it.score }
++    return VersePalette(cl)
++}
++
++/**
++ * @param sat   saturation multiplier 0..2 (1 = original)
++ * @param vib   vibrancy -1..1 (0 = original): glow, colour blending, brightness
++ * @param mode  "auto" | "light" | "dark"
++ * @param hue   highlight hue shift in degrees (-180..180, 0 = auto)
++ */
++fun buildVerseTheme(
++    palette: VersePalette,
++    sat: Float = 1f,
++    vib: Float = 0f,
++    mode: String = VerseThemeMode.AUTO,
++    hue: Int = 0,
++): VerseTheme {
++    val cl = palette.clusters
++    val satC = clampF(sat, 0f, 2f)
++    val v = clampF(vib, -1f, 1f)
++    fun ss(x: Float) = clampF(x * satC, 0f, 1f)
++
++    fun fitDark(h: Float, s: Float, l0: Float, maxL: Float): Float {
++        var l = l0
++        while (l > .04f && lum(hsl2rgb(h, s, l)) > maxL) l -= .01f
++        return l
++    }
++
++    val vivid = cl.maxByOrNull { it.s * sqrt(it.w) }!!
++    val base = cl[0]
++    var h = base.h
++    var s = base.s
++    var l = base.l
++    val dark = cl.firstOrNull { it.l < .14f && it.w > .42f }
++    if (dark != null) {
++        h = vivid.h
++        s = .38f
++        l = .085f
++    } else {
++        if (s > .1f) s = clampF(s * 1.1f, .3f, .92f)
++        l = if (l > .66f) clampF(l, .72f, .86f) else clampF(l, .13f, .44f)
++    }
++    if (mode == VerseThemeMode.LIGHT) {
++        l = if (l > .66f) clampF(l, .72f, .86f) else .8f
++    } else if (mode == VerseThemeMode.DARK && dark == null) {
++        l = clampF(l, .13f, .44f)
++    }
++    val s0 = s
++    s = ss(s)
++    l = clampF(l + v * .04f, .05f, .92f)
++    if (mode == VerseThemeMode.DARK) {
++        // top of the gradient stays dark enough for light text
++        l = max(.05f, fitDark(h, s, l + .05f, .13f) - .05f)
++    }
++    val bg = hsl2rgb(h, s, l)
++    val bgL = lum(bg)
++    val light =
++        when (mode) {
++            VerseThemeMode.LIGHT -> true
++            VerseThemeMode.DARK -> false
++            else -> bgL > .36f
++        }
++
++    class Cand(
++        val h: Float,
++        val s: Float,
++        val l: Float,
++        val base: Float,
++    ) {
++        var rgb: IntArray = IntArray(3)
++        var ok: Boolean = false
++    }
++
++    val cands = ArrayList<Cand>()
++    cl.forEach { k ->
++        if (k === base && dark == null) return@forEach
++        cands.add(
++            Cand(
++                k.h,
++                k.s,
++                k.l,
++                (.2f + k.s) * (.6f + .4f * min(1f, hdiff(k.h, h) / 70f)) * (.4f + sqrt(k.w) * 1.2f),
++            ),
++        )
++    }
++    cands.add(Cand(h, max(s0, .5f) * .9f, .5f, .42f))
++    cands.forEach { c ->
++        val cs2 = ss(if (c.s < .1f && hue == 0) c.s else clampF(c.s, .32f, .95f))
++        val ch = (c.h + hue + 360f) % 360f
++        var ll = c.l
++        for (i in 0 until 40) {
++            if (contrast(lum(hsl2rgb(ch, cs2, ll)), bgL) >= 5f) break
++            ll = clampF(ll + (if (light) -.03f else .03f), .05f, .95f)
++        }
++        c.rgb = hsl2rgb(ch, cs2, ll)
++        c.ok = contrast(lum(c.rgb), bgL) >= 4.5f
++    }
++    val accRgb =
++        cands
++            .filter { it.ok }
++            .sortedByDescending { it.base }
++            .firstOrNull()
++            ?.rgb
++            ?: if (light) intArrayOf(20, 20, 20) else intArrayOf(245, 245, 245)
++
++    val second = cl.firstOrNull { it !== base && hdiff(it.h, h) > 35f && it.s > .3f && it.w > .03f }
++    val top = hsl2rgb(h, s, clampF(l + (if (light) .03f else .05f), 0f, .92f))
++    val mid =
++        if (second != null) {
++            mixRGB(
++                bg,
++                hsl2rgb(second.h, ss(clampF(second.s, .3f, .9f)), clampF(second.l, .2f, if (light) .8f else .45f)),
++                clampF(.38f + .2f * v, .15f, .6f),
++            )
++        } else {
++            bg
++        }
++    val bot = hsl2rgb(h, s, if (light) l * .9f else l * .55f)
++    val c4 =
++        if (second != null) {
++            toColor(hsl2rgb(second.h, ss(clampF(second.s, .4f, .95f)), .55f), clampF(.5f + .3f * v, .2f, .85f))
++        } else {
++            toColor(accRgb, clampF(.16f + .14f * v, .05f, .4f))
++        }
++    return VerseTheme(
++        c1 = toColor(top),
++        c2 = toColor(mid),
++        c3 = toColor(bot),
++        c4 = c4,
++        fg = toColor(accRgb),
++        fg2 = toColor(accRgb, .78f),
++        light = light,
++    )
++}
++
++// ---------------------------------------------------------------------------------------------
++// Palette extraction + remember helpers
++// ---------------------------------------------------------------------------------------------
++
++private suspend fun extractVersePalette(
++    context: android.content.Context,
++    uri: Uri?,
++): VersePalette? =
++    withContext(Dispatchers.IO) {
++        if (uri == null) return@withContext null
++        try {
++            val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
++            context.contentResolver.openInputStream(uri)?.use { BitmapFactory.decodeStream(it, null, bounds) }
++            var sample = 1
++            while (bounds.outWidth / (sample * 2) >= 88 && bounds.outHeight / (sample * 2) >= 88) sample *= 2
++            val opts = BitmapFactory.Options().apply { inSampleSize = sample }
++            val src =
++                context.contentResolver.openInputStream(uri)?.use { BitmapFactory.decodeStream(it, null, opts) }
++                    ?: return@withContext null
++            // same 44x44 sampling as the HTML (alpha > 200 only)
++            val n = 44
++            val scaled = Bitmap.createScaledBitmap(src, n, n, true)
++            val pixels = IntArray(n * n)
++            scaled.getPixels(pixels, 0, n, 0, 0, n, n)
++            if (scaled !== src) scaled.recycle()
++            src.recycle()
++            val px = ArrayList<IntArray>(pixels.size)
++            for (p in pixels) {
++                if (((p ushr 24) and 0xFF) > 200) px.add(intArrayOf((p shr 16) and 0xFF, (p shr 8) and 0xFF, p and 0xFF))
++            }
++            analyzePalette(px)
++        } catch (e: Exception) {
++            null
++        }
++    }
++
++/**
++ * Theme of the current cover. The (slow) palette analysis runs once per cover; moving the
++ * sliders only re-runs the cheap [buildVerseTheme].
++ */
++@Composable
++fun rememberVerseTheme(
++    coverUri: Uri?,
++    mode: String,
++    saturationPercent: Int,
++    vibrancyPercent: Int,
++    hueShift: Int,
++): VerseTheme {
++    val context = LocalContext.current
++    var palette by remember(coverUri) { mutableStateOf<VersePalette?>(null) }
++    LaunchedEffect(coverUri) { palette = extractVersePalette(context, coverUri) }
++    val target =
++        remember(palette, mode, saturationPercent, vibrancyPercent, hueShift) {
++            palette?.let {
++                buildVerseTheme(
++                    palette = it,
++                    sat = saturationPercent / 100f,
++                    vib = (vibrancyPercent - 50) / 50f,
++                    mode = mode,
++                    hue = hueShift,
++                )
++            } ?: VerseTheme.Default
++        }
++    // smooth cross-fade between songs / when sliders move (HTML uses a colour transition too)
++    val spec = tween<Color>(durationMillis = 450)
++    val c1 by animateColorAsState(target.c1, spec, label = "verse_c1")
++    val c2 by animateColorAsState(target.c2, spec, label = "verse_c2")
++    val c3 by animateColorAsState(target.c3, spec, label = "verse_c3")
++    val c4 by animateColorAsState(target.c4, spec, label = "verse_c4")
++    val fg by animateColorAsState(target.fg, spec, label = "verse_fg")
++    val fg2 by animateColorAsState(target.fg2, spec, label = "verse_fg2")
++    return VerseTheme(c1, c2, c3, c4, fg, fg2, target.light)
++}
++
++/**
++ * Makes every Material text / icon / slider inside use the Verse colours (text = fg,
++ * secondary text = fg2, controls = fg on c1), so the whole player looks like the HTML.
++ */
++@Composable
++fun VerseFlowThemeScope(
++    theme: VerseTheme,
++    content: @Composable () -> Unit,
++) {
++    val base = MaterialTheme.colorScheme
++    val scheme =
++        remember(base, theme) {
++            base.copy(
++                primary = theme.fg,
++                onPrimary = theme.c1,
++                primaryContainer = theme.fg.copy(alpha = .26f),
++                onPrimaryContainer = theme.fg,
++                secondary = theme.fg,
++                onSecondary = theme.c1,
++                secondaryContainer = theme.fg.copy(alpha = .26f),
++                onSecondaryContainer = theme.fg,
++                tertiary = theme.fg,
++                onTertiary = theme.c1,
++                surface = theme.c1,
++                onSurface = theme.fg,
++                onSurfaceVariant = theme.fg2,
++                surfaceVariant = theme.fg.copy(alpha = .26f),
++                surfaceTint = theme.fg,
++                background = theme.c1,
++                onBackground = theme.fg,
++                outline = theme.fg2,
++                outlineVariant = theme.fg.copy(alpha = .26f),
++                surfaceContainerLowest = theme.c3.copy(alpha = .5f),
++                surfaceContainerLow = theme.c3.copy(alpha = .6f),
++                surfaceContainer = theme.c3.copy(alpha = .78f),
++                surfaceContainerHigh = theme.c3.copy(alpha = .86f),
++                // seek-bar track in the HTML: fg at 26 %
++                surfaceContainerHighest = theme.fg.copy(alpha = .26f),
++                inverseSurface = theme.fg,
++                inverseOnSurface = theme.c1,
++            )
++        }
++    MaterialTheme(
++        colorScheme = scheme,
++        typography = MaterialTheme.typography,
++        shapes = MaterialTheme.shapes,
++        content = content,
++    )
++}
++
++// ---------------------------------------------------------------------------------------------
++// Background: `.bg` gradient (+ the `.mesh` drifting blobs in lyrics view)
++// ---------------------------------------------------------------------------------------------
++
++/**
++ * CSS:
++ *   radial-gradient(110% 60% at 92% 4%, var(--c4), transparent 62%),
++ *   linear-gradient(180deg, var(--c1) 0%, var(--c2) 55%, var(--c3) 100%)
++ * and, while the lyrics are shown, up to four slowly drifting radial blobs.
++ */
++@Composable
++fun VerseFlowBackground(
++    theme: VerseTheme,
++    showMesh: Boolean,
++    modifier: Modifier = Modifier,
++    mesh: VerseMeshSettings = VerseMeshSettings(),
++    /** Host switch (app in background / system animations off). */
++    meshAnimated: Boolean = true,
++) {
++    val meshAlpha by animateFloatAsState(
++        targetValue = if (showMesh) mesh.opacityPercent / 100f else 0f,
++        animationSpec = tween(600),
++        label = "verse_mesh_alpha",
++    )
++    Box(modifier = modifier) {
++        Canvas(modifier = Modifier.fillMaxSize()) {
++            val w = size.width
++            val h = size.height
++            drawRect(
++                brush =
++                    Brush.verticalGradient(
++                        0f to theme.c1,
++                        .55f to theme.c2,
++                        1f to theme.c3,
++                    ),
++            )
++            // ellipse 110% x 60% centred at (92 %, 4 %), fading out at 62 %
++            val cx = w * .92f
++            val cy = h * .04f
++            val rx = w * 1.10f
++            val ry = h * .60f
++            scale(scaleX = 1f, scaleY = ry / rx, pivot = Offset(cx, cy)) {
++                drawRect(
++                    brush =
++                        Brush.radialGradient(
++                            colors = listOf(theme.c4, theme.c4.copy(alpha = 0f)),
++                            center = Offset(cx, cy),
++                            radius = rx * .62f,
++                        ),
++                    topLeft = Offset(-w * 4f, -h * 4f),
++                    size = Size(w * 9f, h * 9f),
++                )
++            }
++        }
++        if (meshAlpha > 0.001f) {
++            VerseMesh(
++                theme = theme,
++                settings = mesh,
++                alpha = meshAlpha,
++                animated = meshAnimated && mesh.animated,
++                modifier = Modifier.fillMaxSize(),
++            )
++        }
++    }
++}
++
++// drift of each blob: (start x, start y) as fraction of the screen, (tx, ty) as fraction of the blob size
++private class BlobSpec(
++    val x0: (w: Float, d: Float) -> Float,
++    val y0: (h: Float, d: Float) -> Float,
++    val tx: Float,
++    val ty: Float,
++    val scaleTo: Float,
++    /** loop length relative to the fastest blob (24 s / 31 s / 28 s / 35 s in the HTML) */
++    val periodFactor: Float,
++)
++
++private val BlobSpecs =
++    listOf(
++        BlobSpec({ w, _ -> -.25f * w }, { h, _ -> -.08f * h }, .38f, .22f, 1.18f, 1f),
++        BlobSpec({ w, d -> 1.32f * w - d }, { h, _ -> .16f * h }, -.34f, .30f, .90f, 31f / 24f),
++        BlobSpec({ w, _ -> -.22f * w }, { h, d -> .90f * h - d }, .30f, -.28f, 1.15f, 28f / 24f),
++        BlobSpec({ w, d -> 1.22f * w - d }, { h, d -> 1.10f * h - d }, -.36f, -.20f, 1.05f, 35f / 24f),
++    )
++
++/**
++ * Light on purpose: the animation state is read only while drawing (no recomposition per frame),
++ * no off-screen layer is used (the opacity is applied to each blob's colour), and with
++ * animation off nothing runs at all after the first frame.
++ */
++@Composable
++private fun VerseMesh(
++    theme: VerseTheme,
++    settings: VerseMeshSettings,
++    alpha: Float,
++    animated: Boolean,
++    modifier: Modifier = Modifier,
++) {
++    val count = settings.blobCount.coerceIn(1, 4)
++    val periodMs = settings.motionSeconds.coerceIn(5, 60) * 1000
++
++    val phases: List<State<Float>> =
++        if (animated) {
++            val t = rememberInfiniteTransition(label = "verse_mesh")
++            List(count) { i ->
++                t.animateFloat(
++                    initialValue = 0f,
++                    targetValue = 1f,
++                    animationSpec =
++                        infiniteRepeatable(
++                            animation = tween((periodMs * BlobSpecs[i].periodFactor).toInt(), easing = FastOutSlowInEasing),
++                            repeatMode = RepeatMode.Reverse,
++                        ),
++                    label = "verse_mesh_$i",
++                )
++            }
++        } else {
++            emptyList()
++        }
++
++    val k = settings.colorPercent / 50f
++    val colors =
++        listOf(
++            lerp(theme.c2, theme.fg, (.60f * k).coerceIn(0f, 1f)),
++            theme.c4.copy(alpha = (theme.c4.alpha * k).coerceIn(0f, 1f)),
++            lerp(theme.c3, theme.fg, (.35f * k).coerceIn(0f, 1f)),
++            lerp(theme.c2, theme.fg, (.25f * k).coerceIn(0f, 1f)),
++        )
++    val sizeFactor = .45f + settings.sizePercent / 100f
++
++    Canvas(modifier = modifier) {
++        val w = size.width
++        val h = size.height
++        val d = w * sizeFactor
++        for (i in 0 until count) {
++            val spec = BlobSpecs[i]
++            val p = if (animated) phases[i].value else .5f
++            val cx = spec.x0(w, d) + d / 2f + d * spec.tx * p
++            val cy = spec.y0(h, d) + d / 2f + d * spec.ty * p
++            val r = d / 2f * (1f + (spec.scaleTo - 1f) * p)
++            val c = colors[i]
++            drawCircle(
++                brush =
++                    Brush.radialGradient(
++                        listOf(c.copy(alpha = c.alpha * alpha), c.copy(alpha = 0f)),
++                        center = Offset(cx, cy),
++                        radius = r,
++                    ),
++                radius = r,
++                center = Offset(cx, cy),
++            )
++        }
++    }
++}
+diff --git a/app/src/main/java/me/spica27/spicamusic/ui/widget/audio_seekbar/GlowParticleSeekBar.kt b/app/src/main/java/me/spica27/spicamusic/ui/widget/audio_seekbar/GlowParticleSeekBar.kt
+index bced469..c0b9d08 100644
+--- a/app/src/main/java/me/spica27/spicamusic/ui/widget/audio_seekbar/GlowParticleSeekBar.kt
++++ b/app/src/main/java/me/spica27/spicamusic/ui/widget/audio_seekbar/GlowParticleSeekBar.kt
+@@ -96,6 +96,8 @@ fun GlowParticleSeekBar(
+     onProgressChangeFinished: (() -> Unit)? = null,
+     enabled: Boolean = true,
+     animationsEnabled: Boolean = true,
++    /** false: no particle trail behind the glowing head (the glow itself stays). */
++    showParticles: Boolean = true,
+     glowColor: Color = MaterialTheme.colorScheme.primary,
+     trackColor: Color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.16f),
+ ) {
+@@ -164,13 +166,15 @@ fun GlowParticleSeekBar(
+                 val stroke = (3f + emphasis * 1.2f).dp.toPx()
+                 val timeNanos = elapsedTime.value
+                 val animationPhase = (timeNanos % GLOW_PERIOD_NANOS).toFloat() / GLOW_PERIOD_NANOS
+-                particles.update(
+-                    timeNanos = timeNanos,
+-                    emitterX = head.x / density,
+-                    trackWidth = size.width / density,
+-                    emissionDirection = direction,
+-                    emitting = animationsEnabled && enabled,
+-                )
++                if (showParticles) {
++                    particles.update(
++                        timeNanos = timeNanos,
++                        emitterX = head.x / density,
++                        trackWidth = size.width / density,
++                        emissionDirection = direction,
++                        emitting = animationsEnabled && enabled,
++                    )
++                }
+ 
+                 drawLine(trackColor, start, end, stroke, StrokeCap.Round, alpha = opacity)
+                 if (playedLength > 0f) {
+@@ -196,7 +200,7 @@ fun GlowParticleSeekBar(
+                 } else {
+                     drawGlowFallback(head, haloBrush, emphasis, opacity)
+                 }
+-                drawParticles(particles, color)
++                if (showParticles) drawParticles(particles, color)
+ 
+                 val highlightLength = min(14.dp.toPx(), playedLength)
+                 if (highlightLength > 0f) {
+diff --git a/app/src/main/res/values/strings.xml b/app/src/main/res/values/strings.xml
+index 81fc7e9..071122a 100644
+--- a/app/src/main/res/values/strings.xml
++++ b/app/src/main/res/values/strings.xml
+@@ -720,6 +720,35 @@
+   <string name="bg_fluid_warp_desc">The album art melts and ripples</string>
+   <string name="bg_blur_cover">Blurred Cover</string>
+   <string name="bg_blur_cover_desc">Simply blurs the album art. Easiest on battery</string>
++  <string name="bg_verse_flow">Verse Flow</string>
++  <string name="bg_verse_flow_desc">Album-tinted gradient with matching text colors, like the Verse player</string>
++  <string name="verse_mode">Appearance</string>
++  <string name="verse_mode_desc">Auto follows the cover. Light or Dark forces it</string>
++  <string name="verse_mode_auto">Auto</string>
++  <string name="verse_mode_light">Light</string>
++  <string name="verse_mode_dark">Dark</string>
++  <string name="verse_saturation">Saturation</string>
++  <string name="verse_saturation_desc">Color intensity of the whole theme</string>
++  <string name="verse_vibrancy">Vibrancy</string>
++  <string name="verse_vibrancy_desc">Glow and color blending of the background</string>
++  <string name="verse_highlight">Highlight color</string>
++  <string name="verse_highlight_desc">Shifts the accent and lyric highlight color</string>
++  <string name="verse_hue_auto">Auto</string>
++  <string name="verse_reset">Reset appearance</string>
++  <string name="verse_blobs_section">Lyrics blobs</string>
++  <string name="verse_blobs_anim">Animation</string>
++  <string name="verse_blobs_anim_desc">Turn off to keep the blobs still. Lighter on the battery</string>
++  <string name="verse_blobs_count">Blobs</string>
++  <string name="verse_blobs_count_desc">How many color blobs appear on the lyrics page</string>
++  <string name="verse_blobs_size">Blob size</string>
++  <string name="verse_blobs_size_desc">How large each blob is</string>
++  <string name="verse_blobs_opacity">Opacity</string>
++  <string name="verse_blobs_opacity_desc">How visible the blobs are</string>
++  <string name="verse_blobs_color">Colors</string>
++  <string name="verse_blobs_color_desc">How strongly the blobs take the accent color</string>
++  <string name="verse_blobs_motion">Motion</string>
++  <string name="verse_blobs_motion_desc">Seconds per drift cycle. Lower is faster</string>
++  <string name="verse_blobs_reset">Reset blobs</string>
+   <string name="bg_off_desc">Plain background. Best for battery life</string>
+   <string name="cover_shining_stars">Shining Stars</string>
+   <string name="cover_shining_stars_desc">A fractal starfield that pulses with the music</string>
+@@ -850,6 +879,63 @@
+   <string name="lyr_set_current_position">Current lyric position</string>
+   <string name="lyr_set_current_position_desc">Where the playing line sits on screen</string>
+   <string name="lyr_set_section_jiggle">Jiggle</string>
++  <string name="lyr_set_section_header">Enhance header</string>
++  <string name="lyr_set_header_enable">Enhance header</string>
++  <string name="lyr_set_header_enable_desc">Off keeps the original header</string>
++  <string name="lyr_set_header_album">Album size</string>
++  <string name="lyr_set_header_album_desc">Size of the cover in the header</string>
++  <string name="lyr_set_header_title">Title text size</string>
++  <string name="lyr_set_header_title_desc">Size of the song title</string>
++  <string name="lyr_set_header_artist">Artist text size</string>
++  <string name="lyr_set_header_artist_desc">Size of the artist name</string>
++  <string name="lyr_set_header_buttons">Like and dots size</string>
++  <string name="lyr_set_header_buttons_desc">Size of the round like and more buttons</string>
++  <string name="lyr_set_header_line_weight">Line weight</string>
++  <string name="lyr_set_header_line_weight_desc">Thickness of the line under the header</string>
++  <string name="lyr_set_header_line_opacity">Line opacity</string>
++  <string name="lyr_set_header_line_opacity_desc">How visible the line is</string>
++  <string name="lyr_set_header_bottom_padding">Bottom padding</string>
++  <string name="lyr_set_header_bottom_padding_desc">Space between the header and the line</string>
++  <string name="lyr_set_header_blur">Blur</string>
++  <string name="lyr_set_header_blur_desc">On: lyrics scroll behind a blurred header. Off: the line separates the header from the lyrics</string>
++  <string name="lyr_set_header_blur_amount">Blur amount</string>
++  <string name="lyr_set_header_blur_amount_desc">How strongly the header blurs the lyrics behind it</string>
++  <string name="lyr_set_header_soft_edge">Soft edge</string>
++  <string name="lyr_set_header_soft_edge_desc">The blur fades out below the header instead of stopping at a hard edge</string>
++  <string name="lyr_set_header_edge_fade">Edge fade height</string>
++  <string name="lyr_set_header_edge_fade_desc">Length of the soft fade under the header</string>
++  <string name="lyr_set_section_dock">Bottom bar</string>
++  <string name="lyr_set_dock_blur">Bottom bar blur</string>
++  <string name="lyr_set_dock_blur_desc">Off: solid fill color instead of transparent</string>
++  <string name="lyr_set_dock_blur_amount">Blur amount</string>
++  <string name="lyr_set_dock_blur_amount_desc">How much the buttons and the pill blur the lyrics behind them</string>
++  <string name="lyr_set_dock_size">Bottom bar size</string>
++  <string name="lyr_set_dock_size_desc">Size of the side buttons and the pill</string>
++  <string name="lyr_set_dock_bottom_padding">Bottom padding</string>
++  <string name="lyr_set_dock_bottom_padding_desc">Space under the bottom bar</string>
++  <string name="lyr_set_dock_pill_padding">Pill padding</string>
++  <string name="lyr_set_dock_pill_padding_desc">Space inside the pill around the cover and the play button</string>
++  <string name="lyr_set_dock_gap_left">Transliteration gap to pill</string>
++  <string name="lyr_set_dock_gap_left_desc">Space between the transliteration button and the pill</string>
++  <string name="lyr_set_dock_gap_right">Translate gap to pill</string>
++  <string name="lyr_set_dock_gap_right_desc">Space between the translate button and the pill</string>
++  <string name="lyr_set_dock_style">Blur style</string>
++  <string name="lyr_set_dock_style_desc">Normal: each button and the pill blur on their own. Spread: one blur behind the whole bar</string>
++  <string name="lyr_set_dock_style_normal">Normal</string>
++  <string name="lyr_set_dock_style_spread">Spread</string>
++  <string name="lyr_set_dock_soft_edge">Soft edge</string>
++  <string name="lyr_set_dock_soft_edge_desc">The blur fades out above the bar instead of a hard edge</string>
++  <string name="lyr_set_dock_edge_fade">Edge fade height</string>
++  <string name="lyr_set_dock_edge_fade_desc">Length of the soft fade above the bar</string>
++  <string name="lyr_dock_transliteration">Transliteration</string>
++  <string name="lyr_dock_translation">Translation</string>
++  <string name="lyr_set_header_outline">Album outline</string>
++  <string name="lyr_set_header_outline_desc">A thin outline around the album cover</string>
++  <string name="lyr_set_header_outline_weight">Outline weight</string>
++  <string name="lyr_set_header_outline_weight_desc">Thickness of the album outline</string>
++  <string name="lyr_set_header_outline_opacity">Outline opacity</string>
++  <string name="lyr_set_header_outline_opacity_desc">How visible the album outline is</string>
++  <string name="lyr_set_reset_header">Reset header</string>
+   <string name="lyr_set_jiggle">Jiggle effect</string>
+   <string name="lyr_set_jiggle_desc">Lines below the current one spring into place, like Apple Music</string>
+   <string name="lyr_set_jiggle_strength">Jiggle strength</string>
+diff --git a/app/src/main/res/values-zh/strings.xml b/app/src/main/res/values-zh/strings.xml
+index cb105c8..97a3256 100644
+--- a/app/src/main/res/values-zh/strings.xml
++++ b/app/src/main/res/values-zh/strings.xml
+@@ -720,6 +720,35 @@
+   <string name="bg_fluid_warp_desc">专辑封面融化并产生涟漪</string>
+   <string name="bg_blur_cover">模糊封面</string>
+   <string name="bg_blur_cover_desc">仅对封面做模糊处理，最省电</string>
++  <string name="bg_verse_flow">Verse 流光</string>
++  <string name="bg_verse_flow_desc">随封面变色的渐变背景，文字颜色同步变化，与 Verse 播放器一致</string>
++  <string name="verse_mode">外观</string>
++  <string name="verse_mode_desc">自动跟随封面，浅色或深色则强制指定</string>
++  <string name="verse_mode_auto">自动</string>
++  <string name="verse_mode_light">浅色</string>
++  <string name="verse_mode_dark">深色</string>
++  <string name="verse_saturation">饱和度</string>
++  <string name="verse_saturation_desc">整个主题的色彩强度</string>
++  <string name="verse_vibrancy">鲜艳度</string>
++  <string name="verse_vibrancy_desc">背景的光晕与色彩混合</string>
++  <string name="verse_highlight">高亮色</string>
++  <string name="verse_highlight_desc">调整强调色与歌词高亮色相</string>
++  <string name="verse_hue_auto">自动</string>
++  <string name="verse_reset">重置外观</string>
++  <string name="verse_blobs_section">歌词页色块</string>
++  <string name="verse_blobs_anim">动画</string>
++  <string name="verse_blobs_anim_desc">关闭后色块保持静止，更省电</string>
++  <string name="verse_blobs_count">色块数量</string>
++  <string name="verse_blobs_count_desc">歌词页显示的彩色色块个数</string>
++  <string name="verse_blobs_size">色块大小</string>
++  <string name="verse_blobs_size_desc">每个色块的大小</string>
++  <string name="verse_blobs_opacity">不透明度</string>
++  <string name="verse_blobs_opacity_desc">色块的明显程度</string>
++  <string name="verse_blobs_color">颜色</string>
++  <string name="verse_blobs_color_desc">色块带上强调色的程度</string>
++  <string name="verse_blobs_motion">动效</string>
++  <string name="verse_blobs_motion_desc">每次漂移循环的秒数，越小越快</string>
++  <string name="verse_blobs_reset">重置色块</string>
+   <string name="bg_off_desc">纯色背景，最省电</string>
+   <string name="cover_shining_stars">闪耀星光</string>
+   <string name="cover_shining_stars_desc">随音乐跳动的分形星空</string>
+@@ -850,6 +879,63 @@
+   <string name="lyr_set_current_position">当前歌词位置</string>
+   <string name="lyr_set_current_position_desc">正在播放的行在屏幕上的位置</string>
+   <string name="lyr_set_section_jiggle">弹跳</string>
++  <string name="lyr_set_section_header">增强顶栏</string>
++  <string name="lyr_set_header_enable">增强顶栏</string>
++  <string name="lyr_set_header_enable_desc">关闭则保持原样的顶栏</string>
++  <string name="lyr_set_header_album">专辑封面大小</string>
++  <string name="lyr_set_header_album_desc">顶栏中封面的大小</string>
++  <string name="lyr_set_header_title">标题字号</string>
++  <string name="lyr_set_header_title_desc">歌曲标题的字号</string>
++  <string name="lyr_set_header_artist">歌手字号</string>
++  <string name="lyr_set_header_artist_desc">歌手名的字号</string>
++  <string name="lyr_set_header_buttons">喜欢和更多按钮大小</string>
++  <string name="lyr_set_header_buttons_desc">圆形喜欢与更多按钮的大小</string>
++  <string name="lyr_set_header_line_weight">分隔线粗细</string>
++  <string name="lyr_set_header_line_weight_desc">顶栏下方分隔线的粗细</string>
++  <string name="lyr_set_header_line_opacity">分隔线不透明度</string>
++  <string name="lyr_set_header_line_opacity_desc">分隔线的明显程度</string>
++  <string name="lyr_set_header_bottom_padding">底部间距</string>
++  <string name="lyr_set_header_bottom_padding_desc">顶栏内容与分隔线之间的间距</string>
++  <string name="lyr_set_header_blur">模糊</string>
++  <string name="lyr_set_header_blur_desc">开启：歌词从模糊的顶栏下方穿过。关闭：由分隔线把顶栏与歌词分开</string>
++  <string name="lyr_set_header_blur_amount">模糊程度</string>
++  <string name="lyr_set_header_blur_amount_desc">顶栏对其后歌词的模糊强度</string>
++  <string name="lyr_set_header_soft_edge">柔和边缘</string>
++  <string name="lyr_set_header_soft_edge_desc">模糊在顶栏下方逐渐消失，而不是突然停止</string>
++  <string name="lyr_set_header_edge_fade">边缘渐隐高度</string>
++  <string name="lyr_set_header_edge_fade_desc">顶栏下方柔和渐隐的长度</string>
++  <string name="lyr_set_section_dock">底栏</string>
++  <string name="lyr_set_dock_blur">底栏模糊</string>
++  <string name="lyr_set_dock_blur_desc">关闭：使用纯色填充，不再透明</string>
++  <string name="lyr_set_dock_blur_amount">模糊程度</string>
++  <string name="lyr_set_dock_blur_amount_desc">按钮和胶囊对其后歌词的模糊强度</string>
++  <string name="lyr_set_dock_size">底栏大小</string>
++  <string name="lyr_set_dock_size_desc">两侧按钮与胶囊的大小</string>
++  <string name="lyr_set_dock_bottom_padding">底部间距</string>
++  <string name="lyr_set_dock_bottom_padding_desc">底栏下方的间距</string>
++  <string name="lyr_set_dock_pill_padding">胶囊内边距</string>
++  <string name="lyr_set_dock_pill_padding_desc">胶囊内封面与播放按钮周围的间距</string>
++  <string name="lyr_set_dock_gap_left">音译按钮与胶囊间距</string>
++  <string name="lyr_set_dock_gap_left_desc">音译按钮与胶囊之间的间距</string>
++  <string name="lyr_set_dock_gap_right">翻译按钮与胶囊间距</string>
++  <string name="lyr_set_dock_gap_right_desc">翻译按钮与胶囊之间的间距</string>
++  <string name="lyr_set_dock_style">模糊样式</string>
++  <string name="lyr_set_dock_style_desc">普通：每个按钮和胶囊各自模糊。扩散：整条底栏后方一整片模糊</string>
++  <string name="lyr_set_dock_style_normal">普通</string>
++  <string name="lyr_set_dock_style_spread">扩散</string>
++  <string name="lyr_set_dock_soft_edge">柔和边缘</string>
++  <string name="lyr_set_dock_soft_edge_desc">模糊在底栏上方逐渐消失，而不是突然停止</string>
++  <string name="lyr_set_dock_edge_fade">边缘渐隐高度</string>
++  <string name="lyr_set_dock_edge_fade_desc">底栏上方柔和渐隐的长度</string>
++  <string name="lyr_dock_transliteration">音译</string>
++  <string name="lyr_dock_translation">翻译</string>
++  <string name="lyr_set_header_outline">封面描边</string>
++  <string name="lyr_set_header_outline_desc">专辑封面周围的细描边</string>
++  <string name="lyr_set_header_outline_weight">描边粗细</string>
++  <string name="lyr_set_header_outline_weight_desc">封面描边的粗细</string>
++  <string name="lyr_set_header_outline_opacity">描边不透明度</string>
++  <string name="lyr_set_header_outline_opacity_desc">封面描边的明显程度</string>
++  <string name="lyr_set_reset_header">重置顶栏</string>
+   <string name="lyr_set_jiggle">弹跳效果</string>
+   <string name="lyr_set_jiggle_desc">当前行下方的歌词行会像 Apple Music 一样弹入位置</string>
+   <string name="lyr_set_jiggle_strength">弹跳强度</string>
+diff --git a/app/src/main/res/values-zh-rTW/strings.xml b/app/src/main/res/values-zh-rTW/strings.xml
+index c4356a5..3eb9aec 100644
+--- a/app/src/main/res/values-zh-rTW/strings.xml
++++ b/app/src/main/res/values-zh-rTW/strings.xml
+@@ -718,6 +718,35 @@
+   <string name="bg_fluid_warp_desc">專輯封面融化並產生漣漪</string>
+   <string name="bg_blur_cover">模糊封面</string>
+   <string name="bg_blur_cover_desc">僅對封面做模糊處理，最省電</string>
++  <string name="bg_verse_flow">Verse 流光</string>
++  <string name="bg_verse_flow_desc">隨封面變色的漸層背景，文字顏色同步變化，與 Verse 播放器一致</string>
++  <string name="verse_mode">外觀</string>
++  <string name="verse_mode_desc">自動跟隨封面，淺色或深色則強制指定</string>
++  <string name="verse_mode_auto">自動</string>
++  <string name="verse_mode_light">淺色</string>
++  <string name="verse_mode_dark">深色</string>
++  <string name="verse_saturation">飽和度</string>
++  <string name="verse_saturation_desc">整個主題的色彩強度</string>
++  <string name="verse_vibrancy">鮮豔度</string>
++  <string name="verse_vibrancy_desc">背景的光暈與色彩混合</string>
++  <string name="verse_highlight">高亮色</string>
++  <string name="verse_highlight_desc">調整強調色與歌詞高亮色相</string>
++  <string name="verse_hue_auto">自動</string>
++  <string name="verse_reset">重設外觀</string>
++  <string name="verse_blobs_section">歌詞頁色塊</string>
++  <string name="verse_blobs_anim">動畫</string>
++  <string name="verse_blobs_anim_desc">關閉後色塊保持靜止，更省電</string>
++  <string name="verse_blobs_count">色塊數量</string>
++  <string name="verse_blobs_count_desc">歌詞頁顯示的彩色色塊個數</string>
++  <string name="verse_blobs_size">色塊大小</string>
++  <string name="verse_blobs_size_desc">每個色塊的大小</string>
++  <string name="verse_blobs_opacity">不透明度</string>
++  <string name="verse_blobs_opacity_desc">色塊的明顯程度</string>
++  <string name="verse_blobs_color">顏色</string>
++  <string name="verse_blobs_color_desc">色塊帶上強調色的程度</string>
++  <string name="verse_blobs_motion">動效</string>
++  <string name="verse_blobs_motion_desc">每次漂移循環的秒數，越小越快</string>
++  <string name="verse_blobs_reset">重設色塊</string>
+   <string name="bg_off_desc">純色背景，最省電</string>
+   <string name="cover_shining_stars">閃耀星光</string>
+   <string name="cover_shining_stars_desc">隨音樂跳動的分形星空</string>
+@@ -849,6 +878,63 @@
+   <string name="lyr_set_current_position">目前歌詞位置</string>
+   <string name="lyr_set_current_position_desc">正在播放的行在螢幕上的位置</string>
+   <string name="lyr_set_section_jiggle">彈跳</string>
++  <string name="lyr_set_section_header">增強頂欄</string>
++  <string name="lyr_set_header_enable">增強頂欄</string>
++  <string name="lyr_set_header_enable_desc">關閉則保持原樣的頂欄</string>
++  <string name="lyr_set_header_album">專輯封面大小</string>
++  <string name="lyr_set_header_album_desc">頂欄中封面的大小</string>
++  <string name="lyr_set_header_title">標題字級</string>
++  <string name="lyr_set_header_title_desc">歌曲標題的字級</string>
++  <string name="lyr_set_header_artist">歌手字級</string>
++  <string name="lyr_set_header_artist_desc">歌手名的字級</string>
++  <string name="lyr_set_header_buttons">喜歡和更多按鈕大小</string>
++  <string name="lyr_set_header_buttons_desc">圓形喜歡與更多按鈕的大小</string>
++  <string name="lyr_set_header_line_weight">分隔線粗細</string>
++  <string name="lyr_set_header_line_weight_desc">頂欄下方分隔線的粗細</string>
++  <string name="lyr_set_header_line_opacity">分隔線不透明度</string>
++  <string name="lyr_set_header_line_opacity_desc">分隔線的明顯程度</string>
++  <string name="lyr_set_header_bottom_padding">底部間距</string>
++  <string name="lyr_set_header_bottom_padding_desc">頂欄內容與分隔線之間的間距</string>
++  <string name="lyr_set_header_blur">模糊</string>
++  <string name="lyr_set_header_blur_desc">開啟：歌詞從模糊的頂欄下方穿過。關閉：由分隔線把頂欄與歌詞分開</string>
++  <string name="lyr_set_header_blur_amount">模糊程度</string>
++  <string name="lyr_set_header_blur_amount_desc">頂欄對其後歌詞的模糊強度</string>
++  <string name="lyr_set_header_soft_edge">柔和邊緣</string>
++  <string name="lyr_set_header_soft_edge_desc">模糊在頂欄下方逐漸消失，而不是突然停止</string>
++  <string name="lyr_set_header_edge_fade">邊緣漸隱高度</string>
++  <string name="lyr_set_header_edge_fade_desc">頂欄下方柔和漸隱的長度</string>
++  <string name="lyr_set_section_dock">底欄</string>
++  <string name="lyr_set_dock_blur">底欄模糊</string>
++  <string name="lyr_set_dock_blur_desc">關閉：使用純色填滿，不再透明</string>
++  <string name="lyr_set_dock_blur_amount">模糊程度</string>
++  <string name="lyr_set_dock_blur_amount_desc">按鈕和膠囊對其後歌詞的模糊強度</string>
++  <string name="lyr_set_dock_size">底欄大小</string>
++  <string name="lyr_set_dock_size_desc">兩側按鈕與膠囊的大小</string>
++  <string name="lyr_set_dock_bottom_padding">底部間距</string>
++  <string name="lyr_set_dock_bottom_padding_desc">底欄下方的間距</string>
++  <string name="lyr_set_dock_pill_padding">膠囊內邊距</string>
++  <string name="lyr_set_dock_pill_padding_desc">膠囊內封面與播放按鈕周圍的間距</string>
++  <string name="lyr_set_dock_gap_left">音譯按鈕與膠囊間距</string>
++  <string name="lyr_set_dock_gap_left_desc">音譯按鈕與膠囊之間的間距</string>
++  <string name="lyr_set_dock_gap_right">翻譯按鈕與膠囊間距</string>
++  <string name="lyr_set_dock_gap_right_desc">翻譯按鈕與膠囊之間的間距</string>
++  <string name="lyr_set_dock_style">模糊樣式</string>
++  <string name="lyr_set_dock_style_desc">普通：每個按鈕和膠囊各自模糊。擴散：整條底欄後方一整片模糊</string>
++  <string name="lyr_set_dock_style_normal">普通</string>
++  <string name="lyr_set_dock_style_spread">擴散</string>
++  <string name="lyr_set_dock_soft_edge">柔和邊緣</string>
++  <string name="lyr_set_dock_soft_edge_desc">模糊在底欄上方逐漸消失，而不是突然停止</string>
++  <string name="lyr_set_dock_edge_fade">邊緣漸隱高度</string>
++  <string name="lyr_set_dock_edge_fade_desc">底欄上方柔和漸隱的長度</string>
++  <string name="lyr_dock_transliteration">音譯</string>
++  <string name="lyr_dock_translation">翻譯</string>
++  <string name="lyr_set_header_outline">封面描邊</string>
++  <string name="lyr_set_header_outline_desc">專輯封面周圍的細描邊</string>
++  <string name="lyr_set_header_outline_weight">描邊粗細</string>
++  <string name="lyr_set_header_outline_weight_desc">封面描邊的粗細</string>
++  <string name="lyr_set_header_outline_opacity">描邊不透明度</string>
++  <string name="lyr_set_header_outline_opacity_desc">封面描邊的明顯程度</string>
++  <string name="lyr_set_reset_header">重設頂欄</string>
+   <string name="lyr_set_jiggle">彈跳效果</string>
+   <string name="lyr_set_jiggle_desc">目前行下方的歌詞行會像 Apple Music 一樣彈入位置</string>
+   <string name="lyr_set_jiggle_strength">彈跳強度</string>
+diff --git a/common/src/main/java/me/spica27/spicamusic/common/entity/DynamicSpectrumBackground.kt b/common/src/main/java/me/spica27/spicamusic/common/entity/DynamicSpectrumBackground.kt
+index 655839f..ed23cbe 100644
+--- a/common/src/main/java/me/spica27/spicamusic/common/entity/DynamicSpectrumBackground.kt
++++ b/common/src/main/java/me/spica27/spicamusic/common/entity/DynamicSpectrumBackground.kt
+@@ -31,6 +31,12 @@ sealed class DynamicSpectrumBackground(
+         "模糊封面",
+     )
+ 
++    /** Verse "flow" look: album-derived gradient + accent text colours (HTML appearance system). */
++    object VerseFlow : DynamicSpectrumBackground(
++        "verse_flow",
++        "Verse Flow",
++    )
++
+     object OFF : DynamicSpectrumBackground(
+         "off",
+         "关闭",
+@@ -44,6 +50,7 @@ sealed class DynamicSpectrumBackground(
+             is EffectShader -> "流体效果"
+             is FluidWarp -> "动态流体封面"
+             is BlurCover -> "模糊封面"
++            is VerseFlow -> "Verse Flow"
+             is OFF -> "关闭"
+         }
+     }
+@@ -56,13 +63,14 @@ sealed class DynamicSpectrumBackground(
+                 EffectShader.value -> EffectShader
+                 FluidWarp.value -> FluidWarp
+                 BlurCover.value -> BlurCover
++                VerseFlow.value -> VerseFlow
+                 OFF.value -> OFF
+                 else -> OFF
+             }
+         }
+ 
+         val presets: List<DynamicSpectrumBackground>
+-            get() = listOf(TopGlow, LiquidAurora, EffectShader, FluidWarp, BlurCover, OFF)
++            get() = listOf(VerseFlow, TopGlow, LiquidAurora, EffectShader, FluidWarp, BlurCover, OFF)
+     }
+ 
+ }
+\ No newline at end of file
+diff --git a/core-preferences/src/main/java/me/spica27/spicamusic/core/preferences/LyricsStyleSettings.kt b/core-preferences/src/main/java/me/spica27/spicamusic/core/preferences/LyricsStyleSettings.kt
+index ea1e27c..79f7049 100644
+--- a/core-preferences/src/main/java/me/spica27/spicamusic/core/preferences/LyricsStyleSettings.kt
++++ b/core-preferences/src/main/java/me/spica27/spicamusic/core/preferences/LyricsStyleSettings.kt
+@@ -46,6 +46,62 @@ data class LyricsStyleSettings(
+     val jiggleStrength: Int = 50,
+     val jiggleDurationMs: Int = 1200,
+     val jiggleDelayMs: Int = 45,
++    // ---- Enhanced header (lyrics window) ----
++    /** false = the original header (no line, no blur). */
++    val enhanceHeader: Boolean = false,
++    /** Cover size in dp. */
++    val headerAlbumSize: Int = 56,
++    /** Title text size in sp. */
++    val headerTitleSize: Int = 22,
++    /** Artist text size in sp. */
++    val headerArtistSize: Int = 14,
++    /** Like and "more" button size in dp. */
++    val headerButtonSize: Int = 44,
++    /** Separator line weight in steps of 0.5 dp (2 = 1 dp). */
++    val headerLineWeight: Int = 2,
++    /** Separator line opacity in percent. */
++    val headerLineOpacity: Int = 18,
++    /** Space between the header content and the line, in dp. */
++    val headerBottomPadding: Int = 12,
++    /** true: lyrics scroll behind a blurred header. false: the line separates header and lyrics. */
++    val headerBlurEnabled: Boolean = true,
++    /** Blur radius in dp. */
++    val headerBlurAmount: Int = 16,
++    /** true: the blur fades out below the header instead of stopping at a hard edge. */
++    val headerSoftEdge: Boolean = true,
++    /** Height of the fade band below the header, in dp. */
++    val headerEdgeFade: Int = 32,
++    /** Thin outline around the album cover. */
++    val headerOutlineEnabled: Boolean = true,
++    /** Outline weight in steps of 0.5 dp (2 = 1 dp). */
++    val headerOutlineWeight: Int = 2,
++    /** Outline opacity in percent. */
++    val headerOutlineOpacity: Int = 15,
++    // ---- Lyrics page bottom bar (translation / transliteration buttons + player pill) ----
++    /** Show the translation lines (the right button toggles this). */
++    val showTranslation: Boolean = true,
++    /** Show the transliteration lines (the left button toggles this). */
++    val showTransliteration: Boolean = true,
++    /** true: the buttons and the pill blur the lyrics behind them. false: solid fill colour. */
++    val dockBlurEnabled: Boolean = true,
++    /** Blur radius in dp. */
++    val dockBlurAmount: Int = 14,
++    /** Height of the pill and diameter of the side buttons, in dp. */
++    val dockSize: Int = 52,
++    /** Space under the bottom bar, in dp. */
++    val dockBottomPadding: Int = 18,
++    /** Space inside the pill around the cover and the play button, in dp. */
++    val dockPillPadding: Int = 6,
++    /** Space between the transliteration button and the pill, in dp. */
++    val dockGapLeft: Int = 10,
++    /** Space between the translation button and the pill, in dp. */
++    val dockGapRight: Int = 10,
++    /** false: every button and the pill blur on their own (normal). true: one blur behind the whole bar. */
++    val dockSpreadBlur: Boolean = false,
++    /** Spread only: the blur fades out above the bar instead of ending at a hard edge. */
++    val dockSoftEdge: Boolean = true,
++    /** Spread only: height of the fade band above the bar, in dp. */
++    val dockEdgeFade: Int = 32,
+ ) {
+     /** Returns a copy with every value forced into its allowed range. */
+     fun sanitized(): LyricsStyleSettings =
+@@ -62,6 +118,24 @@ data class LyricsStyleSettings(
+             jiggleStrength = jiggleStrength.coerceIn(JIGGLE_STRENGTH_RANGE),
+             jiggleDurationMs = jiggleDurationMs.coerceIn(JIGGLE_DURATION_RANGE),
+             jiggleDelayMs = jiggleDelayMs.coerceIn(JIGGLE_DELAY_RANGE),
++            headerAlbumSize = headerAlbumSize.coerceIn(HEADER_ALBUM_RANGE),
++            headerTitleSize = headerTitleSize.coerceIn(HEADER_TITLE_RANGE),
++            headerArtistSize = headerArtistSize.coerceIn(HEADER_ARTIST_RANGE),
++            headerButtonSize = headerButtonSize.coerceIn(HEADER_BUTTON_RANGE),
++            headerLineWeight = headerLineWeight.coerceIn(HEADER_LINE_WEIGHT_RANGE),
++            headerLineOpacity = headerLineOpacity.coerceIn(HEADER_LINE_OPACITY_RANGE),
++            headerBottomPadding = headerBottomPadding.coerceIn(HEADER_BOTTOM_PADDING_RANGE),
++            headerBlurAmount = headerBlurAmount.coerceIn(HEADER_BLUR_RANGE),
++            headerEdgeFade = headerEdgeFade.coerceIn(HEADER_EDGE_FADE_RANGE),
++            headerOutlineWeight = headerOutlineWeight.coerceIn(HEADER_OUTLINE_WEIGHT_RANGE),
++            headerOutlineOpacity = headerOutlineOpacity.coerceIn(HEADER_OUTLINE_OPACITY_RANGE),
++            dockBlurAmount = dockBlurAmount.coerceIn(DOCK_BLUR_RANGE),
++            dockSize = dockSize.coerceIn(DOCK_SIZE_RANGE),
++            dockBottomPadding = dockBottomPadding.coerceIn(DOCK_BOTTOM_PADDING_RANGE),
++            dockPillPadding = dockPillPadding.coerceIn(DOCK_PILL_PADDING_RANGE),
++            dockGapLeft = dockGapLeft.coerceIn(DOCK_GAP_RANGE),
++            dockGapRight = dockGapRight.coerceIn(DOCK_GAP_RANGE),
++            dockEdgeFade = dockEdgeFade.coerceIn(DOCK_EDGE_FADE_RANGE),
+         )
+ 
+     companion object {
+@@ -76,5 +150,22 @@ data class LyricsStyleSettings(
+         val JIGGLE_STRENGTH_RANGE = 10..100
+         val JIGGLE_DURATION_RANGE = 500..2500
+         val JIGGLE_DELAY_RANGE = 0..150
++        val HEADER_ALBUM_RANGE = 40..96
++        val HEADER_TITLE_RANGE = 14..32
++        val HEADER_ARTIST_RANGE = 10..22
++        val HEADER_BUTTON_RANGE = 32..64
++        val HEADER_LINE_WEIGHT_RANGE = 1..8
++        val HEADER_LINE_OPACITY_RANGE = 0..100
++        val HEADER_BOTTOM_PADDING_RANGE = 0..40
++        val HEADER_BLUR_RANGE = 0..40
++        val HEADER_EDGE_FADE_RANGE = 0..80
++        val HEADER_OUTLINE_WEIGHT_RANGE = 1..8
++        val HEADER_OUTLINE_OPACITY_RANGE = 0..100
++        val DOCK_BLUR_RANGE = 0..40
++        val DOCK_SIZE_RANGE = 40..72
++        val DOCK_BOTTOM_PADDING_RANGE = 0..48
++        val DOCK_PILL_PADDING_RANGE = 0..16
++        val DOCK_GAP_RANGE = 0..32
++        val DOCK_EDGE_FADE_RANGE = 0..80
+     }
+ }
+diff --git a/core-preferences/src/main/java/me/spica27/spicamusic/core/preferences/PreferencesManager.kt b/core-preferences/src/main/java/me/spica27/spicamusic/core/preferences/PreferencesManager.kt
+index 5c0e8b3..d28170f 100644
+--- a/core-preferences/src/main/java/me/spica27/spicamusic/core/preferences/PreferencesManager.kt
++++ b/core-preferences/src/main/java/me/spica27/spicamusic/core/preferences/PreferencesManager.kt
+@@ -24,6 +24,19 @@ class PreferencesManager(
+         val THEME_COLOR_STYLE = stringPreferencesKey("theme_color_style")
+         val KEEP_SCREEN_ON = booleanPreferencesKey("keep_screen_on")
+         val DYNAMIC_SPECTRUM_BACKGROUND = stringPreferencesKey("dynamic_spectrum_background")
++        // ---- Verse Flow 外观（Auto / Light / Dark、饱和度、鲜艳度、高亮色相）----
++        val VERSE_THEME_MODE = stringPreferencesKey("verse_theme_mode")
++        val VERSE_THEME_SATURATION = intPreferencesKey("verse_theme_saturation")
++        val VERSE_THEME_VIBRANCY = intPreferencesKey("verse_theme_vibrancy")
++        val VERSE_THEME_HUE = intPreferencesKey("verse_theme_hue")
++
++        // ---- Verse Flow 歌词页色块（blobs）----
++        val VERSE_MESH_COUNT = intPreferencesKey("verse_mesh_count")
++        val VERSE_MESH_SIZE = intPreferencesKey("verse_mesh_size")
++        val VERSE_MESH_OPACITY = intPreferencesKey("verse_mesh_opacity")
++        val VERSE_MESH_MOTION = intPreferencesKey("verse_mesh_motion")
++        val VERSE_MESH_COLOR = intPreferencesKey("verse_mesh_color")
++        val VERSE_MESH_ANIMATED = booleanPreferencesKey("verse_mesh_animated")
+         val DYNAMIC_COVER_TYPE = stringPreferencesKey("dynamic_cover_type")
+         val PROGRESS_BAR_STYLE = stringPreferencesKey("progress_bar_style")
+         val EQ_ENABLED = booleanPreferencesKey("eq_enabled")
+@@ -58,6 +71,33 @@ class PreferencesManager(
+         val LYRIC_JIGGLE_STRENGTH = intPreferencesKey("lyric_jiggle_strength")
+         val LYRIC_JIGGLE_DURATION_MS = intPreferencesKey("lyric_jiggle_duration_ms")
+         val LYRIC_JIGGLE_DELAY_MS = intPreferencesKey("lyric_jiggle_delay_ms")
++        val LYRIC_HEADER_ENHANCED = booleanPreferencesKey("lyric_header_enhanced")
++        val LYRIC_HEADER_ALBUM_SIZE = intPreferencesKey("lyric_header_album_size")
++        val LYRIC_HEADER_TITLE_SIZE = intPreferencesKey("lyric_header_title_size")
++        val LYRIC_HEADER_ARTIST_SIZE = intPreferencesKey("lyric_header_artist_size")
++        val LYRIC_HEADER_BUTTON_SIZE = intPreferencesKey("lyric_header_button_size")
++        val LYRIC_HEADER_LINE_WEIGHT = intPreferencesKey("lyric_header_line_weight")
++        val LYRIC_HEADER_LINE_OPACITY = intPreferencesKey("lyric_header_line_opacity")
++        val LYRIC_HEADER_BOTTOM_PADDING = intPreferencesKey("lyric_header_bottom_padding")
++        val LYRIC_HEADER_BLUR_ENABLED = booleanPreferencesKey("lyric_header_blur_enabled")
++        val LYRIC_HEADER_BLUR_AMOUNT = intPreferencesKey("lyric_header_blur_amount")
++        val LYRIC_HEADER_SOFT_EDGE = booleanPreferencesKey("lyric_header_soft_edge")
++        val LYRIC_HEADER_EDGE_FADE = intPreferencesKey("lyric_header_edge_fade")
++        val LYRIC_HEADER_OUTLINE_ENABLED = booleanPreferencesKey("lyric_header_outline_enabled")
++        val LYRIC_HEADER_OUTLINE_WEIGHT = intPreferencesKey("lyric_header_outline_weight")
++        val LYRIC_HEADER_OUTLINE_OPACITY = intPreferencesKey("lyric_header_outline_opacity")
++        val LYRIC_SHOW_TRANSLATION = booleanPreferencesKey("lyric_show_translation")
++        val LYRIC_SHOW_TRANSLITERATION = booleanPreferencesKey("lyric_show_transliteration")
++        val LYRIC_DOCK_BLUR_ENABLED = booleanPreferencesKey("lyric_dock_blur_enabled")
++        val LYRIC_DOCK_BLUR_AMOUNT = intPreferencesKey("lyric_dock_blur_amount")
++        val LYRIC_DOCK_SIZE = intPreferencesKey("lyric_dock_size")
++        val LYRIC_DOCK_BOTTOM_PADDING = intPreferencesKey("lyric_dock_bottom_padding")
++        val LYRIC_DOCK_PILL_PADDING = intPreferencesKey("lyric_dock_pill_padding")
++        val LYRIC_DOCK_GAP_LEFT = intPreferencesKey("lyric_dock_gap_left")
++        val LYRIC_DOCK_GAP_RIGHT = intPreferencesKey("lyric_dock_gap_right")
++        val LYRIC_DOCK_SPREAD_BLUR = booleanPreferencesKey("lyric_dock_spread_blur")
++        val LYRIC_DOCK_SOFT_EDGE = booleanPreferencesKey("lyric_dock_soft_edge")
++        val LYRIC_DOCK_EDGE_FADE = intPreferencesKey("lyric_dock_edge_fade")
+     }
+ 
+ 
+@@ -86,6 +126,33 @@ class PreferencesManager(
+                     jiggleStrength = p[Keys.LYRIC_JIGGLE_STRENGTH] ?: d.jiggleStrength,
+                     jiggleDurationMs = p[Keys.LYRIC_JIGGLE_DURATION_MS] ?: d.jiggleDurationMs,
+                     jiggleDelayMs = p[Keys.LYRIC_JIGGLE_DELAY_MS] ?: d.jiggleDelayMs,
++                    enhanceHeader = p[Keys.LYRIC_HEADER_ENHANCED] ?: d.enhanceHeader,
++                    headerAlbumSize = p[Keys.LYRIC_HEADER_ALBUM_SIZE] ?: d.headerAlbumSize,
++                    headerTitleSize = p[Keys.LYRIC_HEADER_TITLE_SIZE] ?: d.headerTitleSize,
++                    headerArtistSize = p[Keys.LYRIC_HEADER_ARTIST_SIZE] ?: d.headerArtistSize,
++                    headerButtonSize = p[Keys.LYRIC_HEADER_BUTTON_SIZE] ?: d.headerButtonSize,
++                    headerLineWeight = p[Keys.LYRIC_HEADER_LINE_WEIGHT] ?: d.headerLineWeight,
++                    headerLineOpacity = p[Keys.LYRIC_HEADER_LINE_OPACITY] ?: d.headerLineOpacity,
++                    headerBottomPadding = p[Keys.LYRIC_HEADER_BOTTOM_PADDING] ?: d.headerBottomPadding,
++                    headerBlurEnabled = p[Keys.LYRIC_HEADER_BLUR_ENABLED] ?: d.headerBlurEnabled,
++                    headerBlurAmount = p[Keys.LYRIC_HEADER_BLUR_AMOUNT] ?: d.headerBlurAmount,
++                    headerSoftEdge = p[Keys.LYRIC_HEADER_SOFT_EDGE] ?: d.headerSoftEdge,
++                    headerEdgeFade = p[Keys.LYRIC_HEADER_EDGE_FADE] ?: d.headerEdgeFade,
++                    headerOutlineEnabled = p[Keys.LYRIC_HEADER_OUTLINE_ENABLED] ?: d.headerOutlineEnabled,
++                    headerOutlineWeight = p[Keys.LYRIC_HEADER_OUTLINE_WEIGHT] ?: d.headerOutlineWeight,
++                    headerOutlineOpacity = p[Keys.LYRIC_HEADER_OUTLINE_OPACITY] ?: d.headerOutlineOpacity,
++                    showTranslation = p[Keys.LYRIC_SHOW_TRANSLATION] ?: d.showTranslation,
++                    showTransliteration = p[Keys.LYRIC_SHOW_TRANSLITERATION] ?: d.showTransliteration,
++                    dockBlurEnabled = p[Keys.LYRIC_DOCK_BLUR_ENABLED] ?: d.dockBlurEnabled,
++                    dockBlurAmount = p[Keys.LYRIC_DOCK_BLUR_AMOUNT] ?: d.dockBlurAmount,
++                    dockSize = p[Keys.LYRIC_DOCK_SIZE] ?: d.dockSize,
++                    dockBottomPadding = p[Keys.LYRIC_DOCK_BOTTOM_PADDING] ?: d.dockBottomPadding,
++                    dockPillPadding = p[Keys.LYRIC_DOCK_PILL_PADDING] ?: d.dockPillPadding,
++                    dockGapLeft = p[Keys.LYRIC_DOCK_GAP_LEFT] ?: d.dockGapLeft,
++                    dockGapRight = p[Keys.LYRIC_DOCK_GAP_RIGHT] ?: d.dockGapRight,
++                    dockSpreadBlur = p[Keys.LYRIC_DOCK_SPREAD_BLUR] ?: d.dockSpreadBlur,
++                    dockSoftEdge = p[Keys.LYRIC_DOCK_SOFT_EDGE] ?: d.dockSoftEdge,
++                    dockEdgeFade = p[Keys.LYRIC_DOCK_EDGE_FADE] ?: d.dockEdgeFade,
+                 ).sanitized()
+             }.distinctUntilChanged()
+ 
+@@ -114,6 +181,33 @@ class PreferencesManager(
+                     jiggleStrength = p[Keys.LYRIC_JIGGLE_STRENGTH] ?: d.jiggleStrength,
+                     jiggleDurationMs = p[Keys.LYRIC_JIGGLE_DURATION_MS] ?: d.jiggleDurationMs,
+                     jiggleDelayMs = p[Keys.LYRIC_JIGGLE_DELAY_MS] ?: d.jiggleDelayMs,
++                    enhanceHeader = p[Keys.LYRIC_HEADER_ENHANCED] ?: d.enhanceHeader,
++                    headerAlbumSize = p[Keys.LYRIC_HEADER_ALBUM_SIZE] ?: d.headerAlbumSize,
++                    headerTitleSize = p[Keys.LYRIC_HEADER_TITLE_SIZE] ?: d.headerTitleSize,
++                    headerArtistSize = p[Keys.LYRIC_HEADER_ARTIST_SIZE] ?: d.headerArtistSize,
++                    headerButtonSize = p[Keys.LYRIC_HEADER_BUTTON_SIZE] ?: d.headerButtonSize,
++                    headerLineWeight = p[Keys.LYRIC_HEADER_LINE_WEIGHT] ?: d.headerLineWeight,
++                    headerLineOpacity = p[Keys.LYRIC_HEADER_LINE_OPACITY] ?: d.headerLineOpacity,
++                    headerBottomPadding = p[Keys.LYRIC_HEADER_BOTTOM_PADDING] ?: d.headerBottomPadding,
++                    headerBlurEnabled = p[Keys.LYRIC_HEADER_BLUR_ENABLED] ?: d.headerBlurEnabled,
++                    headerBlurAmount = p[Keys.LYRIC_HEADER_BLUR_AMOUNT] ?: d.headerBlurAmount,
++                    headerSoftEdge = p[Keys.LYRIC_HEADER_SOFT_EDGE] ?: d.headerSoftEdge,
++                    headerEdgeFade = p[Keys.LYRIC_HEADER_EDGE_FADE] ?: d.headerEdgeFade,
++                    headerOutlineEnabled = p[Keys.LYRIC_HEADER_OUTLINE_ENABLED] ?: d.headerOutlineEnabled,
++                    headerOutlineWeight = p[Keys.LYRIC_HEADER_OUTLINE_WEIGHT] ?: d.headerOutlineWeight,
++                    headerOutlineOpacity = p[Keys.LYRIC_HEADER_OUTLINE_OPACITY] ?: d.headerOutlineOpacity,
++                    showTranslation = p[Keys.LYRIC_SHOW_TRANSLATION] ?: d.showTranslation,
++                    showTransliteration = p[Keys.LYRIC_SHOW_TRANSLITERATION] ?: d.showTransliteration,
++                    dockBlurEnabled = p[Keys.LYRIC_DOCK_BLUR_ENABLED] ?: d.dockBlurEnabled,
++                    dockBlurAmount = p[Keys.LYRIC_DOCK_BLUR_AMOUNT] ?: d.dockBlurAmount,
++                    dockSize = p[Keys.LYRIC_DOCK_SIZE] ?: d.dockSize,
++                    dockBottomPadding = p[Keys.LYRIC_DOCK_BOTTOM_PADDING] ?: d.dockBottomPadding,
++                    dockPillPadding = p[Keys.LYRIC_DOCK_PILL_PADDING] ?: d.dockPillPadding,
++                    dockGapLeft = p[Keys.LYRIC_DOCK_GAP_LEFT] ?: d.dockGapLeft,
++                    dockGapRight = p[Keys.LYRIC_DOCK_GAP_RIGHT] ?: d.dockGapRight,
++                    dockSpreadBlur = p[Keys.LYRIC_DOCK_SPREAD_BLUR] ?: d.dockSpreadBlur,
++                    dockSoftEdge = p[Keys.LYRIC_DOCK_SOFT_EDGE] ?: d.dockSoftEdge,
++                    dockEdgeFade = p[Keys.LYRIC_DOCK_EDGE_FADE] ?: d.dockEdgeFade,
+                 )
+             val n = transform(current).sanitized()
+             p[Keys.LYRIC_FONT_STYLE] = n.fontStyle
+@@ -133,6 +227,33 @@ class PreferencesManager(
+             p[Keys.LYRIC_JIGGLE_STRENGTH] = n.jiggleStrength
+             p[Keys.LYRIC_JIGGLE_DURATION_MS] = n.jiggleDurationMs
+             p[Keys.LYRIC_JIGGLE_DELAY_MS] = n.jiggleDelayMs
++            p[Keys.LYRIC_HEADER_ENHANCED] = n.enhanceHeader
++            p[Keys.LYRIC_HEADER_ALBUM_SIZE] = n.headerAlbumSize
++            p[Keys.LYRIC_HEADER_TITLE_SIZE] = n.headerTitleSize
++            p[Keys.LYRIC_HEADER_ARTIST_SIZE] = n.headerArtistSize
++            p[Keys.LYRIC_HEADER_BUTTON_SIZE] = n.headerButtonSize
++            p[Keys.LYRIC_HEADER_LINE_WEIGHT] = n.headerLineWeight
++            p[Keys.LYRIC_HEADER_LINE_OPACITY] = n.headerLineOpacity
++            p[Keys.LYRIC_HEADER_BOTTOM_PADDING] = n.headerBottomPadding
++            p[Keys.LYRIC_HEADER_BLUR_ENABLED] = n.headerBlurEnabled
++            p[Keys.LYRIC_HEADER_BLUR_AMOUNT] = n.headerBlurAmount
++            p[Keys.LYRIC_HEADER_SOFT_EDGE] = n.headerSoftEdge
++            p[Keys.LYRIC_HEADER_EDGE_FADE] = n.headerEdgeFade
++            p[Keys.LYRIC_HEADER_OUTLINE_ENABLED] = n.headerOutlineEnabled
++            p[Keys.LYRIC_HEADER_OUTLINE_WEIGHT] = n.headerOutlineWeight
++            p[Keys.LYRIC_HEADER_OUTLINE_OPACITY] = n.headerOutlineOpacity
++            p[Keys.LYRIC_SHOW_TRANSLATION] = n.showTranslation
++            p[Keys.LYRIC_SHOW_TRANSLITERATION] = n.showTransliteration
++            p[Keys.LYRIC_DOCK_BLUR_ENABLED] = n.dockBlurEnabled
++            p[Keys.LYRIC_DOCK_BLUR_AMOUNT] = n.dockBlurAmount
++            p[Keys.LYRIC_DOCK_SIZE] = n.dockSize
++            p[Keys.LYRIC_DOCK_BOTTOM_PADDING] = n.dockBottomPadding
++            p[Keys.LYRIC_DOCK_PILL_PADDING] = n.dockPillPadding
++            p[Keys.LYRIC_DOCK_GAP_LEFT] = n.dockGapLeft
++            p[Keys.LYRIC_DOCK_GAP_RIGHT] = n.dockGapRight
++            p[Keys.LYRIC_DOCK_SPREAD_BLUR] = n.dockSpreadBlur
++            p[Keys.LYRIC_DOCK_SOFT_EDGE] = n.dockSoftEdge
++            p[Keys.LYRIC_DOCK_EDGE_FADE] = n.dockEdgeFade
+         }
+     }
+ 
+diff --git a/feature-player-data/src/main/java/me/spica27/spicamusic/player/impl/utils/SongExtensions.kt b/feature-player-data/src/main/java/me/spica27/spicamusic/player/impl/utils/SongExtensions.kt
+index 0cd89f0..1ee559f 100644
+--- a/feature-player-data/src/main/java/me/spica27/spicamusic/player/impl/utils/SongExtensions.kt
++++ b/feature-player-data/src/main/java/me/spica27/spicamusic/player/impl/utils/SongExtensions.kt
+@@ -24,6 +24,8 @@ fun Song.toMediaItem(): MediaItem =
+             MediaMetadata.Builder().setTitle(displayName).setDisplayTitle(displayName)
+                 .setArtist(artist)
+                 .setSubtitle(artist)
++                .setAlbumTitle(album.takeIf { it.isNotBlank() })
++                .setReleaseYear(year.takeIf { it > 0 })
+                 .setExtras(Bundle().apply {
+                     putLong("mediaStoreId", mediaStoreId)
+                     putString("path", path)
+diff --git a/feature-settings-domain/src/main/java/me/spica27/spicamusic/feature/settings/domain/SettingsUseCases.kt b/feature-settings-domain/src/main/java/me/spica27/spicamusic/feature/settings/domain/SettingsUseCases.kt
+index fc576ff..026774f 100644
+--- a/feature-settings-domain/src/main/java/me/spica27/spicamusic/feature/settings/domain/SettingsUseCases.kt
++++ b/feature-settings-domain/src/main/java/me/spica27/spicamusic/feature/settings/domain/SettingsUseCases.kt
+@@ -15,6 +15,16 @@ class SettingsUseCases(
+         val THEME_COLOR_STYLE = PreferencesManager.Keys.THEME_COLOR_STYLE
+         val KEEP_SCREEN_ON = PreferencesManager.Keys.KEEP_SCREEN_ON
+         val DYNAMIC_SPECTRUM_BACKGROUND = PreferencesManager.Keys.DYNAMIC_SPECTRUM_BACKGROUND
++        val VERSE_THEME_MODE = PreferencesManager.Keys.VERSE_THEME_MODE
++        val VERSE_THEME_SATURATION = PreferencesManager.Keys.VERSE_THEME_SATURATION
++        val VERSE_THEME_VIBRANCY = PreferencesManager.Keys.VERSE_THEME_VIBRANCY
++        val VERSE_THEME_HUE = PreferencesManager.Keys.VERSE_THEME_HUE
++        val VERSE_MESH_COUNT = PreferencesManager.Keys.VERSE_MESH_COUNT
++        val VERSE_MESH_SIZE = PreferencesManager.Keys.VERSE_MESH_SIZE
++        val VERSE_MESH_OPACITY = PreferencesManager.Keys.VERSE_MESH_OPACITY
++        val VERSE_MESH_MOTION = PreferencesManager.Keys.VERSE_MESH_MOTION
++        val VERSE_MESH_COLOR = PreferencesManager.Keys.VERSE_MESH_COLOR
++        val VERSE_MESH_ANIMATED = PreferencesManager.Keys.VERSE_MESH_ANIMATED
+         val DYNAMIC_COVER_TYPE = PreferencesManager.Keys.DYNAMIC_COVER_TYPE
+         val PROGRESS_BAR_STYLE = PreferencesManager.Keys.PROGRESS_BAR_STYLE
+         val EQ_ENABLED = PreferencesManager.Keys.EQ_ENABLED
+@@ -36,6 +46,18 @@ class SettingsUseCases(
+         preferencesManager.setBoolean(key, value)
+     }
+ 
++    fun getInt(
++        key: Preferences.Key<Int>,
++        defaultValue: Int = 0,
++    ): Flow<Int> = preferencesManager.getInt(key, defaultValue)
++
++    suspend fun setInt(
++        key: Preferences.Key<Int>,
++        value: Int,
++    ) {
++        preferencesManager.setInt(key, value)
++    }
++
+     fun getString(
+         key: Preferences.Key<String>,
+         defaultValue: String = "",
