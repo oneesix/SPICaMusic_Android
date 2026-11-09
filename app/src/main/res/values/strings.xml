@@ -892,6 +892,19 @@
   <string name="lyr_set_stretch_delay_desc">How long each line waits after the one above it</string>
   <string name="lyr_set_stretch_duration">Stretch duration</string>
   <string name="lyr_set_stretch_duration_desc">How long each line below the current one takes to settle (0 = they jump)</string>
+  <string name="lyr_set_section_light_sweep">Light sweep</string>
+  <string name="lyr_set_light_sweep">Light sweep</string>
+  <string name="lyr_set_light_sweep_desc">A soft light that sweeps across the line as it is sung. Off keeps the original sweep</string>
+  <string name="lyr_set_sweep_continuous">Continuous sweep</string>
+  <string name="lyr_set_sweep_continuous_desc">One light front moves across the whole line instead of word by word</string>
+  <string name="lyr_set_sweep_oklch">OKLCH color blend</string>
+  <string name="lyr_set_sweep_oklch_desc">Smoother, more even blending along the soft edge</string>
+  <string name="lyr_set_sweep_ease">Ease-out timing</string>
+  <string name="lyr_set_sweep_ease_desc">Each letter lights up fast, then settles</string>
+  <string name="lyr_set_sweep_flash">Bright leading flash</string>
+  <string name="lyr_set_sweep_flash_desc">A brighter glow right at the leading edge</string>
+  <string name="lyr_set_sweep_softness">Softness</string>
+  <string name="lyr_set_sweep_softness_desc">How wide and soft the edge of the light is</string>
   <string name="lyr_set_section_header">Enhance header</string>
   <string name="lyr_set_header_enable">Enhance header</string>
   <string name="lyr_set_header_enable_desc">Off keeps the original header</string>

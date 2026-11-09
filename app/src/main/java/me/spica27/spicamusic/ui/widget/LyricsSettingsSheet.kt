@@ -51,6 +51,7 @@ fun LyricsSettingsSheet(
             if (settings.lineEffect == LineEffect.Jiggle) {
                 JiggleSection(settings = settings, onUpdate = onUpdate)
             }
+            LightSweepSection(settings = settings, onUpdate = onUpdate)
             EnhanceHeaderSection(settings = settings, onUpdate = onUpdate)
         }
     }
@@ -255,6 +256,57 @@ private fun BlurAndOpacitySection(
         valueText = { "$it%" },
         onValueChange = { v -> onUpdate { it.copy(currentLinePosition = v) } },
     )
+}
+
+@Composable
+private fun LightSweepSection(
+    settings: LyricsStyleSettings,
+    onUpdate: ((LyricsStyleSettings) -> LyricsStyleSettings) -> Unit,
+) {
+    LyricsSettingsSection(stringResource(R.string.lyr_set_section_light_sweep))
+
+    LyricsSettingsToggle(
+        label = stringResource(R.string.lyr_set_light_sweep),
+        description = stringResource(R.string.lyr_set_light_sweep_desc),
+        checked = settings.lightSweepEnabled,
+        onCheckedChange = { v -> onUpdate { it.copy(lightSweepEnabled = v) } },
+    )
+
+    if (settings.lightSweepEnabled) {
+        LyricsSettingsToggle(
+            label = stringResource(R.string.lyr_set_sweep_continuous),
+            description = stringResource(R.string.lyr_set_sweep_continuous_desc),
+            checked = settings.lightSweepContinuous,
+            onCheckedChange = { v -> onUpdate { it.copy(lightSweepContinuous = v) } },
+        )
+        LyricsSettingsToggle(
+            label = stringResource(R.string.lyr_set_sweep_oklch),
+            description = stringResource(R.string.lyr_set_sweep_oklch_desc),
+            checked = settings.lightSweepOklch,
+            onCheckedChange = { v -> onUpdate { it.copy(lightSweepOklch = v) } },
+        )
+        LyricsSettingsToggle(
+            label = stringResource(R.string.lyr_set_sweep_ease),
+            description = stringResource(R.string.lyr_set_sweep_ease_desc),
+            checked = settings.lightSweepEase,
+            onCheckedChange = { v -> onUpdate { it.copy(lightSweepEase = v) } },
+        )
+        LyricsSettingsToggle(
+            label = stringResource(R.string.lyr_set_sweep_flash),
+            description = stringResource(R.string.lyr_set_sweep_flash_desc),
+            checked = settings.lightSweepFlash,
+            onCheckedChange = { v -> onUpdate { it.copy(lightSweepFlash = v) } },
+        )
+        LyricsSettingsSlider(
+            label = stringResource(R.string.lyr_set_sweep_softness),
+            description = stringResource(R.string.lyr_set_sweep_softness_desc),
+            value = settings.lightSweepSoftness,
+            range = LyricsStyleSettings.LIGHT_SWEEP_SOFTNESS_RANGE,
+            step = 5,
+            valueText = { "$it%" },
+            onValueChange = { v -> onUpdate { it.copy(lightSweepSoftness = v) } },
+        )
+    }
 }
 
 @Composable

@@ -68,6 +68,14 @@ data class LyricsStyleSettings(
     val stretchDelayMs: Int = 45,
     /** Time each line below the current one takes to settle, in ms (0 = they jump). */
     val stretchDurationMs: Int = 600,
+    // ---- Light sweep (off = the original word-by-word sweep) ----
+    val lightSweepEnabled: Boolean = false,
+    val lightSweepContinuous: Boolean = true,
+    val lightSweepOklch: Boolean = true,
+    val lightSweepEase: Boolean = true,
+    val lightSweepFlash: Boolean = true,
+    /** Width of the soft edge of the light, in percent (100 = normal). */
+    val lightSweepSoftness: Int = 100,
     // ---- Enhanced header (lyrics window) ----
     /** false = the original header (no line, no blur). */
     val enhanceHeader: Boolean = false,
@@ -143,6 +151,7 @@ data class LyricsStyleSettings(
             stretchStrength = stretchStrength.coerceIn(STRETCH_STRENGTH_RANGE),
             stretchDelayMs = stretchDelayMs.coerceIn(STRETCH_DELAY_RANGE),
             stretchDurationMs = stretchDurationMs.coerceIn(STRETCH_DURATION_RANGE),
+            lightSweepSoftness = lightSweepSoftness.coerceIn(LIGHT_SWEEP_SOFTNESS_RANGE),
             headerAlbumSize = headerAlbumSize.coerceIn(HEADER_ALBUM_RANGE),
             headerTitleSize = headerTitleSize.coerceIn(HEADER_TITLE_RANGE),
             headerArtistSize = headerArtistSize.coerceIn(HEADER_ARTIST_RANGE),
@@ -178,6 +187,7 @@ data class LyricsStyleSettings(
         val STRETCH_STRENGTH_RANGE = 0..100
         val STRETCH_DELAY_RANGE = 0..150
         val STRETCH_DURATION_RANGE = 0..2500
+        val LIGHT_SWEEP_SOFTNESS_RANGE = 50..200
         val HEADER_ALBUM_RANGE = 40..96
         val HEADER_TITLE_RANGE = 14..32
         val HEADER_ARTIST_RANGE = 10..22

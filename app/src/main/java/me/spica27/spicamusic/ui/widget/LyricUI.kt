@@ -117,6 +117,7 @@ import java.util.Locale
 import kotlin.math.abs
 import kotlin.math.max
 import kotlin.math.min
+import kotlin.math.pow
 import kotlin.math.roundToInt
 
 // ==================== 常量 ====================
@@ -248,6 +249,11 @@ private val InactiveScaleSpec = tween<Float>(durationMillis = 500, easing = Lyri
 private val ActiveAlphaSpec = tween<Float>(durationMillis = 0)
 private val InactiveAlphaSpec = tween<Float>(durationMillis = 450, easing = LyricLineAlphaEasing)
 private val LineBlurSpec = tween<Float>(durationMillis = 450, easing = LyricLineAlphaEasing)
+
+private const val LIGHT_SWEEP_GLOW_ALPHA = 0.45f
+private const val LIGHT_SWEEP_GLOW_BLUR_DP = 7f
+private const val LIGHT_SWEEP_FLASH_BOOST = 1.6f
+private const val LIGHT_SWEEP_RAMP_STEPS = 6
 
 /** Delay of a jiggling line `distanceBelow` lines under the current one: grows per line, easing off for far lines. */
 private fun jiggleDelayMillis(
@@ -399,6 +405,31 @@ data class LyricsDisplayOptions(
     val showAgentLabel: Boolean = false,
 )
 
+/** The light-sweep options from the settings. */
+@Immutable
+private data class LightSweepSpec(
+    val continuous: Boolean,
+    /** Perceptual brightness ramp along the soft edge (single-colour text: the OKLCH idea for alpha). */
+    val perceptualBlend: Boolean,
+    val ease: Boolean,
+    val flash: Boolean,
+    /** Multiplier of the soft edge width. */
+    val softness: Float,
+)
+
+private fun LyricsStyleSettings.toLightSweepSpec(): LightSweepSpec? =
+    if (lightSweepEnabled) {
+        LightSweepSpec(
+            continuous = lightSweepContinuous,
+            perceptualBlend = lightSweepOklch,
+            ease = lightSweepEase,
+            flash = lightSweepFlash,
+            softness = lightSweepSoftness / 100f,
+        )
+    } else {
+        null
+    }
+
 /** 随展示形态变化的排版参数。 */
 @Immutable
 private data class LyricsUIStyle(
@@ -417,6 +448,8 @@ private data class LyricsUIStyle(
     val verticalPadding: Dp,
     /** 逐字扫描前沿的羽化宽度。 */
     val sweepFeather: Dp,
+    /** The light-sweep options (null = the original word sweep). */
+    val lightSweep: LightSweepSpec? = null,
     /** Transliteration above (true) or below (false) the lyric words. */
     val transliterationOnTop: Boolean,
     /** Per-word timed transliteration (true) or a plain static line (false). */
@@ -482,6 +515,7 @@ private fun rememberLyricsUIStyle(
                     horizontalPadding = edgePad.coerceAtLeast(0f).dp,
                     verticalPadding = LyricUIConstants.LINE_PADDING_VERTICAL_DP.dp,
                     sweepFeather = 30.dp,
+                    lightSweep = settings.toLightSweepSpec(),
                     transliterationOnTop = settings.transliterationPosition == TransliterationPosition.Top,
                     attachTransliterationToWords = settings.attachToWords,
                     unsungFactor = settings.unsungOpacity / LyricUIConstants.UNSUNG_DEFAULT_PERCENT,
@@ -514,6 +548,7 @@ private fun rememberLyricsUIStyle(
                     horizontalPadding = 16.dp,
                     verticalPadding = 8.dp,
                     sweepFeather = 18.dp,
+                    lightSweep = settings.toLightSweepSpec(),
                     transliterationOnTop = settings.transliterationPosition == TransliterationPosition.Top,
                     attachTransliterationToWords = settings.attachToWords,
                     unsungFactor = settings.unsungOpacity / LyricUIConstants.UNSUNG_DEFAULT_PERCENT,
@@ -1305,7 +1340,10 @@ private value class SweepPosition(
 }
 
 /** 计算按开始时间排序的词列表在指定时刻的扫描位置。 */
-private fun List<LyricItem.WordsLyric.WordWithTiming>.sweepAt(time: Long): SweepPosition {
+private fun List<LyricItem.WordsLyric.WordWithTiming>.sweepAt(
+    time: Long,
+    easeLetters: Boolean = false,
+): SweepPosition {
     var low = 0
     var high = lastIndex
     var index = -1
@@ -1322,12 +1360,28 @@ private fun List<LyricItem.WordsLyric.WordWithTiming>.sweepAt(time: Long): Sweep
     val word = this[index]
     // 终点限制到下一词起点，避免时间重叠时收尾跳变。
     val endOverride = if (index < lastIndex) minOf(word.endTime, this[index + 1].startTime) else word.endTime
-    return SweepPosition.of(index, wordProgress(word, time, endOverride))
+    val raw = wordProgress(word, time, endOverride)
+    val progress = if (easeLetters) easeAcrossLetters(raw, word.content.trim().length) else raw
+    return SweepPosition.of(index, progress)
+}
+
+/** Ease-out inside every letter: the front surges to each letter, then settles (light sweep timing). */
+private fun easeAcrossLetters(
+    progress: Float,
+    letters: Int,
+): Float {
+    val count = letters.coerceAtLeast(1)
+    val x = progress * count
+    val k = minOf(x.toInt(), count - 1)
+    val u = x - k
+    val eased = 1f - (1f - u) * (1f - u)
+    return ((k + eased) / count).coerceIn(0f, 1f)
 }
 
 /** 登记蒙版宿主中的文本块和长音发光项。 */
 private class SweepMaskRegistry(
     val litFraction: State<Float>,
+    val light: LightSweepSpec? = null,
 ) {
     var hostCoordinates: LayoutCoordinates? = null
 
@@ -1346,6 +1400,8 @@ private fun Modifier.sweepMaskHost(
     onPlaced { registry.hostCoordinates = it }
         .drawWithContent {
             drawContent()
+            // The light-sweep glow goes under the sweep mask, so it follows the front.
+            registry.light?.let { drawLightSweepGlow(registry, it) }
             drawSweepMasks(registry, featherPx)
             // 发光置于扫描蒙版之后，保持整词均匀晕开。
             drawSlowWordGlows(registry)
@@ -1361,8 +1417,14 @@ private class MaskBlock(
     /** 首行和末行额外覆盖的像素。 */
     val rowOverflow: Float,
     wordCount: Int,
+    /** Colour of the light-sweep glow. */
+    val glowColor: Color = Color.White,
 ) {
     val wordCoordinates = arrayOfNulls<LayoutCoordinates>(wordCount)
+
+    /** Where each word's own text sits, and its text layout (for the light-sweep glow). */
+    val textCoordinates = arrayOfNulls<LayoutCoordinates>(wordCount)
+    val wordLayouts = arrayOfNulls<TextLayoutResult>(wordCount)
 
     fun rectOf(
         hostCoordinates: LayoutCoordinates,
@@ -1381,6 +1443,7 @@ private fun DrawScope.drawSweepMasks(
     val hostCoordinates = registry.hostCoordinates?.takeIf { it.isAttached } ?: return
     val width = size.width
     val litFraction = registry.litFraction.value
+    val light = registry.light
     for (block in registry.blocks) {
         val sweep = block.sweep.value
         // A line that is not current shows every word at full strength (the line's own opacity dims it).
@@ -1418,6 +1481,35 @@ private fun DrawScope.drawSweepMasks(
                 // 扫描位置越过整行后，整行显示为已唱状态。
                 sweep.wordIndex >= rowEnd ->
                     if (litAlpha < 1f) drawRect(litColor, rowTopLeft, rowSize, blendMode = BlendMode.DstIn)
+
+                // Light sweep, continuous: one soft front over the whole row (it may reach into the next words).
+                light?.continuous == true -> {
+                    val word = block.rectOf(hostCoordinates, sweep.wordIndex) ?: firstRect
+                    val leftToRight = lastRect.left >= firstRect.left
+                    val edge = feather.coerceAtLeast(1f)
+                    val lineFraction = ((sweep.wordIndex + sweep.progress) / wordCount).coerceIn(0f, 1f)
+                    val ramp = sweepRamp(litAlpha, dimColor.alpha, light.perceptualBlend, reversed = !leftToRight)
+                    val wordWidth = word.right - word.left
+                    // The edge trails the lit position by a full feather at the start and by nothing at the end,
+                    // so nothing is lit at the start and everything is lit at the end.
+                    if (leftToRight) {
+                        val front = word.left + wordWidth * sweep.progress - edge * (1f - lineFraction)
+                        drawRect(
+                            brush = Brush.horizontalGradient(*ramp, startX = front, endX = front + edge),
+                            topLeft = rowTopLeft,
+                            size = rowSize,
+                            blendMode = BlendMode.DstIn,
+                        )
+                    } else {
+                        val front = word.right - wordWidth * sweep.progress + edge * (1f - lineFraction)
+                        drawRect(
+                            brush = Brush.horizontalGradient(*ramp, startX = front - edge, endX = front),
+                            topLeft = rowTopLeft,
+                            size = rowSize,
+                            blendMode = BlendMode.DstIn,
+                        )
+                    }
+                }
 
                 else -> {
                     val word = block.rectOf(hostCoordinates, sweep.wordIndex) ?: firstRect
@@ -1474,6 +1566,48 @@ private fun DrawScope.drawSweepMasks(
             }
             rowStart = rowEnd
         }
+    }
+}
+
+/** Alpha ramp of the soft edge, lit end to dim end (reversed for right-to-left rows). */
+private fun sweepRamp(
+    litAlpha: Float,
+    dimAlpha: Float,
+    perceptual: Boolean,
+    reversed: Boolean,
+): Array<Pair<Float, Color>> {
+    // A perceptual (OKLab-like) brightness ramp sits a little lower in the middle than a plain alpha ramp.
+    val power = if (perceptual) 1.36f else 1f
+    val stops =
+        Array(LIGHT_SWEEP_RAMP_STEPS + 1) { step ->
+            val t = step / LIGHT_SWEEP_RAMP_STEPS.toFloat()
+            val alpha = dimAlpha + (litAlpha - dimAlpha) * (1f - t).pow(power)
+            (if (reversed) 1f - t else t) to Color.Black.copy(alpha = alpha)
+        }
+    if (reversed) stops.reverse()
+    return stops
+}
+
+/** Soft glow around the word the light is passing through (slow words keep their own glow). */
+private fun DrawScope.drawLightSweepGlow(
+    registry: SweepMaskRegistry,
+    light: LightSweepSpec,
+) {
+    val host = registry.hostCoordinates?.takeIf { it.isAttached } ?: return
+    for (block in registry.blocks) {
+        val sweep = block.sweep.value
+        val index = sweep.wordIndex
+        if (index < 0 || index >= block.wordLayouts.size) continue
+        // Rises as the front enters the word and fades as it leaves.
+        val swell = 4f * sweep.progress * (1f - sweep.progress)
+        if (swell <= 0f) continue
+        val layout = block.wordLayouts[index] ?: continue
+        val coordinates = block.textCoordinates[index]?.takeIf { it.isAttached } ?: continue
+        val boost = if (light.flash) LIGHT_SWEEP_FLASH_BOOST else 1f
+        val glowColor = block.glowColor.copy(alpha = (LIGHT_SWEEP_GLOW_ALPHA * swell * boost).coerceAtMost(0.9f))
+        val shadow = Shadow(color = glowColor, blurRadius = LIGHT_SWEEP_GLOW_BLUR_DP.dp.toPx() * (0.4f + 0.6f * swell))
+        val origin = host.localPositionOf(coordinates, Offset.Zero)
+        drawText(textLayoutResult = layout, color = glowColor, topLeft = origin, shadow = shadow)
     }
 }
 
@@ -1552,7 +1686,7 @@ private fun WordsLyricLine(
             animationSpec = if (isActive) ActiveAlphaSpec else InactiveAlphaSpec,
         )
     // 整行在同一个离屏图层中完成透明度、缩放、模糊和扫描。
-    val maskRegistry = remember(litFractionState) { SweepMaskRegistry(litFractionState) }
+    val maskRegistry = remember(litFractionState, style.lightSweep) { SweepMaskRegistry(litFractionState, style.lightSweep) }
     val transliterations =
         lyric.transliterations.visibleTransliterations(
             displayOptions.transliterationMode,
@@ -1606,7 +1740,7 @@ private fun WordsLyricLine(
         }
     }
     val blurEffect = rememberLineBlurEffect(blurRadius)
-    val sweepFeatherPx = with(LocalDensity.current) { style.sweepFeather.toPx() }
+    val sweepFeatherPx = with(LocalDensity.current) { style.sweepFeather.toPx() } * (style.lightSweep?.softness ?: 1f)
     Column(
         horizontalAlignment = horizontalAlignment,
         modifier =
@@ -2075,8 +2209,8 @@ private fun AccompanimentLine(
     if (words.isEmpty()) return
 
     // 伴唱动画可能覆盖主句和翻译，因此使用独立离屏宿主承载蒙版。
-    val maskRegistry = remember(litFraction) { SweepMaskRegistry(litFraction) }
-    val sweepFeatherPx = with(LocalDensity.current) { style.sweepFeather.toPx() }
+    val maskRegistry = remember(litFraction, style.lightSweep) { SweepMaskRegistry(litFraction, style.lightSweep) }
+    val sweepFeatherPx = with(LocalDensity.current) { style.sweepFeather.toPx() } * (style.lightSweep?.softness ?: 1f)
 
     // Background vocals are always visible, like every other lyric line: no open or close animation.
     Column(
@@ -2213,8 +2347,8 @@ private fun ProgressiveWordsText(
 
     // 仅此状态逐帧读取时间；未开始或已唱完时值保持不变。
     val sweepState =
-        remember(words, currentTimeState) {
-            derivedStateOf { words.sweepAt(currentTimeState.value) }
+        remember(words, currentTimeState, maskRegistry) {
+            derivedStateOf { words.sweepAt(currentTimeState.value, maskRegistry.light?.ease == true) }
         }
     val drawColor = color.copy(alpha = sungAlpha)
     val wordStyle = remember(textStyle, drawColor) { textStyle.copy(color = drawColor) }
@@ -2228,12 +2362,13 @@ private fun ProgressiveWordsText(
         }
     val hasSlowWord = slowWordLayouts.any { it != null }
     val maskBlock =
-        remember(sweepState, dimAlpha, hasSlowWord, words.size) {
+        remember(sweepState, dimAlpha, hasSlowWord, words.size, drawColor) {
             MaskBlock(
                 sweep = sweepState,
                 dimAlpha = dimAlpha,
                 rowOverflow = if (hasSlowWord) LyricUIConstants.MASK_ROW_OVERFLOW_PX else 0f,
                 wordCount = words.size,
+                glowColor = drawColor,
             )
         }
     DisposableEffect(maskRegistry, maskBlock) {
@@ -2324,6 +2459,8 @@ private fun ProgressiveWordsText(
                         style = wordStyle,
                         maxLines = 1,
                         softWrap = false,
+                        modifier = Modifier.onPlaced { maskBlock.textCoordinates[index] = it },
+                        onTextLayout = { maskBlock.wordLayouts[index] = it },
                     )
                 }
                 if (attachedTexts != null && attachedStyle != null && !attachedOnTop) {
