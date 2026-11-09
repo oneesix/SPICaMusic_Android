@@ -879,6 +879,16 @@
   <string name="lyr_set_current_position">目前歌詞位置</string>
   <string name="lyr_set_current_position_desc">正在播放的行在螢幕上的位置</string>
   <string name="lyr_set_section_jiggle">彈跳</string>
+  <string name="lyr_set_section_line_effect">線條效果</string>
+  <string name="lyr_set_line_effect">效果</string>
+  <string name="lyr_set_line_effect_desc">目前行變化時，下方各行的動畫效果</string>
+  <string name="lyr_set_effect_stretch">拉伸</string>
+  <string name="lyr_set_effect_jiggle">彈跳</string>
+  <string name="lyr_set_effect_off">關閉</string>
+  <string name="lyr_set_stretch_strength">拉伸</string>
+  <string name="lyr_set_stretch_strength_desc">越靠下的行延遲越多，行與行之間的間距會被拉開</string>
+  <string name="lyr_set_stretch_delay">行間延遲</string>
+  <string name="lyr_set_stretch_delay_desc">每一行在上一行之後等待的時間</string>
   <string name="lyr_set_section_header">增強頂欄</string>
   <string name="lyr_set_header_enable">增強頂欄</string>
   <string name="lyr_set_header_enable_desc">關閉則保持原樣的頂欄</string>

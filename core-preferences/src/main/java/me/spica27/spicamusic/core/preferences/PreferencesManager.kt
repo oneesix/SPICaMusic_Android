@@ -71,6 +71,9 @@ class PreferencesManager(
         val LYRIC_JIGGLE_STRENGTH = intPreferencesKey("lyric_jiggle_strength")
         val LYRIC_JIGGLE_DURATION_MS = intPreferencesKey("lyric_jiggle_duration_ms")
         val LYRIC_JIGGLE_DELAY_MS = intPreferencesKey("lyric_jiggle_delay_ms")
+        val LYRIC_LINE_EFFECT = stringPreferencesKey("lyric_line_effect")
+        val LYRIC_STRETCH_STRENGTH = intPreferencesKey("lyric_stretch_strength")
+        val LYRIC_STRETCH_DELAY_MS = intPreferencesKey("lyric_stretch_delay_ms")
         val LYRIC_HEADER_ENHANCED = booleanPreferencesKey("lyric_header_enhanced")
         val LYRIC_HEADER_ALBUM_SIZE = intPreferencesKey("lyric_header_album_size")
         val LYRIC_HEADER_TITLE_SIZE = intPreferencesKey("lyric_header_title_size")
@@ -126,6 +129,9 @@ class PreferencesManager(
                     jiggleStrength = p[Keys.LYRIC_JIGGLE_STRENGTH] ?: d.jiggleStrength,
                     jiggleDurationMs = p[Keys.LYRIC_JIGGLE_DURATION_MS] ?: d.jiggleDurationMs,
                     jiggleDelayMs = p[Keys.LYRIC_JIGGLE_DELAY_MS] ?: d.jiggleDelayMs,
+                    lineEffect = p[Keys.LYRIC_LINE_EFFECT]?.let(LineEffect::fromString) ?: d.lineEffect,
+                    stretchStrength = p[Keys.LYRIC_STRETCH_STRENGTH] ?: d.stretchStrength,
+                    stretchDelayMs = p[Keys.LYRIC_STRETCH_DELAY_MS] ?: d.stretchDelayMs,
                     enhanceHeader = p[Keys.LYRIC_HEADER_ENHANCED] ?: d.enhanceHeader,
                     headerAlbumSize = p[Keys.LYRIC_HEADER_ALBUM_SIZE] ?: d.headerAlbumSize,
                     headerTitleSize = p[Keys.LYRIC_HEADER_TITLE_SIZE] ?: d.headerTitleSize,
@@ -181,6 +187,9 @@ class PreferencesManager(
                     jiggleStrength = p[Keys.LYRIC_JIGGLE_STRENGTH] ?: d.jiggleStrength,
                     jiggleDurationMs = p[Keys.LYRIC_JIGGLE_DURATION_MS] ?: d.jiggleDurationMs,
                     jiggleDelayMs = p[Keys.LYRIC_JIGGLE_DELAY_MS] ?: d.jiggleDelayMs,
+                    lineEffect = p[Keys.LYRIC_LINE_EFFECT]?.let(LineEffect::fromString) ?: d.lineEffect,
+                    stretchStrength = p[Keys.LYRIC_STRETCH_STRENGTH] ?: d.stretchStrength,
+                    stretchDelayMs = p[Keys.LYRIC_STRETCH_DELAY_MS] ?: d.stretchDelayMs,
                     enhanceHeader = p[Keys.LYRIC_HEADER_ENHANCED] ?: d.enhanceHeader,
                     headerAlbumSize = p[Keys.LYRIC_HEADER_ALBUM_SIZE] ?: d.headerAlbumSize,
                     headerTitleSize = p[Keys.LYRIC_HEADER_TITLE_SIZE] ?: d.headerTitleSize,
@@ -227,6 +236,9 @@ class PreferencesManager(
             p[Keys.LYRIC_JIGGLE_STRENGTH] = n.jiggleStrength
             p[Keys.LYRIC_JIGGLE_DURATION_MS] = n.jiggleDurationMs
             p[Keys.LYRIC_JIGGLE_DELAY_MS] = n.jiggleDelayMs
+            p[Keys.LYRIC_LINE_EFFECT] = n.lineEffect.value
+            p[Keys.LYRIC_STRETCH_STRENGTH] = n.stretchStrength
+            p[Keys.LYRIC_STRETCH_DELAY_MS] = n.stretchDelayMs
             p[Keys.LYRIC_HEADER_ENHANCED] = n.enhanceHeader
             p[Keys.LYRIC_HEADER_ALBUM_SIZE] = n.headerAlbumSize
             p[Keys.LYRIC_HEADER_TITLE_SIZE] = n.headerTitleSize

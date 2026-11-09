@@ -14,6 +14,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import me.spica27.spicamusic.R
+import me.spica27.spicamusic.core.preferences.LineEffect
 import me.spica27.spicamusic.core.preferences.LyricsStyleSettings
 import me.spica27.spicamusic.core.preferences.TransliterationPosition
 
@@ -46,7 +47,10 @@ fun LyricsSettingsSheet(
             TextSizeSection(settings = settings, onUpdate = onUpdate)
             TransliterationSection(settings = settings, onUpdate = onUpdate)
             BlurAndOpacitySection(settings = settings, onUpdate = onUpdate)
-            JiggleSection(settings = settings, onUpdate = onUpdate)
+            LineEffectSection(settings = settings, onUpdate = onUpdate)
+            if (settings.lineEffect == LineEffect.Jiggle) {
+                JiggleSection(settings = settings, onUpdate = onUpdate)
+            }
             EnhanceHeaderSection(settings = settings, onUpdate = onUpdate)
         }
     }
@@ -251,6 +255,52 @@ private fun BlurAndOpacitySection(
         valueText = { "$it%" },
         onValueChange = { v -> onUpdate { it.copy(currentLinePosition = v) } },
     )
+}
+
+@Composable
+private fun LineEffectSection(
+    settings: LyricsStyleSettings,
+    onUpdate: ((LyricsStyleSettings) -> LyricsStyleSettings) -> Unit,
+) {
+    LyricsSettingsSection(stringResource(R.string.lyr_set_section_line_effect))
+
+    LyricsSettingsChips(
+        label = stringResource(R.string.lyr_set_line_effect),
+        description = stringResource(R.string.lyr_set_line_effect_desc),
+        options = LineEffect.entries,
+        selected = settings.lineEffect,
+        optionLabel = {
+            stringResource(
+                when (it) {
+                    LineEffect.Stretch -> R.string.lyr_set_effect_stretch
+                    LineEffect.Jiggle -> R.string.lyr_set_effect_jiggle
+                    LineEffect.Off -> R.string.lyr_set_effect_off
+                },
+            )
+        },
+        onSelect = { v -> onUpdate { it.copy(lineEffect = v) } },
+    )
+
+    if (settings.lineEffect == LineEffect.Stretch) {
+        LyricsSettingsSlider(
+            label = stringResource(R.string.lyr_set_stretch_strength),
+            description = stringResource(R.string.lyr_set_stretch_strength_desc),
+            value = settings.stretchStrength,
+            range = LyricsStyleSettings.STRETCH_STRENGTH_RANGE,
+            step = 5,
+            valueText = { "$it%" },
+            onValueChange = { v -> onUpdate { it.copy(stretchStrength = v) } },
+        )
+        LyricsSettingsSlider(
+            label = stringResource(R.string.lyr_set_stretch_delay),
+            description = stringResource(R.string.lyr_set_stretch_delay_desc),
+            value = settings.stretchDelayMs,
+            range = LyricsStyleSettings.STRETCH_DELAY_RANGE,
+            step = 5,
+            valueText = { "$it ms" },
+            onValueChange = { v -> onUpdate { it.copy(stretchDelayMs = v) } },
+        )
+    }
 }
 
 @Composable

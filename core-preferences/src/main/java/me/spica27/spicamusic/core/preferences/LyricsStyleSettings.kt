@@ -1,6 +1,20 @@
 package me.spica27.spicamusic.core.preferences
 
 /** Where the transliteration (romanized text) sits relative to the lyric words. */
+/** What the lines below the current one do after a line change. */
+enum class LineEffect(
+    val value: String,
+) {
+    Stretch("stretch"),
+    Jiggle("jiggle"),
+    Off("off"),
+    ;
+
+    companion object {
+        fun fromString(value: String?): LineEffect = entries.firstOrNull { it.value == value } ?: Stretch
+    }
+}
+
 enum class TransliterationPosition(
     val value: String,
 ) {
@@ -46,6 +60,12 @@ data class LyricsStyleSettings(
     val jiggleStrength: Int = 50,
     val jiggleDurationMs: Int = 1200,
     val jiggleDelayMs: Int = 45,
+    // ---- Line effect (Stretch is the Apple Music style: no bounce, the gaps between lines stretch) ----
+    val lineEffect: LineEffect = LineEffect.Stretch,
+    /** How much farther lines lag the further down they are (percent). */
+    val stretchStrength: Int = 60,
+    /** Wait of each line after the one above it, in ms. */
+    val stretchDelayMs: Int = 45,
     // ---- Enhanced header (lyrics window) ----
     /** false = the original header (no line, no blur). */
     val enhanceHeader: Boolean = false,
@@ -118,6 +138,8 @@ data class LyricsStyleSettings(
             jiggleStrength = jiggleStrength.coerceIn(JIGGLE_STRENGTH_RANGE),
             jiggleDurationMs = jiggleDurationMs.coerceIn(JIGGLE_DURATION_RANGE),
             jiggleDelayMs = jiggleDelayMs.coerceIn(JIGGLE_DELAY_RANGE),
+            stretchStrength = stretchStrength.coerceIn(STRETCH_STRENGTH_RANGE),
+            stretchDelayMs = stretchDelayMs.coerceIn(STRETCH_DELAY_RANGE),
             headerAlbumSize = headerAlbumSize.coerceIn(HEADER_ALBUM_RANGE),
             headerTitleSize = headerTitleSize.coerceIn(HEADER_TITLE_RANGE),
             headerArtistSize = headerArtistSize.coerceIn(HEADER_ARTIST_RANGE),
@@ -150,6 +172,8 @@ data class LyricsStyleSettings(
         val JIGGLE_STRENGTH_RANGE = 0..100
         val JIGGLE_DURATION_RANGE = 0..2500
         val JIGGLE_DELAY_RANGE = 0..150
+        val STRETCH_STRENGTH_RANGE = 0..100
+        val STRETCH_DELAY_RANGE = 0..150
         val HEADER_ALBUM_RANGE = 40..96
         val HEADER_TITLE_RANGE = 14..32
         val HEADER_ARTIST_RANGE = 10..22

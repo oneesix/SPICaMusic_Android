@@ -880,6 +880,16 @@
   <string name="lyr_set_current_position">Current lyric position</string>
   <string name="lyr_set_current_position_desc">Where the playing line sits on screen</string>
   <string name="lyr_set_section_jiggle">Jiggle</string>
+  <string name="lyr_set_section_line_effect">Line effect</string>
+  <string name="lyr_set_line_effect">Effect</string>
+  <string name="lyr_set_line_effect_desc">What the lines below the current one do when the line changes</string>
+  <string name="lyr_set_effect_stretch">Stretch</string>
+  <string name="lyr_set_effect_jiggle">Jiggle</string>
+  <string name="lyr_set_effect_off">Off</string>
+  <string name="lyr_set_stretch_strength">Stretch</string>
+  <string name="lyr_set_stretch_strength_desc">How much farther the lines further down lag, so the gaps between lines stretch open</string>
+  <string name="lyr_set_stretch_delay">Delay between lines</string>
+  <string name="lyr_set_stretch_delay_desc">How long each line waits after the one above it</string>
   <string name="lyr_set_section_header">Enhance header</string>
   <string name="lyr_set_header_enable">Enhance header</string>
   <string name="lyr_set_header_enable_desc">Off keeps the original header</string>

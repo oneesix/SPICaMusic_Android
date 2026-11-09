@@ -109,6 +109,7 @@ import me.spica27.spicamusic.R
 import me.spica27.spicamusic.common.entity.LyricItem
 import me.spica27.spicamusic.common.entity.getSentenceContent
 import me.spica27.spicamusic.common.entity.voiceAgents
+import me.spica27.spicamusic.core.preferences.LineEffect
 import me.spica27.spicamusic.core.preferences.LyricsStyleSettings
 import me.spica27.spicamusic.core.preferences.TransliterationPosition
 import me.spica27.spicamusic.ui.theme.Shapes
@@ -780,11 +781,24 @@ fun LyricsUI(
                     val isBelowPlaying = playingIndex in lyricLines.indices && index > playingIndex
                     // Strength or duration at 0 means no jiggle at all.
                     val jiggleLine =
-                        styleSettings.jiggleEnabled && isBelowPlaying &&
+                        styleSettings.lineEffect == LineEffect.Jiggle && styleSettings.jiggleEnabled && isBelowPlaying &&
                             styleSettings.jiggleStrength > 0 && styleSettings.jiggleDurationMs > 0
+                    // Stretch (Apple Music style): no bounce; lines further down start later and travel a bit longer.
+                    val stretchLine = styleSettings.lineEffect == LineEffect.Stretch && isBelowPlaying
+                    val distanceBelow = if (isBelowPlaying) (index - playingIndex).coerceAtMost(8) else 0
                     // Each jiggling line waits a little longer than the one above it; the wait levels off for far lines.
                     val staggerDelayMillis =
-                        if (jiggleLine) jiggleDelayMillis(index - playingIndex, styleSettings.jiggleDelayMs) else 0
+                        when {
+                            jiggleLine -> jiggleDelayMillis(index - playingIndex, styleSettings.jiggleDelayMs)
+                            stretchLine -> distanceBelow * styleSettings.stretchDelayMs
+                            else -> 0
+                        }
+                    val lineMoveMillis =
+                        if (stretchLine) {
+                            (lineMoveDurationMillis * (1f + 0.192f * styleSettings.stretchStrength / 100f * distanceBelow)).roundToInt()
+                        } else {
+                            lineMoveDurationMillis
+                        }
                     val songPart = line.songPartLabel()
                     val previousRealLine =
                         lyricLines.getOrNull(index - 1).let { previous ->
@@ -800,7 +814,7 @@ fun LyricsUI(
                             lookaheadScope = this@LookaheadScope,
                             itemKey = line.key,
                             isManualScrolling = isManualScrolling,
-                            durationMillis = lineMoveDurationMillis,
+                            durationMillis = lineMoveMillis,
                             delayMillis = staggerDelayMillis,
                             jiggle = if (jiggleLine) jiggleSpec else null,
                             // No fly-in from the bottom: the page slide is the only opening animation.
