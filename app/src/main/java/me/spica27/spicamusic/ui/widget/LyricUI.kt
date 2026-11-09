@@ -28,7 +28,9 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.requiredSize
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
@@ -97,6 +99,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.DpSize
+import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.util.lerp
@@ -254,6 +257,8 @@ private const val LIGHT_SWEEP_GLOW_ALPHA = 0.45f
 private const val LIGHT_SWEEP_GLOW_BLUR_DP = 7f
 private const val LIGHT_SWEEP_FLASH_BOOST = 1.6f
 private const val LIGHT_SWEEP_RAMP_STEPS = 6
+private const val SMOOTH_GLOW_BLUR_PX = 7f
+private const val SMOOTH_GLOW_ALPHA = 0.8f
 
 /** Delay of a jiggling line `distanceBelow` lines under the current one: grows per line, easing off for far lines. */
 private fun jiggleDelayMillis(
@@ -413,7 +418,7 @@ private data class WordProgressSpec(
     val mergeWords: Boolean = false,
     /** A word counts as held from this length (null = automatic rules). */
     val heldMinMs: Long? = null,
-    /** Lighter held-word glow (no blur), so the held animation keeps its frame rate. */
+    /** Smoother held-word drawing: every letter is its own cached layer moved by the GPU. */
     val optimizeHeld: Boolean = false,
 )
 
@@ -2522,13 +2527,22 @@ private fun ProgressiveWordsText(
                                         { sweep: SweepPosition -> sweep.progressOf(index) }
                                     }
                                 }
-                            SlowWordGlyphs(
-                                layout = slowWordLayout,
-                                sweepState = sweepState,
-                                progressOf = heldProgressOf,
-                                color = drawColor,
-                                registry = maskRegistry,
-                            )
+                            if (maskRegistry.progress.optimizeHeld) {
+                                SlowWordGlyphsSmooth(
+                                    layout = slowWordLayout,
+                                    sweepState = sweepState,
+                                    progressOf = heldProgressOf,
+                                    color = drawColor,
+                                )
+                            } else {
+                                SlowWordGlyphs(
+                                    layout = slowWordLayout,
+                                    sweepState = sweepState,
+                                    progressOf = heldProgressOf,
+                                    color = drawColor,
+                                    registry = maskRegistry,
+                                )
+                            }
                         } else {
                             BasicText(
                                 text = renderWord.text,
@@ -2687,6 +2701,100 @@ private fun SlowWordGlyphs(
     }
 }
 
+/**
+ * Smooth held word (Optimize held words): every letter is its own cached layer that the GPU only moves and
+ * scales (no re-drawing, no pixel snapping), and the glow is one blurred copy of the animated letters
+ * that only fades. Looks like the original drawing.
+ */
+@Composable
+private fun SlowWordGlyphsSmooth(
+    layout: SlowWordLayout,
+    sweepState: State<SweepPosition>,
+    progressOf: (SweepPosition) -> Float,
+    color: Color,
+) {
+    val density = LocalDensity.current
+    val progressState = remember(sweepState, progressOf) { derivedStateOf { progressOf(sweepState.value) } }
+    val padPx = SMOOTH_GLOW_BLUR_PX * 3f
+    val glowBlur = remember { BlurEffect(SMOOTH_GLOW_BLUR_PX, SMOOTH_GLOW_BLUR_PX, TileMode.Decal) }
+    val wordSize =
+        remember(layout, density) {
+            with(density) { DpSize(layout.layout.size.width.toDp(), layout.layout.size.height.toDp()) }
+        }
+    val glowSize =
+        remember(layout, density) {
+            with(density) {
+                DpSize(
+                    (layout.layout.size.width + 2 * padPx).toDp(),
+                    (layout.layout.size.height + 2 * padPx).toDp(),
+                )
+            }
+        }
+    Box(modifier = Modifier.size(wordSize)) {
+        // The glow: the same animated letters, blurred once as a whole and faded with the swell.
+        Box(
+            modifier =
+                Modifier
+                    .requiredSize(glowSize)
+                    .offset { IntOffset(-padPx.roundToInt(), -padPx.roundToInt()) }
+                    .graphicsLayer {
+                        val progress = progressState.value
+                        alpha = (4f * progress * (1f - progress) * SMOOTH_GLOW_ALPHA).coerceIn(0f, 1f)
+                        renderEffect = glowBlur
+                    },
+        ) {
+            SlowWordLetters(layout, progressState, color, padPx)
+        }
+        SlowWordLetters(layout, progressState, color, 0f)
+    }
+}
+
+/** The letters of a held word, each in its own layer (placed like the original drawing). */
+@Composable
+private fun SlowWordLetters(
+    layout: SlowWordLayout,
+    progressState: State<Float>,
+    color: Color,
+    offsetPx: Float,
+) {
+    val pivot = Offset(layout.box.center.x, layout.box.bottom)
+    layout.characterLayouts.forEachIndexed { index, characterLayout ->
+        val bounds = layout.characterBounds[index]
+        val width = characterLayout.size.width.toFloat().coerceAtLeast(1f)
+        val height = characterLayout.size.height.toFloat().coerceAtLeast(1f)
+        val x = bounds.left + (bounds.width - characterLayout.size.width) / 2f + offsetPx
+        val y = bounds.top + offsetPx
+        // The letters scale around the bottom centre of the whole word, like the original drawing.
+        val origin = TransformOrigin((pivot.x + offsetPx - x) / width, (pivot.y + offsetPx - y) / height)
+        Box(
+            modifier =
+                Modifier.graphicsLayer {
+                    val animation =
+                        slowWordCharacterAnimationProgress(
+                            word = layout.timingWord,
+                            wordProgress = progressState.value,
+                            characterIndex = layout.charOffset + index,
+                            characterCount = layout.totalChars,
+                        )
+                    val scale = slowWordCharacterScale(animation, layout.scaleAmplitude)
+                    translationX = x
+                    translationY = y + slowWordCharacterFloatOffset(animation, layout.dipAmplitude)
+                    scaleX = scale
+                    scaleY = scale
+                    transformOrigin = origin
+                    compositingStrategy = CompositingStrategy.Offscreen
+                },
+        ) {
+            BasicText(
+                text = characterLayout.layoutInput.text.text,
+                style = characterLayout.layoutInput.style.copy(color = color),
+                maxLines = 1,
+                softWrap = false,
+            )
+        }
+    }
+}
+
 /** 记录长音词外发光所需的数据。 */
 private class SlowWordGlow(
     val layout: SlowWordLayout,
@@ -2704,7 +2812,6 @@ private fun DrawScope.drawSlowWordChars(
     progress: Float,
     color: Color,
     shadow: Shadow?,
-    extraScale: Float = 1f,
 ) {
     val characterCount = layout.totalChars
     val wordPivot = Offset(layout.box.center.x, layout.box.bottom)
@@ -2728,7 +2835,7 @@ private fun DrawScope.drawSlowWordChars(
                 x = characterBox.left + (characterBox.width - characterLayout.size.width) / 2f,
                 y = characterBox.top + floatOffset,
             )
-        withTransform({ scale(scaleX = scale * extraScale, scaleY = scale * extraScale, pivot = wordPivot) }) {
+        withTransform({ scale(scaleX = scale, scaleY = scale, pivot = wordPivot) }) {
             drawText(
                 textLayoutResult = characterLayout,
                 color = color,
@@ -2747,15 +2854,6 @@ private fun DrawScope.drawSlowWordGlows(registry: SweepMaskRegistry) {
         val progress = glow.progressOf(glow.sweep.value)
         val swell = 4f * progress * (1f - progress)
         if (swell <= 0f) continue
-        if (registry.progress.optimizeHeld) {
-            // Lighter glow: two plain, slightly larger, translucent copies instead of a blurred shadow.
-            val origin = host.localPositionOf(coordinates, Offset.Zero)
-            translate(origin.x, origin.y) {
-                drawSlowWordChars(glow.layout, progress, glow.color.copy(alpha = 0.26f * swell), shadow = null, extraScale = 1.05f)
-                drawSlowWordChars(glow.layout, progress, glow.color.copy(alpha = 0.14f * swell), shadow = null, extraScale = 1.11f)
-            }
-            continue
-        }
         val glowColor = glow.color.copy(alpha = LyricUIConstants.WORD_GLOW_ALPHA * swell)
         val shadow =
             Shadow(
