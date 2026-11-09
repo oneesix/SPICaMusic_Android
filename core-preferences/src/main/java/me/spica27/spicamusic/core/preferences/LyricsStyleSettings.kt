@@ -66,6 +66,8 @@ data class LyricsStyleSettings(
     val stretchStrength: Int = 60,
     /** Wait of each line after the one above it, in ms. */
     val stretchDelayMs: Int = 45,
+    /** Time each line below the current one takes to settle, in ms (0 = they jump). */
+    val stretchDurationMs: Int = 600,
     // ---- Enhanced header (lyrics window) ----
     /** false = the original header (no line, no blur). */
     val enhanceHeader: Boolean = false,
@@ -140,6 +142,7 @@ data class LyricsStyleSettings(
             jiggleDelayMs = jiggleDelayMs.coerceIn(JIGGLE_DELAY_RANGE),
             stretchStrength = stretchStrength.coerceIn(STRETCH_STRENGTH_RANGE),
             stretchDelayMs = stretchDelayMs.coerceIn(STRETCH_DELAY_RANGE),
+            stretchDurationMs = stretchDurationMs.coerceIn(STRETCH_DURATION_RANGE),
             headerAlbumSize = headerAlbumSize.coerceIn(HEADER_ALBUM_RANGE),
             headerTitleSize = headerTitleSize.coerceIn(HEADER_TITLE_RANGE),
             headerArtistSize = headerArtistSize.coerceIn(HEADER_ARTIST_RANGE),
@@ -174,6 +177,7 @@ data class LyricsStyleSettings(
         val JIGGLE_DELAY_RANGE = 0..150
         val STRETCH_STRENGTH_RANGE = 0..100
         val STRETCH_DELAY_RANGE = 0..150
+        val STRETCH_DURATION_RANGE = 0..2500
         val HEADER_ALBUM_RANGE = 40..96
         val HEADER_TITLE_RANGE = 14..32
         val HEADER_ARTIST_RANGE = 10..22

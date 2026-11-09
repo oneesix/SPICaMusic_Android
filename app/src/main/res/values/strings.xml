@@ -890,6 +890,8 @@
   <string name="lyr_set_stretch_strength_desc">How much farther the lines further down lag, so the gaps between lines stretch open</string>
   <string name="lyr_set_stretch_delay">Delay between lines</string>
   <string name="lyr_set_stretch_delay_desc">How long each line waits after the one above it</string>
+  <string name="lyr_set_stretch_duration">Stretch duration</string>
+  <string name="lyr_set_stretch_duration_desc">How long each line below the current one takes to settle (0 = they jump)</string>
   <string name="lyr_set_section_header">Enhance header</string>
   <string name="lyr_set_header_enable">Enhance header</string>
   <string name="lyr_set_header_enable_desc">Off keeps the original header</string>

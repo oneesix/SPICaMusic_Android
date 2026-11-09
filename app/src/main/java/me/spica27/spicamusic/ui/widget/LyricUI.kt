@@ -795,7 +795,7 @@ fun LyricsUI(
                         }
                     val lineMoveMillis =
                         if (stretchLine) {
-                            (lineMoveDurationMillis * (1f + 0.192f * styleSettings.stretchStrength / 100f * distanceBelow)).roundToInt()
+                            (styleSettings.stretchDurationMs * (1f + 0.192f * styleSettings.stretchStrength / 100f * distanceBelow)).roundToInt()
                         } else {
                             lineMoveDurationMillis
                         }

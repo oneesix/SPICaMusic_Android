@@ -300,6 +300,15 @@ private fun LineEffectSection(
             valueText = { "$it ms" },
             onValueChange = { v -> onUpdate { it.copy(stretchDelayMs = v) } },
         )
+        LyricsSettingsSlider(
+            label = stringResource(R.string.lyr_set_stretch_duration),
+            description = stringResource(R.string.lyr_set_stretch_duration_desc),
+            value = settings.stretchDurationMs,
+            range = LyricsStyleSettings.STRETCH_DURATION_RANGE,
+            step = 50,
+            valueText = { "$it ms" },
+            onValueChange = { v -> onUpdate { it.copy(stretchDurationMs = v) } },
+        )
     }
 }
 

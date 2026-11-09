@@ -889,6 +889,8 @@
   <string name="lyr_set_stretch_strength_desc">越靠下的行延遲越多，行與行之間的間距會被拉開</string>
   <string name="lyr_set_stretch_delay">行間延遲</string>
   <string name="lyr_set_stretch_delay_desc">每一行在上一行之後等待的時間</string>
+  <string name="lyr_set_stretch_duration">拉伸時長</string>
+  <string name="lyr_set_stretch_duration_desc">目前行下方每一行完成移動所需的時間（0 表示直接跳到位）</string>
   <string name="lyr_set_section_header">增強頂欄</string>
   <string name="lyr_set_header_enable">增強頂欄</string>
   <string name="lyr_set_header_enable_desc">關閉則保持原樣的頂欄</string>
