@@ -431,6 +431,9 @@ class LyricsViewModel(
     /** 获取当前播放位置（毫秒） */
     fun getCurrentPositionMs(): Long = player.currentPosition
 
+    /** True while the player is playing (the lyrics clock may be smoothed only then). */
+    fun isPlayingNow(): Boolean = player.isPlaying.value
+
     /** 在后台线程解析歌词，避免大段 YRC/LRC 阻塞主线程 */
     private suspend fun parseOffMain(text: String): ParsedLyrics = withContext(parseDispatcher) { parseAnyLyrics(text) }
 

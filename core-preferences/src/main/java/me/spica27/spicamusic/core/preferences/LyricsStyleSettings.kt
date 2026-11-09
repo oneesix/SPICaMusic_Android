@@ -76,6 +76,17 @@ data class LyricsStyleSettings(
     val lightSweepFlash: Boolean = true,
     /** Width of the soft edge of the light, in percent (100 = normal). */
     val lightSweepSoftness: Int = 100,
+    // ---- Lyrics progress (all off = the original behaviour) ----
+    val wordLiftEnabled: Boolean = false,
+    /** Custom word lift in tenths of dp (15 = 1.5 dp), used when [wordLiftEnabled]. */
+    val wordLift: Int = 15,
+    /** Join the pieces of one word that the lyrics file splits (sym + phony = symphony). */
+    val mergeWords: Boolean = false,
+    val manualHeldWords: Boolean = false,
+    /** A word counts as held from this length in ms, used when [manualHeldWords]. */
+    val heldWordMinMs: Int = 1000,
+    /** Smooth the lyrics clock so held-word animations do not step. */
+    val optimizeHeldWords: Boolean = false,
     // ---- Enhanced header (lyrics window) ----
     /** false = the original header (no line, no blur). */
     val enhanceHeader: Boolean = false,
@@ -152,6 +163,8 @@ data class LyricsStyleSettings(
             stretchDelayMs = stretchDelayMs.coerceIn(STRETCH_DELAY_RANGE),
             stretchDurationMs = stretchDurationMs.coerceIn(STRETCH_DURATION_RANGE),
             lightSweepSoftness = lightSweepSoftness.coerceIn(LIGHT_SWEEP_SOFTNESS_RANGE),
+            wordLift = wordLift.coerceIn(WORD_LIFT_RANGE),
+            heldWordMinMs = heldWordMinMs.coerceIn(HELD_WORD_MIN_RANGE),
             headerAlbumSize = headerAlbumSize.coerceIn(HEADER_ALBUM_RANGE),
             headerTitleSize = headerTitleSize.coerceIn(HEADER_TITLE_RANGE),
             headerArtistSize = headerArtistSize.coerceIn(HEADER_ARTIST_RANGE),
@@ -188,6 +201,8 @@ data class LyricsStyleSettings(
         val STRETCH_DELAY_RANGE = 0..150
         val STRETCH_DURATION_RANGE = 0..2500
         val LIGHT_SWEEP_SOFTNESS_RANGE = 50..200
+        val WORD_LIFT_RANGE = 0..80
+        val HELD_WORD_MIN_RANGE = 0..3000
         val HEADER_ALBUM_RANGE = 40..96
         val HEADER_TITLE_RANGE = 14..32
         val HEADER_ARTIST_RANGE = 10..22

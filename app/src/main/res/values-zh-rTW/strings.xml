@@ -904,6 +904,19 @@
   <string name="lyr_set_sweep_flash_desc">在光的前沿處加強亮度</string>
   <string name="lyr_set_sweep_softness">柔和度</string>
   <string name="lyr_set_sweep_softness_desc">光的邊緣有多寬、多柔和</string>
+  <string name="lyr_set_section_progress">歌詞進度</string>
+  <string name="lyr_set_word_lift">自訂文字上抬</string>
+  <string name="lyr_set_word_lift_desc">關閉則使用預設上抬幅度</string>
+  <string name="lyr_set_word_lift_amount">文字上抬</string>
+  <string name="lyr_set_word_lift_amount_desc">每個詞在演唱時上升的距離（0 為不上抬）</string>
+  <string name="lyr_set_merge_words">合併單字</string>
+  <string name="lyr_set_merge_words_desc">把歌詞檔案拆開的同一個詞的片段合併（sym + phony = symphony）</string>
+  <string name="lyr_set_held_manual">手動設定長音詞</string>
+  <string name="lyr_set_held_manual_desc">關閉則自動判斷哪些詞是長音詞</string>
+  <string name="lyr_set_held_min">長音詞起始時長</string>
+  <string name="lyr_set_held_min_desc">時長不少於此值的詞視為長音詞</string>
+  <string name="lyr_set_held_optimize">優化長音詞</string>
+  <string name="lyr_set_held_optimize_desc">平滑歌詞時鐘，讓長音詞動畫不再卡頓</string>
   <string name="lyr_set_section_header">增強頂欄</string>
   <string name="lyr_set_header_enable">增強頂欄</string>
   <string name="lyr_set_header_enable_desc">關閉則保持原樣的頂欄</string>

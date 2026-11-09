@@ -52,6 +52,7 @@ fun LyricsSettingsSheet(
                 JiggleSection(settings = settings, onUpdate = onUpdate)
             }
             LightSweepSection(settings = settings, onUpdate = onUpdate)
+            LyricsProgressSection(settings = settings, onUpdate = onUpdate)
             EnhanceHeaderSection(settings = settings, onUpdate = onUpdate)
         }
     }
@@ -255,6 +256,61 @@ private fun BlurAndOpacitySection(
         step = 5,
         valueText = { "$it%" },
         onValueChange = { v -> onUpdate { it.copy(currentLinePosition = v) } },
+    )
+}
+
+@Composable
+private fun LyricsProgressSection(
+    settings: LyricsStyleSettings,
+    onUpdate: ((LyricsStyleSettings) -> LyricsStyleSettings) -> Unit,
+) {
+    LyricsSettingsSection(stringResource(R.string.lyr_set_section_progress))
+
+    LyricsSettingsToggle(
+        label = stringResource(R.string.lyr_set_word_lift),
+        description = stringResource(R.string.lyr_set_word_lift_desc),
+        checked = settings.wordLiftEnabled,
+        onCheckedChange = { v -> onUpdate { it.copy(wordLiftEnabled = v) } },
+    )
+    if (settings.wordLiftEnabled) {
+        LyricsSettingsSlider(
+            label = stringResource(R.string.lyr_set_word_lift_amount),
+            description = stringResource(R.string.lyr_set_word_lift_amount_desc),
+            value = settings.wordLift,
+            range = LyricsStyleSettings.WORD_LIFT_RANGE,
+            step = 5,
+            valueText = { "${it / 10}.${it % 10}" },
+            onValueChange = { v -> onUpdate { it.copy(wordLift = v) } },
+        )
+    }
+    LyricsSettingsToggle(
+        label = stringResource(R.string.lyr_set_merge_words),
+        description = stringResource(R.string.lyr_set_merge_words_desc),
+        checked = settings.mergeWords,
+        onCheckedChange = { v -> onUpdate { it.copy(mergeWords = v) } },
+    )
+    LyricsSettingsToggle(
+        label = stringResource(R.string.lyr_set_held_manual),
+        description = stringResource(R.string.lyr_set_held_manual_desc),
+        checked = settings.manualHeldWords,
+        onCheckedChange = { v -> onUpdate { it.copy(manualHeldWords = v) } },
+    )
+    if (settings.manualHeldWords) {
+        LyricsSettingsSlider(
+            label = stringResource(R.string.lyr_set_held_min),
+            description = stringResource(R.string.lyr_set_held_min_desc),
+            value = settings.heldWordMinMs,
+            range = LyricsStyleSettings.HELD_WORD_MIN_RANGE,
+            step = 50,
+            valueText = { "$it ms" },
+            onValueChange = { v -> onUpdate { it.copy(heldWordMinMs = v) } },
+        )
+    }
+    LyricsSettingsToggle(
+        label = stringResource(R.string.lyr_set_held_optimize),
+        description = stringResource(R.string.lyr_set_held_optimize_desc),
+        checked = settings.optimizeHeldWords,
+        onCheckedChange = { v -> onUpdate { it.copy(optimizeHeldWords = v) } },
     )
 }
 

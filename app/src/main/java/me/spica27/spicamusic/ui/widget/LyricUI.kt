@@ -405,6 +405,23 @@ data class LyricsDisplayOptions(
     val showAgentLabel: Boolean = false,
 )
 
+/** The lyrics-progress options from the settings (defaults = the original behaviour). */
+@Immutable
+private data class WordProgressSpec(
+    /** Word lift in dp (negative = up). */
+    val liftDp: Float = LyricUIConstants.WORD_LIFT_DP,
+    val mergeWords: Boolean = false,
+    /** A word counts as held from this length (null = automatic rules). */
+    val heldMinMs: Long? = null,
+)
+
+private fun LyricsStyleSettings.toProgressSpec(): WordProgressSpec =
+    WordProgressSpec(
+        liftDp = if (wordLiftEnabled) -wordLift / 10f else LyricUIConstants.WORD_LIFT_DP,
+        mergeWords = mergeWords,
+        heldMinMs = if (manualHeldWords) heldWordMinMs.toLong() else null,
+    )
+
 /** The light-sweep options from the settings. */
 @Immutable
 private data class LightSweepSpec(
@@ -450,6 +467,7 @@ private data class LyricsUIStyle(
     val sweepFeather: Dp,
     /** The light-sweep options (null = the original word sweep). */
     val lightSweep: LightSweepSpec? = null,
+    val progress: WordProgressSpec = WordProgressSpec(),
     /** Transliteration above (true) or below (false) the lyric words. */
     val transliterationOnTop: Boolean,
     /** Per-word timed transliteration (true) or a plain static line (false). */
@@ -516,6 +534,7 @@ private fun rememberLyricsUIStyle(
                     verticalPadding = LyricUIConstants.LINE_PADDING_VERTICAL_DP.dp,
                     sweepFeather = 30.dp,
                     lightSweep = settings.toLightSweepSpec(),
+                    progress = settings.toProgressSpec(),
                     transliterationOnTop = settings.transliterationPosition == TransliterationPosition.Top,
                     attachTransliterationToWords = settings.attachToWords,
                     unsungFactor = settings.unsungOpacity / LyricUIConstants.UNSUNG_DEFAULT_PERCENT,
@@ -549,6 +568,7 @@ private fun rememberLyricsUIStyle(
                     verticalPadding = 8.dp,
                     sweepFeather = 18.dp,
                     lightSweep = settings.toLightSweepSpec(),
+                    progress = settings.toProgressSpec(),
                     transliterationOnTop = settings.transliterationPosition == TransliterationPosition.Top,
                     attachTransliterationToWords = settings.attachToWords,
                     unsungFactor = settings.unsungOpacity / LyricUIConstants.UNSUNG_DEFAULT_PERCENT,
@@ -1203,9 +1223,17 @@ private fun wordProgress(
     return ((time - word.startTime).toFloat() / duration).coerceIn(0f, 1f)
 }
 
-private fun slowWordAnimationIntensity(word: LyricItem.WordsLyric.WordWithTiming): Float {
+private fun slowWordAnimationIntensity(
+    word: LyricItem.WordsLyric.WordWithTiming,
+    manualMinMs: Long? = null,
+): Float {
     val characterCount = word.content.length
     val duration = word.endTime - word.startTime
+    if (manualMinMs != null) {
+        // Manual held words: from the chosen length on, the longer the word the stronger the animation.
+        if (characterCount == 0 || duration < manualMinMs || word.content.shouldUseSimpleWordAnimation()) return 0f
+        return (0.3f + (duration - manualMinMs) / 2_000f).coerceIn(0.3f, 1f)
+    }
     if (
         characterCount == 0 ||
         duration < LyricUIConstants.SLOW_WORD_MIN_DURATION_MS ||
@@ -1221,12 +1249,18 @@ private fun slowWordAnimationIntensity(word: LyricItem.WordsLyric.WordWithTiming
     ) / 1_000f
 }
 
-private fun slowWordScaleAmplitude(word: LyricItem.WordsLyric.WordWithTiming): Float =
-    (LyricUIConstants.SLOW_WORD_MAX_SCALE_INCREASE * slowWordAnimationIntensity(word))
+private fun slowWordScaleAmplitude(
+    word: LyricItem.WordsLyric.WordWithTiming,
+    manualMinMs: Long? = null,
+): Float =
+    (LyricUIConstants.SLOW_WORD_MAX_SCALE_INCREASE * slowWordAnimationIntensity(word, manualMinMs))
         .coerceIn(0f, LyricUIConstants.SLOW_WORD_MAX_SCALE_INCREASE)
 
-private fun slowWordDipAmplitude(word: LyricItem.WordsLyric.WordWithTiming): Float =
-    (LyricUIConstants.SLOW_WORD_MAX_DIP * slowWordAnimationIntensity(word))
+private fun slowWordDipAmplitude(
+    word: LyricItem.WordsLyric.WordWithTiming,
+    manualMinMs: Long? = null,
+): Float =
+    (LyricUIConstants.SLOW_WORD_MAX_DIP * slowWordAnimationIntensity(word, manualMinMs))
         .coerceIn(0f, LyricUIConstants.SLOW_WORD_MAX_DIP)
 
 private fun slowWordCharacterAnimationProgress(
@@ -1382,6 +1416,7 @@ private fun easeAcrossLetters(
 private class SweepMaskRegistry(
     val litFraction: State<Float>,
     val light: LightSweepSpec? = null,
+    val progress: WordProgressSpec = WordProgressSpec(),
 ) {
     var hostCoordinates: LayoutCoordinates? = null
 
@@ -1686,7 +1721,10 @@ private fun WordsLyricLine(
             animationSpec = if (isActive) ActiveAlphaSpec else InactiveAlphaSpec,
         )
     // 整行在同一个离屏图层中完成透明度、缩放、模糊和扫描。
-    val maskRegistry = remember(litFractionState, style.lightSweep) { SweepMaskRegistry(litFractionState, style.lightSweep) }
+    val maskRegistry =
+        remember(litFractionState, style.lightSweep, style.progress) {
+            SweepMaskRegistry(litFractionState, style.lightSweep, style.progress)
+        }
     val transliterations =
         lyric.transliterations.visibleTransliterations(
             displayOptions.transliterationMode,
@@ -2209,7 +2247,10 @@ private fun AccompanimentLine(
     if (words.isEmpty()) return
 
     // 伴唱动画可能覆盖主句和翻译，因此使用独立离屏宿主承载蒙版。
-    val maskRegistry = remember(litFraction, style.lightSweep) { SweepMaskRegistry(litFraction, style.lightSweep) }
+    val maskRegistry =
+        remember(litFraction, style.lightSweep, style.progress) {
+            SweepMaskRegistry(litFraction, style.lightSweep, style.progress)
+        }
     val sweepFeatherPx = with(LocalDensity.current) { style.sweepFeather.toPx() } * (style.lightSweep?.softness ?: 1f)
 
     // Background vocals are always visible, like every other lyric line: no open or close animation.
@@ -2354,10 +2395,16 @@ private fun ProgressiveWordsText(
     val wordStyle = remember(textStyle, drawColor) { textStyle.copy(color = drawColor) }
     val dimAlpha = if (sungAlpha > 0f) (unsungAlpha / sungAlpha).coerceIn(0f, 1f) else 0f
     val renderWords = remember(words) { words.toRenderWords() }
+    val progressSpec = maskRegistry.progress
+    // Merge words: the pieces of one word (no space between them) are grouped.
+    val groups = remember(renderWords, progressSpec.mergeWords) { buildWordGroups(renderWords, progressSpec.mergeWords) }
     val slowWordLayouts =
-        remember(words, renderWords, textStyle, textMeasurer) {
+        remember(words, renderWords, textStyle, textMeasurer, progressSpec, groups) {
             words.mapIndexed { index, word ->
-                measureSlowWord(textMeasurer, word, renderWords[index].text, textStyle)
+                val group = groups.firstOrNull { index in it }
+                // A merged word is held as a whole: every piece gets the held look of the whole word.
+                val wholeWord = if (group != null && group.size > 1) mergedWord(words, group) else word
+                measureSlowWord(textMeasurer, word, renderWords[index].text, textStyle, progressSpec.heldMinMs, wholeWord)
             }
         }
     val hasSlowWord = slowWordLayouts.any { it != null }
@@ -2376,7 +2423,7 @@ private fun ProgressiveWordsText(
         onDispose { maskRegistry.blocks.remove(maskBlock) }
     }
     val density = LocalDensity.current
-    val wordLiftPx = with(density) { LyricUIConstants.WORD_LIFT_DP.dp.toPx() }
+    val wordLiftPx = with(density) { maskRegistry.progress.liftDp.dp.toPx() }
     val wordGap =
         remember(textStyle, textMeasurer, density) {
             with(density) {
@@ -2400,71 +2447,79 @@ private fun ProgressiveWordsText(
             return space + beat
         }
 
-        words.forEachIndexed { index, word ->
-            val renderWord = renderWords[index]
-            val rubyText =
-                if (showRuby && rubyTextStyle != null) {
-                    word.ruby
-                        .joinToString(separator = "") { it.text }
-                        .trim()
-                } else {
-                    ""
-                }
-            // 间隔放在远离对齐边的一侧，避免换行后出现隐形留白。
-            val leadingGap = if (alignEnd && index > 0) gapAfter(index - 1) else 0.dp
-            val trailingGap = if (!alignEnd && index < words.lastIndex) gapAfter(index) else 0.dp
-            Column(
-                horizontalAlignment = Alignment.CenterHorizontally,
-                modifier =
-                    Modifier
-                        .graphicsLayer {
-                            // 已唱词保持上抬，当前词随进度上移。
-                            translationY = sweepState.value.progressOf(index) * wordLiftPx
-                        }.padding(start = leadingGap, end = trailingGap)
-                        // 在内间距之后登记坐标，让扫描只覆盖字形。
-                        .onPlaced { maskBlock.wordCoordinates[index] = it },
-            ) {
-                if (attachedTexts != null && attachedStyle != null && attachedOnTop) {
-                    AttachedTransliteration(attachedTexts.getOrNull(index).orEmpty(), attachedStyle, color)
-                }
-                if (rubyText.isNotBlank()) {
-                    Text(
-                        text = rubyText,
-                        style = rubyTextStyle!!,
-                        color = color.copy(alpha = LyricUIConstants.RUBY_TEXT_ALPHA),
-                        maxLines = 1,
-                        // 注音超出词宽时向两侧悬出，不改变对齐位置。
+        groups.forEach { group ->
+            // Merged pieces of one word stay together on a row and never wrap apart.
+            MergedGroup(merged = group.size > 1) {
+                group.forEach { index ->
+                    val word = words[index]
+                    val renderWord = renderWords[index]
+                    val rubyText =
+                        if (showRuby && rubyTextStyle != null) {
+                            word.ruby
+                                .joinToString(separator = "") { it.text }
+                                .trim()
+                        } else {
+                            ""
+                        }
+                    // 间隔放在远离对齐边的一侧，避免换行后出现隐形留白。
+                    val leadingGap = if (alignEnd && index > 0) gapAfter(index - 1) else 0.dp
+                    val trailingGap = if (!alignEnd && index < words.lastIndex) gapAfter(index) else 0.dp
+                    Column(
+                        horizontalAlignment = Alignment.CenterHorizontally,
                         modifier =
-                            Modifier.layout { measurable, _ ->
-                                val placeable = measurable.measure(Constraints())
-                                layout(0, placeable.height) {
-                                    placeable.place(-placeable.width / 2, 0)
-                                }
-                            },
-                    )
-                }
-                val slowWordLayout = slowWordLayouts[index]
-                if (slowWordLayout != null) {
-                    SlowWordGlyphs(
-                        word = word,
-                        layout = slowWordLayout,
-                        sweepState = sweepState,
-                        index = index,
-                        color = drawColor,
-                        registry = maskRegistry,
-                    )
-                } else {
-                    BasicText(
-                        text = renderWord.text,
-                        style = wordStyle,
-                        maxLines = 1,
-                        softWrap = false,
-                        modifier = Modifier.onPlaced { maskBlock.textCoordinates[index] = it },
-                        onTextLayout = { maskBlock.wordLayouts[index] = it },
-                    )
-                }
-                if (attachedTexts != null && attachedStyle != null && !attachedOnTop) {
-                    AttachedTransliteration(attachedTexts.getOrNull(index).orEmpty(), attachedStyle, color)
+                            Modifier
+                                .graphicsLayer {
+                                    // 已唱词保持上抬，当前词随进度上移。
+                                    translationY =
+                                        (if (group.size > 1) mergedProgress(sweepState.value, group, renderWords) else sweepState.value.progressOf(index)) *
+                                            wordLiftPx
+                                }.padding(start = leadingGap, end = trailingGap)
+                                // 在内间距之后登记坐标，让扫描只覆盖字形。
+                                .onPlaced { maskBlock.wordCoordinates[index] = it },
+                    ) {
+                        if (attachedTexts != null && attachedStyle != null && attachedOnTop) {
+                            AttachedTransliteration(attachedTexts.getOrNull(index).orEmpty(), attachedStyle, color)
+                        }
+                        if (rubyText.isNotBlank()) {
+                            Text(
+                                text = rubyText,
+                                style = rubyTextStyle!!,
+                                color = color.copy(alpha = LyricUIConstants.RUBY_TEXT_ALPHA),
+                                maxLines = 1,
+                                // 注音超出词宽时向两侧悬出，不改变对齐位置。
+                                modifier =
+                                    Modifier.layout { measurable, _ ->
+                                        val placeable = measurable.measure(Constraints())
+                                        layout(0, placeable.height) {
+                                            placeable.place(-placeable.width / 2, 0)
+                                        }
+                                    },
+                            )
+                        }
+                        val slowWordLayout = slowWordLayouts[index]
+                        if (slowWordLayout != null) {
+                            SlowWordGlyphs(
+                                word = word,
+                                layout = slowWordLayout,
+                                sweepState = sweepState,
+                                index = index,
+                                color = drawColor,
+                                registry = maskRegistry,
+                            )
+                        } else {
+                            BasicText(
+                                text = renderWord.text,
+                                style = wordStyle,
+                                maxLines = 1,
+                                softWrap = false,
+                                modifier = Modifier.onPlaced { maskBlock.textCoordinates[index] = it },
+                                onTextLayout = { maskBlock.wordLayouts[index] = it },
+                            )
+                        }
+                        if (attachedTexts != null && attachedStyle != null && !attachedOnTop) {
+                            AttachedTransliteration(attachedTexts.getOrNull(index).orEmpty(), attachedStyle, color)
+                        }
+                    }
                 }
             }
         }
@@ -2492,6 +2547,64 @@ private class RenderWord(
     val text: String,
     val gapAfter: Boolean,
 )
+
+/** Groups the word pieces: with [merge], pieces with no space between them form one word. */
+private fun buildWordGroups(
+    renderWords: List<RenderWord>,
+    merge: Boolean,
+): List<List<Int>> {
+    if (!merge) return renderWords.indices.map { listOf(it) }
+    val groups = mutableListOf<List<Int>>()
+    var current = mutableListOf<Int>()
+    renderWords.forEachIndexed { index, word ->
+        current.add(index)
+        if (word.gapAfter || index == renderWords.lastIndex) {
+            groups.add(current)
+            current = mutableListOf()
+        }
+    }
+    return groups
+}
+
+/** One word made of the pieces in [group] (used to judge how long the whole word is held). */
+private fun mergedWord(
+    words: List<LyricItem.WordsLyric.WordWithTiming>,
+    group: List<Int>,
+): LyricItem.WordsLyric.WordWithTiming =
+    LyricItem.WordsLyric.WordWithTiming(
+        content = group.joinToString(separator = "") { words[it].content.trim() },
+        startTime = words[group.first()].startTime,
+        endTime = words[group.last()].endTime,
+    )
+
+/** Progress of a merged word: the pieces weighted by their letters, so it moves as one word. */
+private fun mergedProgress(
+    sweep: SweepPosition,
+    group: List<Int>,
+    renderWords: List<RenderWord>,
+): Float {
+    var total = 0f
+    var done = 0f
+    for (index in group) {
+        val weight = renderWords[index].text.length.coerceAtLeast(1).toFloat()
+        total += weight
+        done += weight * sweep.progressOf(index)
+    }
+    return if (total > 0f) done / total else 0f
+}
+
+/** Keeps the pieces of one merged word together on a row; a single word is shown as it is. */
+@Composable
+private fun MergedGroup(
+    merged: Boolean,
+    content: @Composable () -> Unit,
+) {
+    if (merged) {
+        Row { content() }
+    } else {
+        content()
+    }
+}
 
 private fun List<LyricItem.WordsLyric.WordWithTiming>.toRenderWords(): List<RenderWord> =
     mapIndexed { index, word ->
@@ -2631,9 +2744,12 @@ private fun measureSlowWord(
     word: LyricItem.WordsLyric.WordWithTiming,
     text: String,
     textStyle: TextStyle,
+    manualMinMs: Long? = null,
+    /** The word whose length decides how strong the held animation is (the whole word for merged pieces). */
+    intensityWord: LyricItem.WordsLyric.WordWithTiming = word,
 ): SlowWordLayout? {
-    val scaleAmplitude = slowWordScaleAmplitude(word)
-    val dipAmplitude = slowWordDipAmplitude(word)
+    val scaleAmplitude = slowWordScaleAmplitude(intensityWord, manualMinMs)
+    val dipAmplitude = slowWordDipAmplitude(intensityWord, manualMinMs)
     if (text.isEmpty() || (scaleAmplitude <= 0f && dipAmplitude <= 0f)) return null
     val layout = textMeasurer.measure(text = text, style = textStyle)
     return SlowWordLayout(

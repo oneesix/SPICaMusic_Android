@@ -905,6 +905,19 @@
   <string name="lyr_set_sweep_flash_desc">A brighter glow right at the leading edge</string>
   <string name="lyr_set_sweep_softness">Softness</string>
   <string name="lyr_set_sweep_softness_desc">How wide and soft the edge of the light is</string>
+  <string name="lyr_set_section_progress">Lyrics progress</string>
+  <string name="lyr_set_word_lift">Custom text lift</string>
+  <string name="lyr_set_word_lift_desc">Off keeps the default lift</string>
+  <string name="lyr_set_word_lift_amount">Text lift</string>
+  <string name="lyr_set_word_lift_amount_desc">How far each word rises as it is sung (0 = no lift)</string>
+  <string name="lyr_set_merge_words">Merge words</string>
+  <string name="lyr_set_merge_words_desc">Join the pieces of one word that the lyrics file splits (sym + phony = symphony)</string>
+  <string name="lyr_set_held_manual">Manual held words</string>
+  <string name="lyr_set_held_manual_desc">Off decides automatically which words are held</string>
+  <string name="lyr_set_held_min">Held from</string>
+  <string name="lyr_set_held_min_desc">A word counts as held when it is at least this long</string>
+  <string name="lyr_set_held_optimize">Optimize held words</string>
+  <string name="lyr_set_held_optimize_desc">Smooths the lyrics clock so held-word animations do not step</string>
   <string name="lyr_set_section_header">Enhance header</string>
   <string name="lyr_set_header_enable">Enhance header</string>
   <string name="lyr_set_header_enable_desc">Off keeps the original header</string>

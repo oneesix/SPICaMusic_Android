@@ -79,6 +79,7 @@ fun LyricsPanel(
     // 不把每帧变化的 Long 作为 LyricsPanel/LyricsUI 的组合参数。
     val currentTimeState = remember { mutableLongStateOf(viewModel.getCurrentPositionMs()) }
     val lyricsOffsetState = rememberUpdatedState(uiState.lyricsOffsetMs)
+    val optimizeClockState = rememberUpdatedState(styleSettings.optimizeHeldWords)
     val currentTimeProvider =
         remember {
             { currentTimeState.longValue + lyricsOffsetState.value }
@@ -88,9 +89,23 @@ fun LyricsPanel(
     val lifecycleOwner = LocalLifecycleOwner.current
     LaunchedEffect(lifecycleOwner) {
         lifecycleOwner.repeatOnLifecycle(Lifecycle.State.STARTED) {
+            var smoothMs = viewModel.getCurrentPositionMs().toDouble()
+            var lastFrameNanos = 0L
             while (true) {
-                withFrameNanos { }
-                currentTimeState.longValue = viewModel.getCurrentPositionMs()
+                val frameNanos = withFrameNanos { it }
+                val sample = viewModel.getCurrentPositionMs()
+                if (optimizeClockState.value && viewModel.isPlayingNow()) {
+                    // Optimize held words: the clock keeps running between player updates and is gently pulled
+                    // to the real position, so the animations do not step. A big jump (seek) snaps.
+                    val frameMs = if (lastFrameNanos == 0L) 0.0 else (frameNanos - lastFrameNanos) / 1_000_000.0
+                    smoothMs += frameMs.coerceAtMost(100.0)
+                    val error = sample - smoothMs
+                    smoothMs = if (kotlin.math.abs(error) > 250.0) sample.toDouble() else smoothMs + error * 0.2
+                } else {
+                    smoothMs = sample.toDouble()
+                }
+                lastFrameNanos = frameNanos
+                currentTimeState.longValue = smoothMs.toLong()
             }
         }
     }
