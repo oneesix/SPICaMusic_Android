@@ -1,0 +1,137 @@
+diff --git a/app/src/main/java/me/spica27/spicamusic/ui/widget/LyricUI.kt b/app/src/main/java/me/spica27/spicamusic/ui/widget/LyricUI.kt
+index f3c5b29..d960a8a 100644
+--- a/app/src/main/java/me/spica27/spicamusic/ui/widget/LyricUI.kt
++++ b/app/src/main/java/me/spica27/spicamusic/ui/widget/LyricUI.kt
+@@ -795,7 +795,7 @@ fun LyricsUI(
+                         }
+                     val lineMoveMillis =
+                         if (stretchLine) {
+-                            (lineMoveDurationMillis * (1f + 0.192f * styleSettings.stretchStrength / 100f * distanceBelow)).roundToInt()
++                            (styleSettings.stretchDurationMs * (1f + 0.192f * styleSettings.stretchStrength / 100f * distanceBelow)).roundToInt()
+                         } else {
+                             lineMoveDurationMillis
+                         }
+diff --git a/app/src/main/java/me/spica27/spicamusic/ui/widget/LyricsSettingsSheet.kt b/app/src/main/java/me/spica27/spicamusic/ui/widget/LyricsSettingsSheet.kt
+index 4e4d455..69a74a8 100644
+--- a/app/src/main/java/me/spica27/spicamusic/ui/widget/LyricsSettingsSheet.kt
++++ b/app/src/main/java/me/spica27/spicamusic/ui/widget/LyricsSettingsSheet.kt
+@@ -300,6 +300,15 @@ private fun LineEffectSection(
+             valueText = { "$it ms" },
+             onValueChange = { v -> onUpdate { it.copy(stretchDelayMs = v) } },
+         )
++        LyricsSettingsSlider(
++            label = stringResource(R.string.lyr_set_stretch_duration),
++            description = stringResource(R.string.lyr_set_stretch_duration_desc),
++            value = settings.stretchDurationMs,
++            range = LyricsStyleSettings.STRETCH_DURATION_RANGE,
++            step = 50,
++            valueText = { "$it ms" },
++            onValueChange = { v -> onUpdate { it.copy(stretchDurationMs = v) } },
++        )
+     }
+ }
+ 
+diff --git a/app/src/main/res/values-zh-rTW/strings.xml b/app/src/main/res/values-zh-rTW/strings.xml
+index dd72564..3eb1f45 100644
+--- a/app/src/main/res/values-zh-rTW/strings.xml
++++ b/app/src/main/res/values-zh-rTW/strings.xml
+@@ -889,6 +889,8 @@
+   <string name="lyr_set_stretch_strength_desc">越靠下的行延遲越多，行與行之間的間距會被拉開</string>
+   <string name="lyr_set_stretch_delay">行間延遲</string>
+   <string name="lyr_set_stretch_delay_desc">每一行在上一行之後等待的時間</string>
++  <string name="lyr_set_stretch_duration">拉伸時長</string>
++  <string name="lyr_set_stretch_duration_desc">目前行下方每一行完成移動所需的時間（0 表示直接跳到位）</string>
+   <string name="lyr_set_section_header">增強頂欄</string>
+   <string name="lyr_set_header_enable">增強頂欄</string>
+   <string name="lyr_set_header_enable_desc">關閉則保持原樣的頂欄</string>
+diff --git a/app/src/main/res/values-zh/strings.xml b/app/src/main/res/values-zh/strings.xml
+index eb29cea..dc72f77 100644
+--- a/app/src/main/res/values-zh/strings.xml
++++ b/app/src/main/res/values-zh/strings.xml
+@@ -890,6 +890,8 @@
+   <string name="lyr_set_stretch_strength_desc">越靠下的行滞后越多，行与行之间的间距会被拉开</string>
+   <string name="lyr_set_stretch_delay">行间延迟</string>
+   <string name="lyr_set_stretch_delay_desc">每一行在上一行之后等待的时间</string>
++  <string name="lyr_set_stretch_duration">拉伸时长</string>
++  <string name="lyr_set_stretch_duration_desc">当前行下方每一行完成移动所需的时间（0 表示直接跳到位）</string>
+   <string name="lyr_set_section_header">增强顶栏</string>
+   <string name="lyr_set_header_enable">增强顶栏</string>
+   <string name="lyr_set_header_enable_desc">关闭则保持原样的顶栏</string>
+diff --git a/app/src/main/res/values/strings.xml b/app/src/main/res/values/strings.xml
+index ce51ef2..fbd689d 100644
+--- a/app/src/main/res/values/strings.xml
++++ b/app/src/main/res/values/strings.xml
+@@ -890,6 +890,8 @@
+   <string name="lyr_set_stretch_strength_desc">How much farther the lines further down lag, so the gaps between lines stretch open</string>
+   <string name="lyr_set_stretch_delay">Delay between lines</string>
+   <string name="lyr_set_stretch_delay_desc">How long each line waits after the one above it</string>
++  <string name="lyr_set_stretch_duration">Stretch duration</string>
++  <string name="lyr_set_stretch_duration_desc">How long each line below the current one takes to settle (0 = they jump)</string>
+   <string name="lyr_set_section_header">Enhance header</string>
+   <string name="lyr_set_header_enable">Enhance header</string>
+   <string name="lyr_set_header_enable_desc">Off keeps the original header</string>
+diff --git a/core-preferences/src/main/java/me/spica27/spicamusic/core/preferences/LyricsStyleSettings.kt b/core-preferences/src/main/java/me/spica27/spicamusic/core/preferences/LyricsStyleSettings.kt
+index be91538..735955a 100644
+--- a/core-preferences/src/main/java/me/spica27/spicamusic/core/preferences/LyricsStyleSettings.kt
++++ b/core-preferences/src/main/java/me/spica27/spicamusic/core/preferences/LyricsStyleSettings.kt
+@@ -66,6 +66,8 @@ data class LyricsStyleSettings(
+     val stretchStrength: Int = 60,
+     /** Wait of each line after the one above it, in ms. */
+     val stretchDelayMs: Int = 45,
++    /** Time each line below the current one takes to settle, in ms (0 = they jump). */
++    val stretchDurationMs: Int = 600,
+     // ---- Enhanced header (lyrics window) ----
+     /** false = the original header (no line, no blur). */
+     val enhanceHeader: Boolean = false,
+@@ -140,6 +142,7 @@ data class LyricsStyleSettings(
+             jiggleDelayMs = jiggleDelayMs.coerceIn(JIGGLE_DELAY_RANGE),
+             stretchStrength = stretchStrength.coerceIn(STRETCH_STRENGTH_RANGE),
+             stretchDelayMs = stretchDelayMs.coerceIn(STRETCH_DELAY_RANGE),
++            stretchDurationMs = stretchDurationMs.coerceIn(STRETCH_DURATION_RANGE),
+             headerAlbumSize = headerAlbumSize.coerceIn(HEADER_ALBUM_RANGE),
+             headerTitleSize = headerTitleSize.coerceIn(HEADER_TITLE_RANGE),
+             headerArtistSize = headerArtistSize.coerceIn(HEADER_ARTIST_RANGE),
+@@ -174,6 +177,7 @@ data class LyricsStyleSettings(
+         val JIGGLE_DELAY_RANGE = 0..150
+         val STRETCH_STRENGTH_RANGE = 0..100
+         val STRETCH_DELAY_RANGE = 0..150
++        val STRETCH_DURATION_RANGE = 0..2500
+         val HEADER_ALBUM_RANGE = 40..96
+         val HEADER_TITLE_RANGE = 14..32
+         val HEADER_ARTIST_RANGE = 10..22
+diff --git a/core-preferences/src/main/java/me/spica27/spicamusic/core/preferences/PreferencesManager.kt b/core-preferences/src/main/java/me/spica27/spicamusic/core/preferences/PreferencesManager.kt
+index 9437458..4c5d8da 100644
+--- a/core-preferences/src/main/java/me/spica27/spicamusic/core/preferences/PreferencesManager.kt
++++ b/core-preferences/src/main/java/me/spica27/spicamusic/core/preferences/PreferencesManager.kt
+@@ -74,6 +74,7 @@ class PreferencesManager(
+         val LYRIC_LINE_EFFECT = stringPreferencesKey("lyric_line_effect")
+         val LYRIC_STRETCH_STRENGTH = intPreferencesKey("lyric_stretch_strength")
+         val LYRIC_STRETCH_DELAY_MS = intPreferencesKey("lyric_stretch_delay_ms")
++        val LYRIC_STRETCH_DURATION_MS = intPreferencesKey("lyric_stretch_duration_ms")
+         val LYRIC_HEADER_ENHANCED = booleanPreferencesKey("lyric_header_enhanced")
+         val LYRIC_HEADER_ALBUM_SIZE = intPreferencesKey("lyric_header_album_size")
+         val LYRIC_HEADER_TITLE_SIZE = intPreferencesKey("lyric_header_title_size")
+@@ -132,6 +133,7 @@ class PreferencesManager(
+                     lineEffect = p[Keys.LYRIC_LINE_EFFECT]?.let(LineEffect::fromString) ?: d.lineEffect,
+                     stretchStrength = p[Keys.LYRIC_STRETCH_STRENGTH] ?: d.stretchStrength,
+                     stretchDelayMs = p[Keys.LYRIC_STRETCH_DELAY_MS] ?: d.stretchDelayMs,
++                    stretchDurationMs = p[Keys.LYRIC_STRETCH_DURATION_MS] ?: d.stretchDurationMs,
+                     enhanceHeader = p[Keys.LYRIC_HEADER_ENHANCED] ?: d.enhanceHeader,
+                     headerAlbumSize = p[Keys.LYRIC_HEADER_ALBUM_SIZE] ?: d.headerAlbumSize,
+                     headerTitleSize = p[Keys.LYRIC_HEADER_TITLE_SIZE] ?: d.headerTitleSize,
+@@ -190,6 +192,7 @@ class PreferencesManager(
+                     lineEffect = p[Keys.LYRIC_LINE_EFFECT]?.let(LineEffect::fromString) ?: d.lineEffect,
+                     stretchStrength = p[Keys.LYRIC_STRETCH_STRENGTH] ?: d.stretchStrength,
+                     stretchDelayMs = p[Keys.LYRIC_STRETCH_DELAY_MS] ?: d.stretchDelayMs,
++                    stretchDurationMs = p[Keys.LYRIC_STRETCH_DURATION_MS] ?: d.stretchDurationMs,
+                     enhanceHeader = p[Keys.LYRIC_HEADER_ENHANCED] ?: d.enhanceHeader,
+                     headerAlbumSize = p[Keys.LYRIC_HEADER_ALBUM_SIZE] ?: d.headerAlbumSize,
+                     headerTitleSize = p[Keys.LYRIC_HEADER_TITLE_SIZE] ?: d.headerTitleSize,
+@@ -239,6 +242,7 @@ class PreferencesManager(
+             p[Keys.LYRIC_LINE_EFFECT] = n.lineEffect.value
+             p[Keys.LYRIC_STRETCH_STRENGTH] = n.stretchStrength
+             p[Keys.LYRIC_STRETCH_DELAY_MS] = n.stretchDelayMs
++            p[Keys.LYRIC_STRETCH_DURATION_MS] = n.stretchDurationMs
+             p[Keys.LYRIC_HEADER_ENHANCED] = n.enhanceHeader
+             p[Keys.LYRIC_HEADER_ALBUM_SIZE] = n.headerAlbumSize
+             p[Keys.LYRIC_HEADER_TITLE_SIZE] = n.headerTitleSize
