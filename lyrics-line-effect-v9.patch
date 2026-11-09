@@ -1,0 +1,288 @@
+diff --git a/app/src/main/java/me/spica27/spicamusic/ui/widget/LyricUI.kt b/app/src/main/java/me/spica27/spicamusic/ui/widget/LyricUI.kt
+index b3f51c5..f3c5b29 100644
+--- a/app/src/main/java/me/spica27/spicamusic/ui/widget/LyricUI.kt
++++ b/app/src/main/java/me/spica27/spicamusic/ui/widget/LyricUI.kt
+@@ -109,6 +109,7 @@ import me.spica27.spicamusic.R
+ import me.spica27.spicamusic.common.entity.LyricItem
+ import me.spica27.spicamusic.common.entity.getSentenceContent
+ import me.spica27.spicamusic.common.entity.voiceAgents
++import me.spica27.spicamusic.core.preferences.LineEffect
+ import me.spica27.spicamusic.core.preferences.LyricsStyleSettings
+ import me.spica27.spicamusic.core.preferences.TransliterationPosition
+ import me.spica27.spicamusic.ui.theme.Shapes
+@@ -780,11 +781,24 @@ fun LyricsUI(
+                     val isBelowPlaying = playingIndex in lyricLines.indices && index > playingIndex
+                     // Strength or duration at 0 means no jiggle at all.
+                     val jiggleLine =
+-                        styleSettings.jiggleEnabled && isBelowPlaying &&
++                        styleSettings.lineEffect == LineEffect.Jiggle && styleSettings.jiggleEnabled && isBelowPlaying &&
+                             styleSettings.jiggleStrength > 0 && styleSettings.jiggleDurationMs > 0
++                    // Stretch (Apple Music style): no bounce; lines further down start later and travel a bit longer.
++                    val stretchLine = styleSettings.lineEffect == LineEffect.Stretch && isBelowPlaying
++                    val distanceBelow = if (isBelowPlaying) (index - playingIndex).coerceAtMost(8) else 0
+                     // Each jiggling line waits a little longer than the one above it; the wait levels off for far lines.
+                     val staggerDelayMillis =
+-                        if (jiggleLine) jiggleDelayMillis(index - playingIndex, styleSettings.jiggleDelayMs) else 0
++                        when {
++                            jiggleLine -> jiggleDelayMillis(index - playingIndex, styleSettings.jiggleDelayMs)
++                            stretchLine -> distanceBelow * styleSettings.stretchDelayMs
++                            else -> 0
++                        }
++                    val lineMoveMillis =
++                        if (stretchLine) {
++                            (lineMoveDurationMillis * (1f + 0.192f * styleSettings.stretchStrength / 100f * distanceBelow)).roundToInt()
++                        } else {
++                            lineMoveDurationMillis
++                        }
+                     val songPart = line.songPartLabel()
+                     val previousRealLine =
+                         lyricLines.getOrNull(index - 1).let { previous ->
+@@ -800,7 +814,7 @@ fun LyricsUI(
+                             lookaheadScope = this@LookaheadScope,
+                             itemKey = line.key,
+                             isManualScrolling = isManualScrolling,
+-                            durationMillis = lineMoveDurationMillis,
++                            durationMillis = lineMoveMillis,
+                             delayMillis = staggerDelayMillis,
+                             jiggle = if (jiggleLine) jiggleSpec else null,
+                             // No fly-in from the bottom: the page slide is the only opening animation.
+diff --git a/app/src/main/java/me/spica27/spicamusic/ui/widget/LyricsSettingsSheet.kt b/app/src/main/java/me/spica27/spicamusic/ui/widget/LyricsSettingsSheet.kt
+index 310cecd..4e4d455 100644
+--- a/app/src/main/java/me/spica27/spicamusic/ui/widget/LyricsSettingsSheet.kt
++++ b/app/src/main/java/me/spica27/spicamusic/ui/widget/LyricsSettingsSheet.kt
+@@ -14,6 +14,7 @@ import androidx.compose.ui.Modifier
+ import androidx.compose.ui.res.stringResource
+ import androidx.compose.ui.unit.dp
+ import me.spica27.spicamusic.R
++import me.spica27.spicamusic.core.preferences.LineEffect
+ import me.spica27.spicamusic.core.preferences.LyricsStyleSettings
+ import me.spica27.spicamusic.core.preferences.TransliterationPosition
+ 
+@@ -46,7 +47,10 @@ fun LyricsSettingsSheet(
+             TextSizeSection(settings = settings, onUpdate = onUpdate)
+             TransliterationSection(settings = settings, onUpdate = onUpdate)
+             BlurAndOpacitySection(settings = settings, onUpdate = onUpdate)
+-            JiggleSection(settings = settings, onUpdate = onUpdate)
++            LineEffectSection(settings = settings, onUpdate = onUpdate)
++            if (settings.lineEffect == LineEffect.Jiggle) {
++                JiggleSection(settings = settings, onUpdate = onUpdate)
++            }
+             EnhanceHeaderSection(settings = settings, onUpdate = onUpdate)
+         }
+     }
+@@ -253,6 +257,52 @@ private fun BlurAndOpacitySection(
+     )
+ }
+ 
++@Composable
++private fun LineEffectSection(
++    settings: LyricsStyleSettings,
++    onUpdate: ((LyricsStyleSettings) -> LyricsStyleSettings) -> Unit,
++) {
++    LyricsSettingsSection(stringResource(R.string.lyr_set_section_line_effect))
++
++    LyricsSettingsChips(
++        label = stringResource(R.string.lyr_set_line_effect),
++        description = stringResource(R.string.lyr_set_line_effect_desc),
++        options = LineEffect.entries,
++        selected = settings.lineEffect,
++        optionLabel = {
++            stringResource(
++                when (it) {
++                    LineEffect.Stretch -> R.string.lyr_set_effect_stretch
++                    LineEffect.Jiggle -> R.string.lyr_set_effect_jiggle
++                    LineEffect.Off -> R.string.lyr_set_effect_off
++                },
++            )
++        },
++        onSelect = { v -> onUpdate { it.copy(lineEffect = v) } },
++    )
++
++    if (settings.lineEffect == LineEffect.Stretch) {
++        LyricsSettingsSlider(
++            label = stringResource(R.string.lyr_set_stretch_strength),
++            description = stringResource(R.string.lyr_set_stretch_strength_desc),
++            value = settings.stretchStrength,
++            range = LyricsStyleSettings.STRETCH_STRENGTH_RANGE,
++            step = 5,
++            valueText = { "$it%" },
++            onValueChange = { v -> onUpdate { it.copy(stretchStrength = v) } },
++        )
++        LyricsSettingsSlider(
++            label = stringResource(R.string.lyr_set_stretch_delay),
++            description = stringResource(R.string.lyr_set_stretch_delay_desc),
++            value = settings.stretchDelayMs,
++            range = LyricsStyleSettings.STRETCH_DELAY_RANGE,
++            step = 5,
++            valueText = { "$it ms" },
++            onValueChange = { v -> onUpdate { it.copy(stretchDelayMs = v) } },
++        )
++    }
++}
++
+ @Composable
+ private fun JiggleSection(
+     settings: LyricsStyleSettings,
+diff --git a/app/src/main/res/values-zh-rTW/strings.xml b/app/src/main/res/values-zh-rTW/strings.xml
+index 06c4f65..dd72564 100644
+--- a/app/src/main/res/values-zh-rTW/strings.xml
++++ b/app/src/main/res/values-zh-rTW/strings.xml
+@@ -879,6 +879,16 @@
+   <string name="lyr_set_current_position">目前歌詞位置</string>
+   <string name="lyr_set_current_position_desc">正在播放的行在螢幕上的位置</string>
+   <string name="lyr_set_section_jiggle">彈跳</string>
++  <string name="lyr_set_section_line_effect">線條效果</string>
++  <string name="lyr_set_line_effect">效果</string>
++  <string name="lyr_set_line_effect_desc">目前行變化時，下方各行的動畫效果</string>
++  <string name="lyr_set_effect_stretch">拉伸</string>
++  <string name="lyr_set_effect_jiggle">彈跳</string>
++  <string name="lyr_set_effect_off">關閉</string>
++  <string name="lyr_set_stretch_strength">拉伸</string>
++  <string name="lyr_set_stretch_strength_desc">越靠下的行延遲越多，行與行之間的間距會被拉開</string>
++  <string name="lyr_set_stretch_delay">行間延遲</string>
++  <string name="lyr_set_stretch_delay_desc">每一行在上一行之後等待的時間</string>
+   <string name="lyr_set_section_header">增強頂欄</string>
+   <string name="lyr_set_header_enable">增強頂欄</string>
+   <string name="lyr_set_header_enable_desc">關閉則保持原樣的頂欄</string>
+diff --git a/app/src/main/res/values-zh/strings.xml b/app/src/main/res/values-zh/strings.xml
+index c33350f..eb29cea 100644
+--- a/app/src/main/res/values-zh/strings.xml
++++ b/app/src/main/res/values-zh/strings.xml
+@@ -880,6 +880,16 @@
+   <string name="lyr_set_current_position">当前歌词位置</string>
+   <string name="lyr_set_current_position_desc">正在播放的行在屏幕上的位置</string>
+   <string name="lyr_set_section_jiggle">弹跳</string>
++  <string name="lyr_set_section_line_effect">线条效果</string>
++  <string name="lyr_set_line_effect">效果</string>
++  <string name="lyr_set_line_effect_desc">当前行变化时，下方各行的动画效果</string>
++  <string name="lyr_set_effect_stretch">拉伸</string>
++  <string name="lyr_set_effect_jiggle">弹跳</string>
++  <string name="lyr_set_effect_off">关闭</string>
++  <string name="lyr_set_stretch_strength">拉伸</string>
++  <string name="lyr_set_stretch_strength_desc">越靠下的行滞后越多，行与行之间的间距会被拉开</string>
++  <string name="lyr_set_stretch_delay">行间延迟</string>
++  <string name="lyr_set_stretch_delay_desc">每一行在上一行之后等待的时间</string>
+   <string name="lyr_set_section_header">增强顶栏</string>
+   <string name="lyr_set_header_enable">增强顶栏</string>
+   <string name="lyr_set_header_enable_desc">关闭则保持原样的顶栏</string>
+diff --git a/app/src/main/res/values/strings.xml b/app/src/main/res/values/strings.xml
+index c5d6ca9..ce51ef2 100644
+--- a/app/src/main/res/values/strings.xml
++++ b/app/src/main/res/values/strings.xml
+@@ -880,6 +880,16 @@
+   <string name="lyr_set_current_position">Current lyric position</string>
+   <string name="lyr_set_current_position_desc">Where the playing line sits on screen</string>
+   <string name="lyr_set_section_jiggle">Jiggle</string>
++  <string name="lyr_set_section_line_effect">Line effect</string>
++  <string name="lyr_set_line_effect">Effect</string>
++  <string name="lyr_set_line_effect_desc">What the lines below the current one do when the line changes</string>
++  <string name="lyr_set_effect_stretch">Stretch</string>
++  <string name="lyr_set_effect_jiggle">Jiggle</string>
++  <string name="lyr_set_effect_off">Off</string>
++  <string name="lyr_set_stretch_strength">Stretch</string>
++  <string name="lyr_set_stretch_strength_desc">How much farther the lines further down lag, so the gaps between lines stretch open</string>
++  <string name="lyr_set_stretch_delay">Delay between lines</string>
++  <string name="lyr_set_stretch_delay_desc">How long each line waits after the one above it</string>
+   <string name="lyr_set_section_header">Enhance header</string>
+   <string name="lyr_set_header_enable">Enhance header</string>
+   <string name="lyr_set_header_enable_desc">Off keeps the original header</string>
+diff --git a/core-preferences/src/main/java/me/spica27/spicamusic/core/preferences/LyricsStyleSettings.kt b/core-preferences/src/main/java/me/spica27/spicamusic/core/preferences/LyricsStyleSettings.kt
+index 942d929..be91538 100644
+--- a/core-preferences/src/main/java/me/spica27/spicamusic/core/preferences/LyricsStyleSettings.kt
++++ b/core-preferences/src/main/java/me/spica27/spicamusic/core/preferences/LyricsStyleSettings.kt
+@@ -1,6 +1,20 @@
+ package me.spica27.spicamusic.core.preferences
+ 
+ /** Where the transliteration (romanized text) sits relative to the lyric words. */
++/** What the lines below the current one do after a line change. */
++enum class LineEffect(
++    val value: String,
++) {
++    Stretch("stretch"),
++    Jiggle("jiggle"),
++    Off("off"),
++    ;
++
++    companion object {
++        fun fromString(value: String?): LineEffect = entries.firstOrNull { it.value == value } ?: Stretch
++    }
++}
++
+ enum class TransliterationPosition(
+     val value: String,
+ ) {
+@@ -46,6 +60,12 @@ data class LyricsStyleSettings(
+     val jiggleStrength: Int = 50,
+     val jiggleDurationMs: Int = 1200,
+     val jiggleDelayMs: Int = 45,
++    // ---- Line effect (Stretch is the Apple Music style: no bounce, the gaps between lines stretch) ----
++    val lineEffect: LineEffect = LineEffect.Stretch,
++    /** How much farther lines lag the further down they are (percent). */
++    val stretchStrength: Int = 60,
++    /** Wait of each line after the one above it, in ms. */
++    val stretchDelayMs: Int = 45,
+     // ---- Enhanced header (lyrics window) ----
+     /** false = the original header (no line, no blur). */
+     val enhanceHeader: Boolean = false,
+@@ -118,6 +138,8 @@ data class LyricsStyleSettings(
+             jiggleStrength = jiggleStrength.coerceIn(JIGGLE_STRENGTH_RANGE),
+             jiggleDurationMs = jiggleDurationMs.coerceIn(JIGGLE_DURATION_RANGE),
+             jiggleDelayMs = jiggleDelayMs.coerceIn(JIGGLE_DELAY_RANGE),
++            stretchStrength = stretchStrength.coerceIn(STRETCH_STRENGTH_RANGE),
++            stretchDelayMs = stretchDelayMs.coerceIn(STRETCH_DELAY_RANGE),
+             headerAlbumSize = headerAlbumSize.coerceIn(HEADER_ALBUM_RANGE),
+             headerTitleSize = headerTitleSize.coerceIn(HEADER_TITLE_RANGE),
+             headerArtistSize = headerArtistSize.coerceIn(HEADER_ARTIST_RANGE),
+@@ -150,6 +172,8 @@ data class LyricsStyleSettings(
+         val JIGGLE_STRENGTH_RANGE = 0..100
+         val JIGGLE_DURATION_RANGE = 0..2500
+         val JIGGLE_DELAY_RANGE = 0..150
++        val STRETCH_STRENGTH_RANGE = 0..100
++        val STRETCH_DELAY_RANGE = 0..150
+         val HEADER_ALBUM_RANGE = 40..96
+         val HEADER_TITLE_RANGE = 14..32
+         val HEADER_ARTIST_RANGE = 10..22
+diff --git a/core-preferences/src/main/java/me/spica27/spicamusic/core/preferences/PreferencesManager.kt b/core-preferences/src/main/java/me/spica27/spicamusic/core/preferences/PreferencesManager.kt
+index d28170f..9437458 100644
+--- a/core-preferences/src/main/java/me/spica27/spicamusic/core/preferences/PreferencesManager.kt
++++ b/core-preferences/src/main/java/me/spica27/spicamusic/core/preferences/PreferencesManager.kt
+@@ -71,6 +71,9 @@ class PreferencesManager(
+         val LYRIC_JIGGLE_STRENGTH = intPreferencesKey("lyric_jiggle_strength")
+         val LYRIC_JIGGLE_DURATION_MS = intPreferencesKey("lyric_jiggle_duration_ms")
+         val LYRIC_JIGGLE_DELAY_MS = intPreferencesKey("lyric_jiggle_delay_ms")
++        val LYRIC_LINE_EFFECT = stringPreferencesKey("lyric_line_effect")
++        val LYRIC_STRETCH_STRENGTH = intPreferencesKey("lyric_stretch_strength")
++        val LYRIC_STRETCH_DELAY_MS = intPreferencesKey("lyric_stretch_delay_ms")
+         val LYRIC_HEADER_ENHANCED = booleanPreferencesKey("lyric_header_enhanced")
+         val LYRIC_HEADER_ALBUM_SIZE = intPreferencesKey("lyric_header_album_size")
+         val LYRIC_HEADER_TITLE_SIZE = intPreferencesKey("lyric_header_title_size")
+@@ -126,6 +129,9 @@ class PreferencesManager(
+                     jiggleStrength = p[Keys.LYRIC_JIGGLE_STRENGTH] ?: d.jiggleStrength,
+                     jiggleDurationMs = p[Keys.LYRIC_JIGGLE_DURATION_MS] ?: d.jiggleDurationMs,
+                     jiggleDelayMs = p[Keys.LYRIC_JIGGLE_DELAY_MS] ?: d.jiggleDelayMs,
++                    lineEffect = p[Keys.LYRIC_LINE_EFFECT]?.let(LineEffect::fromString) ?: d.lineEffect,
++                    stretchStrength = p[Keys.LYRIC_STRETCH_STRENGTH] ?: d.stretchStrength,
++                    stretchDelayMs = p[Keys.LYRIC_STRETCH_DELAY_MS] ?: d.stretchDelayMs,
+                     enhanceHeader = p[Keys.LYRIC_HEADER_ENHANCED] ?: d.enhanceHeader,
+                     headerAlbumSize = p[Keys.LYRIC_HEADER_ALBUM_SIZE] ?: d.headerAlbumSize,
+                     headerTitleSize = p[Keys.LYRIC_HEADER_TITLE_SIZE] ?: d.headerTitleSize,
+@@ -181,6 +187,9 @@ class PreferencesManager(
+                     jiggleStrength = p[Keys.LYRIC_JIGGLE_STRENGTH] ?: d.jiggleStrength,
+                     jiggleDurationMs = p[Keys.LYRIC_JIGGLE_DURATION_MS] ?: d.jiggleDurationMs,
+                     jiggleDelayMs = p[Keys.LYRIC_JIGGLE_DELAY_MS] ?: d.jiggleDelayMs,
++                    lineEffect = p[Keys.LYRIC_LINE_EFFECT]?.let(LineEffect::fromString) ?: d.lineEffect,
++                    stretchStrength = p[Keys.LYRIC_STRETCH_STRENGTH] ?: d.stretchStrength,
++                    stretchDelayMs = p[Keys.LYRIC_STRETCH_DELAY_MS] ?: d.stretchDelayMs,
+                     enhanceHeader = p[Keys.LYRIC_HEADER_ENHANCED] ?: d.enhanceHeader,
+                     headerAlbumSize = p[Keys.LYRIC_HEADER_ALBUM_SIZE] ?: d.headerAlbumSize,
+                     headerTitleSize = p[Keys.LYRIC_HEADER_TITLE_SIZE] ?: d.headerTitleSize,
+@@ -227,6 +236,9 @@ class PreferencesManager(
+             p[Keys.LYRIC_JIGGLE_STRENGTH] = n.jiggleStrength
+             p[Keys.LYRIC_JIGGLE_DURATION_MS] = n.jiggleDurationMs
+             p[Keys.LYRIC_JIGGLE_DELAY_MS] = n.jiggleDelayMs
++            p[Keys.LYRIC_LINE_EFFECT] = n.lineEffect.value
++            p[Keys.LYRIC_STRETCH_STRENGTH] = n.stretchStrength
++            p[Keys.LYRIC_STRETCH_DELAY_MS] = n.stretchDelayMs
+             p[Keys.LYRIC_HEADER_ENHANCED] = n.enhanceHeader
+             p[Keys.LYRIC_HEADER_ALBUM_SIZE] = n.headerAlbumSize
+             p[Keys.LYRIC_HEADER_TITLE_SIZE] = n.headerTitleSize
