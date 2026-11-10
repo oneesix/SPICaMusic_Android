@@ -87,6 +87,10 @@ data class LyricsStyleSettings(
     val heldWordMinMs: Int = 1000,
     /** Smooth the lyrics clock so held-word animations do not step. */
     val optimizeHeldWords: Boolean = false,
+    /** Keep the lyrics on a line that is still being sung while the next line has already started. */
+    val holdScrollEnabled: Boolean = false,
+    /** How many lines the lyrics may hold back (1..3), used when [holdScrollEnabled]. */
+    val holdScrollLines: Int = 2,
     // ---- Enhanced header (lyrics window) ----
     /** false = the original header (no line, no blur). */
     val enhanceHeader: Boolean = false,
@@ -165,6 +169,7 @@ data class LyricsStyleSettings(
             lightSweepSoftness = lightSweepSoftness.coerceIn(LIGHT_SWEEP_SOFTNESS_RANGE),
             wordLift = wordLift.coerceIn(WORD_LIFT_RANGE),
             heldWordMinMs = heldWordMinMs.coerceIn(HELD_WORD_MIN_RANGE),
+            holdScrollLines = holdScrollLines.coerceIn(HOLD_SCROLL_RANGE),
             headerAlbumSize = headerAlbumSize.coerceIn(HEADER_ALBUM_RANGE),
             headerTitleSize = headerTitleSize.coerceIn(HEADER_TITLE_RANGE),
             headerArtistSize = headerArtistSize.coerceIn(HEADER_ARTIST_RANGE),
@@ -203,6 +208,7 @@ data class LyricsStyleSettings(
         val LIGHT_SWEEP_SOFTNESS_RANGE = 50..200
         val WORD_LIFT_RANGE = 0..80
         val HELD_WORD_MIN_RANGE = 0..3000
+        val HOLD_SCROLL_RANGE = 1..3
         val HEADER_ALBUM_RANGE = 40..96
         val HEADER_TITLE_RANGE = 14..32
         val HEADER_ARTIST_RANGE = 10..22

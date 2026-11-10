@@ -312,6 +312,23 @@ private fun LyricsProgressSection(
         checked = settings.optimizeHeldWords,
         onCheckedChange = { v -> onUpdate { it.copy(optimizeHeldWords = v) } },
     )
+    LyricsSettingsToggle(
+        label = stringResource(R.string.lyr_set_hold_scroll),
+        description = stringResource(R.string.lyr_set_hold_scroll_desc),
+        checked = settings.holdScrollEnabled,
+        onCheckedChange = { v -> onUpdate { it.copy(holdScrollEnabled = v) } },
+    )
+    if (settings.holdScrollEnabled) {
+        LyricsSettingsSlider(
+            label = stringResource(R.string.lyr_set_hold_scroll_lines),
+            description = stringResource(R.string.lyr_set_hold_scroll_lines_desc),
+            value = settings.holdScrollLines,
+            range = LyricsStyleSettings.HOLD_SCROLL_RANGE,
+            step = 1,
+            valueText = { "$it" },
+            onValueChange = { v -> onUpdate { it.copy(holdScrollLines = v) } },
+        )
+    }
 }
 
 @Composable

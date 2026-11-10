@@ -152,6 +152,7 @@ internal fun FullscreenLyricsSurface(
             // 工具栏已移到顶栏右侧（三点按钮）
             showToolbar = false,
             seekPreviewTimeProvider = seekPreviewTimeProvider,
+            songDurationMs = durationMs,
         )
 
         // Blur layer behind the header: strong behind the whole header, then it fades out softly

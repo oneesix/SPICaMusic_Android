@@ -70,7 +70,7 @@ internal fun LyricItem.isInterlude(): Boolean = this is LyricItem.NormalLyric &&
 /** End of a break line in ms (it ends 0.3 s before the next lyric starts). */
 internal fun LyricItem.interludeEndMs(): Long = (this as? LyricItem.NormalLyric)?.translation?.toLongOrNull() ?: time
 
-private fun LyricItem.knownEndMs(): Long? =
+internal fun LyricItem.knownEndMs(): Long? =
     (this as? LyricItem.WordsLyric)?.let { words ->
         max(words.endTime, words.accompaniment.maxOfOrNull { it.endTime } ?: words.endTime)
     }
@@ -87,8 +87,14 @@ private fun interludeItem(
         key = "$INTERLUDE_KEY_PREFIX$index",
     )
 
-/** Inserts break lines into a time-sorted lyric list. Only used for time-synced lyrics. */
-internal fun insertInterludes(lines: List<LyricItem>): List<LyricItem> {
+/**
+ * Inserts break lines into a time-sorted lyric list. Only used for time-synced lyrics.
+ * [songEndMs] (0 = unknown) adds a break after the last line when the song goes on for 7 s or more.
+ */
+internal fun insertInterludes(
+    lines: List<LyricItem>,
+    songEndMs: Long = 0L,
+): List<LyricItem> {
     if (lines.isEmpty()) return lines
     val result = ArrayList<LyricItem>(lines.size + 4)
     val first = lines.first()
@@ -102,6 +108,11 @@ internal fun insertInterludes(lines: List<LyricItem>): List<LyricItem> {
         if (next.time - end >= BREAK_MIN_MS) {
             result += interludeItem(end, next.time - INTERLUDE_LEAD_MS, result.size)
         }
+    }
+    // Outro: the last line ends and the song is still playing.
+    val lastEnd = lines.last().knownEndMs()
+    if (songEndMs > 0L && lastEnd != null && songEndMs - lastEnd >= BREAK_MIN_MS) {
+        result += interludeItem(lastEnd, songEndMs - INTERLUDE_LEAD_MS, result.size)
     }
     return result
 }

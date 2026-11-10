@@ -61,6 +61,8 @@ fun LyricsPanel(
     showToolbar: Boolean = true,
     /** Time (ms) the progress bar is dragged to, or null when not dragging. The lyrics follow it. */
     seekPreviewTimeProvider: () -> Long? = { null },
+    /** Length of the song in ms (0 = unknown): lets the lyrics show a break after the last line. */
+    songDurationMs: Long = 0L,
 ) {
     // Activity 作用域共享实例：与 mini 歌词同源，
     // 此处切换歌词源 / 调整偏移量会同步反映到 mini 歌词
@@ -159,6 +161,7 @@ fun LyricsPanel(
                     displayOptions = displayOptions,
                     styleSettings = styleSettings,
                     isSynced = displayed.isSynced,
+                    songDurationMs = songDurationMs,
                     onSeekToTime = { posMs ->
                         viewModel.seekTo(posMs - uiState.lyricsOffsetMs)
                     },

@@ -348,6 +348,24 @@ private class LineTimeline private constructor(
     }
 }
 
+/** The oldest line, at most [maxHold] lines before [latest], that is still being sung at [time]. */
+private fun heldLineIndex(
+    lines: List<LyricItem>,
+    latest: Int,
+    time: Long,
+    maxHold: Int,
+): Int {
+    var focus = latest
+    var i = latest - 1
+    while (i >= 0 && latest - i <= maxHold) {
+        val end = lines[i].knownEndMs() ?: break
+        if (end <= time) break
+        focus = i
+        i--
+    }
+    return focus
+}
+
 /** 返回升序数组中最后一个不大于指定值的下标。 */
 private fun LongArray.lastIndexAtOrBefore(value: Long): Int {
     var low = 0
@@ -630,6 +648,8 @@ fun LyricsUI(
     onSeekToTime: (Long) -> Unit = {},
     /** Time the player's progress bar is dragged to (null = not dragging). The lyrics follow it. */
     seekPreviewTimeProvider: () -> Long? = { null },
+    /** Length of the song in ms (0 = unknown). Used for the break line after the last lyric. */
+    songDurationMs: Long = 0L,
 ) {
     val sortedLines = remember(lyric) { lyric.sortedBy { it.time } }
 
@@ -651,7 +671,7 @@ fun LyricsUI(
     }
 
     // Long intros and instrumental gaps get a break line (three dots and a countdown).
-    val lyricLines = remember(sortedLines) { insertInterludes(sortedLines) }
+    val lyricLines = remember(sortedLines, songDurationMs) { insertInterludes(sortedLines, songDurationMs) }
     val style = rememberLyricsUIStyle(displayMode, styleSettings)
     val lazyListState = rememberLazyListState()
     var isAutoScrolling by remember { mutableStateOf(false) }
@@ -684,8 +704,19 @@ fun LyricsUI(
         }
     // 滚动按时间表提前开始，逐字高亮仍使用真实时间。
     val timeline = remember(lyricLines, styleSettings.moveDurationMs) { LineTimeline.of(lyricLines, styleSettings.moveDurationMs) }
-    val playingIndex by remember(timeline) {
-        derivedStateOf { timeline.indexAt(currentTimeState.value) }
+    val holdScrollEnabled = styleSettings.holdScrollEnabled
+    val holdScrollLines = styleSettings.holdScrollLines
+    val playingIndex by remember(timeline, lyricLines, holdScrollEnabled, holdScrollLines) {
+        derivedStateOf {
+            val time = currentTimeState.value
+            val latest = timeline.indexAt(time)
+            // Hold scroll: stay on an older line while it (or its background vocal) is still sung.
+            if (holdScrollEnabled && latest != Int.MAX_VALUE) {
+                heldLineIndex(lyricLines, latest, time, holdScrollLines)
+            } else {
+                latest
+            }
+        }
     }
     val activeLineIndices by remember(timeline) {
         derivedStateOf { timeline.activeLinesAt(currentTimeState.value) }

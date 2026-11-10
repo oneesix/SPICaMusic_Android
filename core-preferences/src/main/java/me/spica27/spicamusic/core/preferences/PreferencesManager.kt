@@ -87,6 +87,8 @@ class PreferencesManager(
         val LYRIC_HELD_MANUAL = booleanPreferencesKey("lyric_held_manual")
         val LYRIC_HELD_MIN_MS = intPreferencesKey("lyric_held_min_ms")
         val LYRIC_HELD_OPTIMIZE = booleanPreferencesKey("lyric_held_optimize")
+        val LYRIC_HOLD_SCROLL = booleanPreferencesKey("lyric_hold_scroll")
+        val LYRIC_HOLD_SCROLL_LINES = intPreferencesKey("lyric_hold_scroll_lines")
         val LYRIC_HEADER_ENHANCED = booleanPreferencesKey("lyric_header_enhanced")
         val LYRIC_HEADER_ALBUM_SIZE = intPreferencesKey("lyric_header_album_size")
         val LYRIC_HEADER_TITLE_SIZE = intPreferencesKey("lyric_header_title_size")
@@ -158,6 +160,8 @@ class PreferencesManager(
                     manualHeldWords = p[Keys.LYRIC_HELD_MANUAL] ?: d.manualHeldWords,
                     heldWordMinMs = p[Keys.LYRIC_HELD_MIN_MS] ?: d.heldWordMinMs,
                     optimizeHeldWords = p[Keys.LYRIC_HELD_OPTIMIZE] ?: d.optimizeHeldWords,
+                    holdScrollEnabled = p[Keys.LYRIC_HOLD_SCROLL] ?: d.holdScrollEnabled,
+                    holdScrollLines = p[Keys.LYRIC_HOLD_SCROLL_LINES] ?: d.holdScrollLines,
                     enhanceHeader = p[Keys.LYRIC_HEADER_ENHANCED] ?: d.enhanceHeader,
                     headerAlbumSize = p[Keys.LYRIC_HEADER_ALBUM_SIZE] ?: d.headerAlbumSize,
                     headerTitleSize = p[Keys.LYRIC_HEADER_TITLE_SIZE] ?: d.headerTitleSize,
@@ -229,6 +233,8 @@ class PreferencesManager(
                     manualHeldWords = p[Keys.LYRIC_HELD_MANUAL] ?: d.manualHeldWords,
                     heldWordMinMs = p[Keys.LYRIC_HELD_MIN_MS] ?: d.heldWordMinMs,
                     optimizeHeldWords = p[Keys.LYRIC_HELD_OPTIMIZE] ?: d.optimizeHeldWords,
+                    holdScrollEnabled = p[Keys.LYRIC_HOLD_SCROLL] ?: d.holdScrollEnabled,
+                    holdScrollLines = p[Keys.LYRIC_HOLD_SCROLL_LINES] ?: d.holdScrollLines,
                     enhanceHeader = p[Keys.LYRIC_HEADER_ENHANCED] ?: d.enhanceHeader,
                     headerAlbumSize = p[Keys.LYRIC_HEADER_ALBUM_SIZE] ?: d.headerAlbumSize,
                     headerTitleSize = p[Keys.LYRIC_HEADER_TITLE_SIZE] ?: d.headerTitleSize,
@@ -291,6 +297,8 @@ class PreferencesManager(
             p[Keys.LYRIC_HELD_MANUAL] = n.manualHeldWords
             p[Keys.LYRIC_HELD_MIN_MS] = n.heldWordMinMs
             p[Keys.LYRIC_HELD_OPTIMIZE] = n.optimizeHeldWords
+            p[Keys.LYRIC_HOLD_SCROLL] = n.holdScrollEnabled
+            p[Keys.LYRIC_HOLD_SCROLL_LINES] = n.holdScrollLines
             p[Keys.LYRIC_HEADER_ENHANCED] = n.enhanceHeader
             p[Keys.LYRIC_HEADER_ALBUM_SIZE] = n.headerAlbumSize
             p[Keys.LYRIC_HEADER_TITLE_SIZE] = n.headerTitleSize

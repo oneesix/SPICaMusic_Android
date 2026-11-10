@@ -918,6 +918,10 @@
   <string name="lyr_set_held_min_desc">时长不少于此值的词视为长音词</string>
   <string name="lyr_set_held_optimize">优化长音词</string>
   <string name="lyr_set_held_optimize_desc">平滑歌词时钟，让长音词动画不再卡顿</string>
+  <string name="lyr_set_hold_scroll">演唱未结束时不滚动</string>
+  <string name="lyr_set_hold_scroll_desc">上一行（或其伴唱）仍在演唱时，不滚动到下一行</string>
+  <string name="lyr_set_hold_scroll_lines">保持行数</string>
+  <string name="lyr_set_hold_scroll_lines_desc">歌词最多可停留在之前的几行（1-3）</string>
   <string name="lyr_set_section_header">增强顶栏</string>
   <string name="lyr_set_header_enable">增强顶栏</string>
   <string name="lyr_set_header_enable_desc">关闭则保持原样的顶栏</string>
