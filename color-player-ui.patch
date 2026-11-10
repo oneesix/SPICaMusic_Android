@@ -1,0 +1,559 @@
+diff --git a/app/src/main/java/me/spica27/spicamusic/ui/home/HomeScene.kt b/app/src/main/java/me/spica27/spicamusic/ui/home/HomeScene.kt
+index cafb3ab..d6f7968 100644
+--- a/app/src/main/java/me/spica27/spicamusic/ui/home/HomeScene.kt
++++ b/app/src/main/java/me/spica27/spicamusic/ui/home/HomeScene.kt
+@@ -43,7 +43,10 @@ import me.spica27.spicamusic.ui.navigation.LocalBackStack
+ import me.spica27.spicamusic.ui.player.DEFAULT_PAGE
+ import me.spica27.spicamusic.ui.player.ExpandedPlayerScreen
+ import me.spica27.spicamusic.ui.player.LocalPlayerViewModel
++import me.spica27.spicamusic.ui.player.LyricsStyleViewModel
+ import me.spica27.spicamusic.ui.player.QUEUE_PAGE
++import me.spica27.spicamusic.ui.widget.DynamicPlayerColorScope
++import me.spica27.spicamusic.ui.widget.rememberDynamicPlayerColors
+ import me.spica27.spicamusic.ui.theme.LocalReducedMotion
+ import org.koin.compose.viewmodel.koinActivityViewModel
+ 
+@@ -66,6 +69,10 @@ fun HomeScreen() {
+     val position = playerViewModel.currentPosition.collectAsStateWithLifecycle()
+     val duration = playerViewModel.currentDuration.collectAsStateWithLifecycle()
+     val reducedMotion = LocalReducedMotion.current
++    // Color player UI: the mini player follows the album colours too (null = off).
++    val dynamicStyleViewModel: LyricsStyleViewModel = koinActivityViewModel()
++    val dynamicStyle by dynamicStyleViewModel.style.collectAsStateWithLifecycle()
++    val dynamicColors = rememberDynamicPlayerColors(dynamicStyle, displayedMediaItem?.mediaMetadata?.artworkUri)
+     val sheetState = rememberPlayerSheetState()
+     var initialPlayerPage by rememberSaveable { mutableIntStateOf(DEFAULT_PAGE) }
+     val pageStateHolder = rememberSaveableStateHolder()
+@@ -87,6 +94,7 @@ fun HomeScreen() {
+         },
+         miniPlayer = { dragModifier ->
+             val metadata = displayedMediaItem?.mediaMetadata
++            DynamicPlayerColorScope(colors = dynamicColors) {
+             MiniPlayerBar(
+                 title = metadata?.title?.toString() ?: stringResource(R.string.unknown_song),
+                 artist = metadata?.artist?.toString() ?: stringResource(R.string.unknown_artist),
+@@ -107,6 +115,7 @@ fun HomeScreen() {
+                 glassEnabled = glassEnabled,
+                 layout = bottomBarLayout,
+             )
++            }
+         },
+         fullScreenPlayer = { progress, dragModifier ->
+             val collapse = { sheetState.animateTo(false, reducedMotion) }
+diff --git a/app/src/main/java/me/spica27/spicamusic/ui/player/ExpandedPlayerScreen.kt b/app/src/main/java/me/spica27/spicamusic/ui/player/ExpandedPlayerScreen.kt
+index 307fb73..98c8111 100644
+--- a/app/src/main/java/me/spica27/spicamusic/ui/player/ExpandedPlayerScreen.kt
++++ b/app/src/main/java/me/spica27/spicamusic/ui/player/ExpandedPlayerScreen.kt
+@@ -131,7 +131,10 @@ import me.spica27.spicamusic.ui.theme.Shapes
+ import me.spica27.spicamusic.ui.theme.Spacing
+ import me.spica27.spicamusic.ui.widget.AudioCover
+ import me.spica27.spicamusic.ui.settings.SettingsViewModel
++import me.spica27.spicamusic.ui.widget.DynamicPlayerColorScope
+ import me.spica27.spicamusic.ui.widget.FluidMusicBackground
++import me.spica27.spicamusic.ui.widget.rememberDynamicPlayerColors
++import org.koin.compose.viewmodel.koinActivityViewModel
+ import me.spica27.spicamusic.ui.widget.VerseFlowBackground
+ import me.spica27.spicamusic.ui.widget.VerseFlowThemeScope
+ import me.spica27.spicamusic.ui.widget.rememberVerseTheme
+@@ -486,6 +489,10 @@ fun ExpandedPlayerScreen(
+             vibrancyPercent = verseVibrancy,
+             hueShift = verseHue,
+         )
++    // Color player UI: colours from the album art (null = off).
++    val dynamicStyleViewModel: LyricsStyleViewModel = koinActivityViewModel()
++    val dynamicStyle by dynamicStyleViewModel.style.collectAsStateWithLifecycle()
++    val dynamicColors = rememberDynamicPlayerColors(dynamicStyle, currentMediaItem?.mediaMetadata?.artworkUri)
+     val hazeState = rememberHazeState()
+     val lyricsScrimAlpha =
+         animateFloatAsState(
+@@ -495,7 +502,7 @@ fun ExpandedPlayerScreen(
+         )
+     val lyricsScrimColor = MaterialTheme.colorScheme.scrim.copy(alpha = 0.14f)
+ 
+-    PlayerThemeScope(isVerseFlow = isVerseFlow, theme = verseTheme) {
++    PlayerThemeScope(isVerseFlow = isVerseFlow, theme = verseTheme, dynamicColors = dynamicColors) {
+         Box(
+             modifier =
+                 modifier
+@@ -530,6 +537,17 @@ fun ExpandedPlayerScreen(
+                     enabled = animationsEnabled && isAppInForeground,
+                 )
+ 
++                // Color player UI > Color background: an album-colour tint on top of the animated background.
++                dynamicColors?.backgroundTint?.let { tint ->
++                    Box(
++                        modifier =
++                            Modifier
++                                .fillMaxSize()
++                                .hazeSource(hazeState, zIndex = 0.3f)
++                                .background(tint),
++                    )
++                }
++
+                 // 歌词模式只压暗同一份动态背景，不创建第二个背景实例。
+                 Box(
+                     modifier =
+@@ -761,12 +779,15 @@ fun ExpandedPlayerScreen(
+ private fun PlayerThemeScope(
+     isVerseFlow: Boolean,
+     theme: me.spica27.spicamusic.ui.widget.VerseTheme,
++    dynamicColors: me.spica27.spicamusic.ui.widget.DynamicPlayerColors? = null,
+     content: @Composable () -> Unit,
+ ) {
+-    if (isVerseFlow) {
+-        VerseFlowThemeScope(theme = theme, content = content)
+-    } else {
+-        content()
++    DynamicPlayerColorScope(colors = dynamicColors) {
++        if (isVerseFlow) {
++            VerseFlowThemeScope(theme = theme, content = content)
++        } else {
++            content()
++        }
+     }
+ }
+ 
+diff --git a/app/src/main/java/me/spica27/spicamusic/ui/player/LyricsPanel.kt b/app/src/main/java/me/spica27/spicamusic/ui/player/LyricsPanel.kt
+index cd02593..88f7066 100644
+--- a/app/src/main/java/me/spica27/spicamusic/ui/player/LyricsPanel.kt
++++ b/app/src/main/java/me/spica27/spicamusic/ui/player/LyricsPanel.kt
+@@ -18,7 +18,6 @@ import androidx.compose.runtime.setValue
+ import androidx.compose.runtime.withFrameNanos
+ import androidx.compose.ui.Alignment
+ import androidx.compose.ui.Modifier
+-import androidx.compose.ui.graphics.Color
+ import androidx.compose.ui.res.stringResource
+ import androidx.compose.ui.text.style.TextAlign
+ import androidx.compose.ui.unit.Dp
+@@ -36,7 +35,6 @@ import me.spica27.spicamusic.ui.widget.LyricsDisplayMode
+ import me.spica27.spicamusic.ui.widget.LyricsDisplayOptions
+ import me.spica27.spicamusic.ui.widget.LyricsSettingsSheet
+ import me.spica27.spicamusic.ui.widget.LyricsUI
+-import me.spica27.spicamusic.utils.rememberDominantColorFromUri
+ import org.koin.compose.viewmodel.koinActivityViewModel
+ 
+ /**
+@@ -73,18 +71,6 @@ fun LyricsPanel(
+     val styleViewModel: LyricsStyleViewModel = koinActivityViewModel()
+     val styleSettings by styleViewModel.style.collectAsStateWithLifecycle()
+     var showLyricsSettings by remember { mutableStateOf(false) }
+-    // Dynamic lyrics colour: the dominant colour of the current album art (null = off).
+-    val albumColor: Color? =
+-        if (styleSettings.dynamicLyricsEnabled) {
+-            val playerViewModel = LocalPlayerViewModel.current
+-            val currentMediaItem by playerViewModel.currentMediaItem.collectAsStateWithLifecycle()
+-            rememberDominantColorFromUri(
+-                uri = currentMediaItem?.mediaMetadata?.artworkUri,
+-                fallbackColor = MaterialTheme.colorScheme.primary,
+-            )
+-        } else {
+-            null
+-        }
+ 
+     val backStack = LocalBackStack.current
+ 
+@@ -176,7 +162,6 @@ fun LyricsPanel(
+                     styleSettings = styleSettings,
+                     isSynced = displayed.isSynced,
+                     songDurationMs = songDurationMs,
+-                    albumColor = albumColor,
+                     onSeekToTime = { posMs ->
+                         viewModel.seekTo(posMs - uiState.lyricsOffsetMs)
+                     },
+diff --git a/app/src/main/java/me/spica27/spicamusic/ui/widget/DynamicPlayerColor.kt b/app/src/main/java/me/spica27/spicamusic/ui/widget/DynamicPlayerColor.kt
+new file mode 100644
+index 0000000..6440ead
+--- /dev/null
++++ b/app/src/main/java/me/spica27/spicamusic/ui/widget/DynamicPlayerColor.kt
+@@ -0,0 +1,117 @@
++package me.spica27.spicamusic.ui.widget
++
++import android.net.Uri
++import androidx.compose.material3.MaterialTheme
++import androidx.compose.runtime.Composable
++import androidx.compose.runtime.Immutable
++import androidx.compose.runtime.remember
++import androidx.compose.ui.graphics.Color
++import androidx.compose.ui.graphics.luminance
++import androidx.compose.ui.graphics.toArgb
++import androidx.core.graphics.ColorUtils
++import me.spica27.spicamusic.core.preferences.LyricsStyleSettings
++import me.spica27.spicamusic.utils.rememberDominantColorFromUri
++
++/** Player colours taken from the album art (Color player UI). */
++@Immutable
++data class DynamicPlayerColors(
++    /** Main colour: text, icons, buttons, progress bar, lyrics. */
++    val fg: Color,
++    /** Softer colour for secondary text and icons. */
++    val fg2: Color,
++    /** Colour of content drawn on top of [fg] (for example the play icon). */
++    val onFg: Color,
++    /** Optional tint for the player background (null = background not coloured). */
++    val backgroundTint: Color?,
++)
++
++/** The colours for the current song, or null when Color player UI is off. */
++@Composable
++fun rememberDynamicPlayerColors(
++    settings: LyricsStyleSettings,
++    artworkUri: Uri?,
++): DynamicPlayerColors? {
++    val enabled = settings.dynamicLyricsEnabled
++    val album = rememberDominantColorFromUri(uri = if (enabled) artworkUri else null, fallbackColor = MaterialTheme.colorScheme.primary)
++    val appDark = MaterialTheme.colorScheme.surface.luminance() < 0.5f
++    return remember(
++        enabled,
++        settings.dynamicBackgroundEnabled,
++        settings.dynamicLyricsMode,
++        settings.dynamicLyricsOpacity,
++        settings.dynamicLyricsSaturation,
++        settings.dynamicLyricsContrast,
++        album,
++        appDark,
++    ) {
++        if (!enabled) {
++            null
++        } else {
++            val dark =
++                when (settings.dynamicLyricsMode) {
++                    "dark" -> true
++                    "light" -> false
++                    else -> appDark
++                }
++            val hsl = FloatArray(3)
++            ColorUtils.colorToHSL(album.toArgb(), hsl)
++            val saturation = (hsl[1] * settings.dynamicLyricsSaturation / 100f).coerceIn(0f, 1f)
++            // Light tones on a dark page, dark tones on a light page; contrast moves the tone away from the page.
++            val contrast = settings.dynamicLyricsContrast * 0.0035f
++            val lightness = (if (dark) 0.60f + contrast else 0.45f - contrast).coerceIn(0f, 1f)
++            val solid = Color(ColorUtils.HSLToColor(floatArrayOf(hsl[0], saturation, lightness)))
++            val opacity = settings.dynamicLyricsOpacity / 100f
++            val tint =
++                if (settings.dynamicBackgroundEnabled) {
++                    Color(ColorUtils.HSLToColor(floatArrayOf(hsl[0], saturation, 0.5f))).copy(alpha = 0.22f * opacity)
++                } else {
++                    null
++                }
++            DynamicPlayerColors(
++                fg = solid.copy(alpha = opacity),
++                fg2 = solid.copy(alpha = opacity * 0.7f),
++                onFg = if (solid.luminance() > 0.5f) Color(0xFF17121F) else Color.White,
++                backgroundTint = tint,
++            )
++        }
++    }
++}
++
++/** Recolours the foreground roles of the Material theme (text, icons, buttons); surfaces stay as they are. */
++@Composable
++fun DynamicPlayerColorScope(
++    colors: DynamicPlayerColors?,
++    content: @Composable () -> Unit,
++) {
++    if (colors == null) {
++        content()
++        return
++    }
++    val base = MaterialTheme.colorScheme
++    val scheme =
++        remember(base, colors) {
++            base.copy(
++                primary = colors.fg,
++                onPrimary = colors.onFg,
++                primaryContainer = colors.fg.copy(alpha = colors.fg.alpha * 0.26f),
++                onPrimaryContainer = colors.fg,
++                secondary = colors.fg,
++                onSecondary = colors.onFg,
++                secondaryContainer = colors.fg.copy(alpha = colors.fg.alpha * 0.26f),
++                onSecondaryContainer = colors.fg,
++                tertiary = colors.fg,
++                onTertiary = colors.onFg,
++                onSurface = colors.fg,
++                onSurfaceVariant = colors.fg2,
++                onBackground = colors.fg,
++                outline = colors.fg2,
++                outlineVariant = colors.fg.copy(alpha = colors.fg.alpha * 0.26f),
++            )
++        }
++    MaterialTheme(
++        colorScheme = scheme,
++        typography = MaterialTheme.typography,
++        shapes = MaterialTheme.shapes,
++        content = content,
++    )
++}
+diff --git a/app/src/main/java/me/spica27/spicamusic/ui/widget/LyricUI.kt b/app/src/main/java/me/spica27/spicamusic/ui/widget/LyricUI.kt
+index 846ef8e..39784f6 100644
+--- a/app/src/main/java/me/spica27/spicamusic/ui/widget/LyricUI.kt
++++ b/app/src/main/java/me/spica27/spicamusic/ui/widget/LyricUI.kt
+@@ -70,9 +70,6 @@ import androidx.compose.ui.graphics.BlurEffect
+ import androidx.compose.ui.graphics.Brush
+ import androidx.compose.ui.graphics.Color
+ import androidx.compose.ui.graphics.lerp as lerpColor
+-import androidx.compose.ui.graphics.luminance
+-import androidx.compose.ui.graphics.toArgb
+-import androidx.core.graphics.ColorUtils
+ import androidx.compose.ui.graphics.CompositingStrategy
+ import androidx.compose.ui.graphics.RenderEffect
+ import androidx.compose.ui.graphics.Shadow
+@@ -497,34 +494,6 @@ private fun LyricsStyleSettings.toFxSpec(primary: Color): LyricsFxSpec? =
+         null
+     }
+ 
+-/** Lyrics colour taken from the album art. */
+-@Immutable
+-private data class DynamicLyricsSpec(
+-    val color: Color,
+-    val opacity: Float,
+-)
+-
+-private fun LyricsStyleSettings.toDynamicSpec(
+-    albumColor: Color?,
+-    appDark: Boolean,
+-): DynamicLyricsSpec? {
+-    if (!dynamicLyricsEnabled || albumColor == null) return null
+-    val dark =
+-        when (dynamicLyricsMode) {
+-            "dark" -> true
+-            "light" -> false
+-            else -> appDark
+-        }
+-    val hsl = FloatArray(3)
+-    ColorUtils.colorToHSL(albumColor.toArgb(), hsl)
+-    val saturation = (hsl[1] * dynamicLyricsSaturation / 100f).coerceIn(0f, 1f)
+-    // Light tones on a dark page, dark tones on a light page; contrast moves the tone away from the page.
+-    val lightness =
+-        if (dark) 0.60f + dynamicLyricsContrast * 0.0035f else 0.45f - dynamicLyricsContrast * 0.0035f
+-    val rgb = ColorUtils.HSLToColor(floatArrayOf(hsl[0], saturation, lightness.coerceIn(0f, 1f)))
+-    return DynamicLyricsSpec(color = Color(rgb), opacity = dynamicLyricsOpacity / 100f)
+-}
+-
+ /** 随展示形态变化的排版参数。 */
+ @Immutable
+ private data class LyricsUIStyle(
+@@ -548,8 +517,6 @@ private data class LyricsUIStyle(
+     val progress: WordProgressSpec = WordProgressSpec(),
+     /** Gradient lyrics colour and light effects (null = off). */
+     val fx: LyricsFxSpec? = null,
+-    /** Lyrics colour from the album art (null = the theme text colour). */
+-    val dynamic: DynamicLyricsSpec? = null,
+     /** Background vocal reveal (null = background vocals are always visible). */
+     val bgReveal: BgRevealSpec? = null,
+     /** Transliteration above (true) or below (false) the lyric words. */
+@@ -566,13 +533,11 @@ private data class LyricsUIStyle(
+ private fun rememberLyricsUIStyle(
+     displayMode: LyricsDisplayMode,
+     settings: LyricsStyleSettings,
+-    albumColor: Color? = null,
+ ): LyricsUIStyle {
+     val typography = MaterialTheme.typography
+     val primaryColor = MaterialTheme.colorScheme.primary
+-    val appDark = MaterialTheme.colorScheme.surface.luminance() < 0.5f
+     val screenWidthDp = LocalConfiguration.current.screenWidthDp
+-    return remember(typography, displayMode, settings, screenWidthDp, primaryColor, albumColor, appDark) {
++    return remember(typography, displayMode, settings, screenWidthDp, primaryColor) {
+         val built =
+             when (displayMode) {
+             LyricsDisplayMode.Fullscreen -> {
+@@ -676,7 +641,6 @@ private fun rememberLyricsUIStyle(
+             .withFontFamily(LyricsFontOption.lyricsFamily(settings.lyricsFont))
+             .copy(
+                 fx = settings.toFxSpec(primaryColor),
+-                dynamic = settings.toDynamicSpec(albumColor, appDark),
+                 bgReveal =
+                     if (settings.bgRevealEnabled) {
+                         BgRevealSpec(
+@@ -727,8 +691,6 @@ fun LyricsUI(
+     seekPreviewTimeProvider: () -> Long? = { null },
+     /** Length of the song in ms (0 = unknown). Used for the break line after the last lyric. */
+     songDurationMs: Long = 0L,
+-    /** Dominant colour of the album art, used by the dynamic lyrics colour (null = off). */
+-    albumColor: Color? = null,
+ ) {
+     val sortedLines = remember(lyric) { lyric.sortedBy { it.time } }
+ 
+@@ -751,7 +713,7 @@ fun LyricsUI(
+ 
+     // Long intros and instrumental gaps get a break line (three dots and a countdown).
+     val lyricLines = remember(sortedLines, songDurationMs) { insertInterludes(sortedLines, songDurationMs) }
+-    val style = rememberLyricsUIStyle(displayMode, styleSettings, albumColor)
++    val style = rememberLyricsUIStyle(displayMode, styleSettings)
+     val lazyListState = rememberLazyListState()
+     var isAutoScrolling by remember { mutableStateOf(false) }
+     val isManualScrolling by remember {
+@@ -1292,8 +1254,8 @@ private fun LyricLine(
+     displayOptions: LyricsDisplayOptions,
+     modifier: Modifier = Modifier,
+ ) {
+-    val inactiveTextColor = style.dynamic?.color ?: MaterialTheme.colorScheme.onSurface
+-    val activeTextColor = voiceAccent ?: style.dynamic?.color ?: MaterialTheme.colorScheme.onSurface
++    val inactiveTextColor = MaterialTheme.colorScheme.onSurface
++    val activeTextColor = voiceAccent ?: MaterialTheme.colorScheme.onSurface
+     val horizontalAlignment = if (alignEnd) Alignment.End else Alignment.Start
+     val textAlign = if (alignEnd) TextAlign.End else TextAlign.Start
+     val phoneticBlock: @Composable () -> Unit = {
+@@ -1980,7 +1942,7 @@ private fun WordsLyricLine(
+     displayOptions: LyricsDisplayOptions,
+     modifier: Modifier = Modifier,
+ ) {
+-    val textColor = voiceAccent ?: style.dynamic?.color ?: colorScheme.onSurface
++    val textColor = voiceAccent ?: colorScheme.onSurface
+     val translationColor = textColor.copy(alpha = LyricUIConstants.TRANSLATION_TEXT_ALPHA)
+     val transliterationColor = textColor.copy(alpha = LyricUIConstants.TRANSLITERATION_TEXT_ALPHA)
+     val horizontalAlignment = if (alignEnd) Alignment.End else Alignment.Start
+@@ -2131,10 +2093,8 @@ private fun WordsLyricLine(
+                 currentTimeState = currentTimeState,
+                 textStyle = style.wordsTextStyle,
+                 color = textColor,
+-                sungAlpha = LyricUIConstants.WORD_SUNG_ALPHA * (style.dynamic?.opacity ?: 1f),
+-                unsungAlpha =
+-                    (LyricUIConstants.INACTIVE_LINE_ALPHA * style.unsungFactor).coerceIn(0f, 1f) *
+-                        (style.dynamic?.opacity ?: 1f),
++                sungAlpha = LyricUIConstants.WORD_SUNG_ALPHA,
++                unsungAlpha = (LyricUIConstants.INACTIVE_LINE_ALPHA * style.unsungFactor).coerceIn(0f, 1f),
+                 maskRegistry = maskRegistry,
+                 textMeasurer = textMeasurer,
+                 modifier = Modifier.fillMaxWidth(),
+diff --git a/app/src/main/java/me/spica27/spicamusic/ui/widget/LyricsSettingsSheet.kt b/app/src/main/java/me/spica27/spicamusic/ui/widget/LyricsSettingsSheet.kt
+index 4efbb30..6a7faa9 100644
+--- a/app/src/main/java/me/spica27/spicamusic/ui/widget/LyricsSettingsSheet.kt
++++ b/app/src/main/java/me/spica27/spicamusic/ui/widget/LyricsSettingsSheet.kt
+@@ -431,6 +431,12 @@ private fun DynamicColorSection(
+         onCheckedChange = { v -> onUpdate { it.copy(dynamicLyricsEnabled = v) } },
+     )
+     if (settings.dynamicLyricsEnabled) {
++        LyricsSettingsToggle(
++            label = stringResource(R.string.lyr_set_dyn_bg),
++            description = stringResource(R.string.lyr_set_dyn_bg_desc),
++            checked = settings.dynamicBackgroundEnabled,
++            onCheckedChange = { v -> onUpdate { it.copy(dynamicBackgroundEnabled = v) } },
++        )
+         LyricsSettingsChips(
+             label = stringResource(R.string.lyr_set_dyn_mode),
+             description = stringResource(R.string.lyr_set_dyn_mode_desc),
+diff --git a/app/src/main/res/values-zh-rTW/strings.xml b/app/src/main/res/values-zh-rTW/strings.xml
+index 0a92e24..8f04b95 100644
+--- a/app/src/main/res/values-zh-rTW/strings.xml
++++ b/app/src/main/res/values-zh-rTW/strings.xml
+@@ -1012,9 +1012,9 @@
+   <string name="lyr_set_fx_light_desc">已唱歌詞周圍的柔光和前沿的亮點，與進度條一致</string>
+   <string name="lyr_set_fx_intensity">光效強度</string>
+   <string name="lyr_set_fx_intensity_desc">柔光和亮點的強度</string>
+-  <string name="lyr_set_section_dyn">動態歌詞顏色</string>
+-  <string name="lyr_set_dyn">動態歌詞顏色</string>
+-  <string name="lyr_set_dyn_desc">歌詞顏色取自專輯封面</string>
++  <string name="lyr_set_section_dyn">播放器介面配色</string>
++  <string name="lyr_set_dyn">播放器介面配色</string>
++  <string name="lyr_set_dyn_desc">播放器顏色跟隨專輯封面</string>
+   <string name="lyr_set_dyn_mode">顏色模式</string>
+   <string name="lyr_set_dyn_mode_desc">自動跟隨應用主題</string>
+   <string name="lyr_set_dyn_opacity">顏色不透明度</string>
+@@ -1023,4 +1023,6 @@
+   <string name="lyr_set_dyn_saturation_desc">封面顏色的鮮豔程度</string>
+   <string name="lyr_set_dyn_contrast">顏色對比度</string>
+   <string name="lyr_set_dyn_contrast_desc">深色下更亮，淺色下更暗</string>
++  <string name="lyr_set_dyn_bg">背景著色</string>
++  <string name="lyr_set_dyn_bg_desc">同時用封面顏色為背景著色</string>
+ </resources>
+diff --git a/app/src/main/res/values-zh/strings.xml b/app/src/main/res/values-zh/strings.xml
+index 4a97bf4..771cc1b 100644
+--- a/app/src/main/res/values-zh/strings.xml
++++ b/app/src/main/res/values-zh/strings.xml
+@@ -1013,9 +1013,9 @@
+   <string name="lyr_set_fx_light_desc">已唱歌词周围的柔光和前沿的亮点，与进度条一致</string>
+   <string name="lyr_set_fx_intensity">光效强度</string>
+   <string name="lyr_set_fx_intensity_desc">柔光和亮点的强度</string>
+-  <string name="lyr_set_section_dyn">动态歌词颜色</string>
+-  <string name="lyr_set_dyn">动态歌词颜色</string>
+-  <string name="lyr_set_dyn_desc">歌词颜色取自专辑封面</string>
++  <string name="lyr_set_section_dyn">播放器界面配色</string>
++  <string name="lyr_set_dyn">播放器界面配色</string>
++  <string name="lyr_set_dyn_desc">播放器颜色跟随专辑封面</string>
+   <string name="lyr_set_dyn_mode">颜色模式</string>
+   <string name="lyr_set_dyn_mode_desc">自动跟随应用主题</string>
+   <string name="lyr_set_dyn_opacity">颜色不透明度</string>
+@@ -1024,4 +1024,6 @@
+   <string name="lyr_set_dyn_saturation_desc">封面颜色的鲜艳程度</string>
+   <string name="lyr_set_dyn_contrast">颜色对比度</string>
+   <string name="lyr_set_dyn_contrast_desc">深色下更亮，浅色下更暗</string>
++  <string name="lyr_set_dyn_bg">背景着色</string>
++  <string name="lyr_set_dyn_bg_desc">同时用封面颜色给背景着色</string>
+ </resources>
+diff --git a/app/src/main/res/values/strings.xml b/app/src/main/res/values/strings.xml
+index 9a36146..07220e4 100644
+--- a/app/src/main/res/values/strings.xml
++++ b/app/src/main/res/values/strings.xml
+@@ -1013,9 +1013,9 @@
+   <string name="lyr_set_fx_light_desc">A soft glow around the sung words and a bright spark at the front, like the progress bar</string>
+   <string name="lyr_set_fx_intensity">Light intensity</string>
+   <string name="lyr_set_fx_intensity_desc">How strong the glow and the spark are</string>
+-  <string name="lyr_set_section_dyn">Dynamic lyrics color</string>
+-  <string name="lyr_set_dyn">Dynamic lyrics color</string>
+-  <string name="lyr_set_dyn_desc">Lyrics colour is taken from the album art</string>
++  <string name="lyr_set_section_dyn">Color player UI</string>
++  <string name="lyr_set_dyn">Color player UI</string>
++  <string name="lyr_set_dyn_desc">Player colours follow the album art</string>
+   <string name="lyr_set_dyn_mode">Colour mode</string>
+   <string name="lyr_set_dyn_mode_desc">Auto follows the app theme</string>
+   <string name="lyr_set_dyn_opacity">Color opacity</string>
+@@ -1024,4 +1024,6 @@
+   <string name="lyr_set_dyn_saturation_desc">How vivid the album colour is</string>
+   <string name="lyr_set_dyn_contrast">Color contrast</string>
+   <string name="lyr_set_dyn_contrast_desc">Lighter on dark, darker on light</string>
++  <string name="lyr_set_dyn_bg">Color background</string>
++  <string name="lyr_set_dyn_bg_desc">Also tint the background with the album colour</string>
+ </resources>
+diff --git a/core-preferences/src/main/java/me/spica27/spicamusic/core/preferences/LyricsStyleSettings.kt b/core-preferences/src/main/java/me/spica27/spicamusic/core/preferences/LyricsStyleSettings.kt
+index b42a633..692de9f 100644
+--- a/core-preferences/src/main/java/me/spica27/spicamusic/core/preferences/LyricsStyleSettings.kt
++++ b/core-preferences/src/main/java/me/spica27/spicamusic/core/preferences/LyricsStyleSettings.kt
+@@ -83,8 +83,11 @@ data class LyricsStyleSettings(
+     val lyricsLightEnabled: Boolean = false,
+     /** Strength of the light effects in percent. */
+     val lyricsLightIntensity: Int = 70,
+-    // ---- Dynamic lyrics colour (from the album art; off = the theme text colour) ----
++    // ---- Color player UI (player colours from the album art; off = the theme colours) ----
++    /** Colour the player UI (text, icons, buttons, lyrics) from the album art. */
+     val dynamicLyricsEnabled: Boolean = false,
++    /** Also tint the player background with the album colour (needs [dynamicLyricsEnabled]). */
++    val dynamicBackgroundEnabled: Boolean = false,
+     /** "auto" follows the app theme, "dark" or "light" forces the tone. */
+     val dynamicLyricsMode: String = "auto",
+     /** Opacity of the lyrics colour in percent. */
+diff --git a/core-preferences/src/main/java/me/spica27/spicamusic/core/preferences/PreferencesManager.kt b/core-preferences/src/main/java/me/spica27/spicamusic/core/preferences/PreferencesManager.kt
+index 8e8448e..3ca54de 100644
+--- a/core-preferences/src/main/java/me/spica27/spicamusic/core/preferences/PreferencesManager.kt
++++ b/core-preferences/src/main/java/me/spica27/spicamusic/core/preferences/PreferencesManager.kt
+@@ -85,6 +85,7 @@ class PreferencesManager(
+         val LYRIC_LIGHT_ENABLED = booleanPreferencesKey("lyric_light_enabled")
+         val LYRIC_LIGHT_INTENSITY = intPreferencesKey("lyric_light_intensity")
+         val LYRIC_DYNAMIC_ENABLED = booleanPreferencesKey("lyric_dynamic_enabled")
++        val LYRIC_DYNAMIC_BACKGROUND = booleanPreferencesKey("lyric_dynamic_background")
+         val LYRIC_DYNAMIC_MODE = stringPreferencesKey("lyric_dynamic_mode")
+         val LYRIC_DYNAMIC_OPACITY = intPreferencesKey("lyric_dynamic_opacity")
+         val LYRIC_DYNAMIC_SATURATION = intPreferencesKey("lyric_dynamic_saturation")
+@@ -175,6 +176,7 @@ class PreferencesManager(
+                     lyricsLightEnabled = p[Keys.LYRIC_LIGHT_ENABLED] ?: d.lyricsLightEnabled,
+                     lyricsLightIntensity = p[Keys.LYRIC_LIGHT_INTENSITY] ?: d.lyricsLightIntensity,
+                     dynamicLyricsEnabled = p[Keys.LYRIC_DYNAMIC_ENABLED] ?: d.dynamicLyricsEnabled,
++                    dynamicBackgroundEnabled = p[Keys.LYRIC_DYNAMIC_BACKGROUND] ?: d.dynamicBackgroundEnabled,
+                     dynamicLyricsMode = p[Keys.LYRIC_DYNAMIC_MODE] ?: d.dynamicLyricsMode,
+                     dynamicLyricsOpacity = p[Keys.LYRIC_DYNAMIC_OPACITY] ?: d.dynamicLyricsOpacity,
+                     dynamicLyricsSaturation = p[Keys.LYRIC_DYNAMIC_SATURATION] ?: d.dynamicLyricsSaturation,
+@@ -265,6 +267,7 @@ class PreferencesManager(
+                     lyricsLightEnabled = p[Keys.LYRIC_LIGHT_ENABLED] ?: d.lyricsLightEnabled,
+                     lyricsLightIntensity = p[Keys.LYRIC_LIGHT_INTENSITY] ?: d.lyricsLightIntensity,
+                     dynamicLyricsEnabled = p[Keys.LYRIC_DYNAMIC_ENABLED] ?: d.dynamicLyricsEnabled,
++                    dynamicBackgroundEnabled = p[Keys.LYRIC_DYNAMIC_BACKGROUND] ?: d.dynamicBackgroundEnabled,
+                     dynamicLyricsMode = p[Keys.LYRIC_DYNAMIC_MODE] ?: d.dynamicLyricsMode,
+                     dynamicLyricsOpacity = p[Keys.LYRIC_DYNAMIC_OPACITY] ?: d.dynamicLyricsOpacity,
+                     dynamicLyricsSaturation = p[Keys.LYRIC_DYNAMIC_SATURATION] ?: d.dynamicLyricsSaturation,
+@@ -346,6 +349,7 @@ class PreferencesManager(
+             p[Keys.LYRIC_LIGHT_ENABLED] = n.lyricsLightEnabled
+             p[Keys.LYRIC_LIGHT_INTENSITY] = n.lyricsLightIntensity
+             p[Keys.LYRIC_DYNAMIC_ENABLED] = n.dynamicLyricsEnabled
++            p[Keys.LYRIC_DYNAMIC_BACKGROUND] = n.dynamicBackgroundEnabled
+             p[Keys.LYRIC_DYNAMIC_MODE] = n.dynamicLyricsMode
+             p[Keys.LYRIC_DYNAMIC_OPACITY] = n.dynamicLyricsOpacity
+             p[Keys.LYRIC_DYNAMIC_SATURATION] = n.dynamicLyricsSaturation
