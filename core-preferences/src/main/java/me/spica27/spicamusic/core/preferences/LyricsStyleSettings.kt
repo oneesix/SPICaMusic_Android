@@ -164,6 +164,8 @@ data class LyricsStyleSettings(
     val bgRevealBlurEnabled: Boolean = true,
     /** Blur radius in dp. */
     val bgRevealBlurAmount: Int = 8,
+    /** Keeps lines and the current line steady on their anchor while a background vocal expands or collapses. */
+    val fixAnchorEnabled: Boolean = true,
 ) {
     /** Returns a copy with every value forced into its allowed range. */
     fun sanitized(): LyricsStyleSettings =

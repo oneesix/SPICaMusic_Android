@@ -799,6 +799,29 @@ fun LyricsUI(
                     JiggleSpec(styleSettings.jiggleStrength, styleSettings.jiggleDurationMs, density.density)
                 }
             val keepAliveZonePx = with(density) { keepAliveZone.toPx() }
+            // Biggest per-frame shift that still counts as a line growing or shrinking (not a line change).
+            val revealFollowPx = with(density) { 24.dp.roundToPx() }
+
+            // The background vocal reveal changes line heights; keep the current line on its anchor meanwhile.
+            if (styleSettings.bgRevealEnabled && styleSettings.fixAnchorEnabled) {
+                LaunchedEffect(lazyListState, lyricLines, playbackAnchorOffsetPx, keepAliveZonePx) {
+                    val anchorPx = (playbackAnchorOffsetPx + keepAliveZonePx).roundToInt()
+                    snapshotFlow {
+                        val index = playingIndex
+                        lazyListState.layoutInfo.visibleItemsInfo.firstOrNull { it.index == index }?.offset
+                    }.collect { offset ->
+                        if (offset == null || !hasSyncedInitialPosition || isAutoScrolling ||
+                            showSeekOverlay || isBarSeeking || lazyListState.isScrollInProgress
+                        ) {
+                            return@collect
+                        }
+                        val distance = lazyListState.distanceToAnchor(offset, anchorPx)
+                        if (abs(distance) >= 0.5f && abs(distance) <= revealFollowPx) {
+                            lazyListState.scrollBy(distance)
+                        }
+                    }
+                }
+            }
 
             LaunchedEffect(playingIndex, showSeekOverlay, isBarSeeking, lyricLines) {
                 val target = playingIndex
@@ -946,6 +969,8 @@ fun LyricsUI(
                             jiggle = if (jiggleLine) jiggleSpec else null,
                             // No fly-in from the bottom: the page slide is the only opening animation.
                             initialOffsetY = 0,
+                            // Background vocal reveal: lines follow a growing or shrinking line at once.
+                            followThresholdPx = if (styleSettings.bgRevealEnabled && styleSettings.fixAnchorEnabled) revealFollowPx else 0,
                         ).then(sungMoveModifier)
 
                     if (line.isInterlude()) {

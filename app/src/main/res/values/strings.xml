@@ -922,6 +922,8 @@
   <string name="lyr_set_bg_reveal_blur_desc">Background vocals start blurred and sharpen as they expand, and blur again as they collapse</string>
   <string name="lyr_set_bg_reveal_blur_amount">Blur amount</string>
   <string name="lyr_set_bg_reveal_blur_amount_desc">Blur radius while revealing</string>
+  <string name="lyr_set_fix_anchor">Fix anchor</string>
+  <string name="lyr_set_fix_anchor_desc">Keeps the current line and the lines below steady while a background vocal expands or collapses (needs Background vocal reveal)</string>
   <string name="lyr_set_section_progress">Lyrics progress</string>
   <string name="lyr_set_word_lift">Custom text lift</string>
   <string name="lyr_set_word_lift_desc">Off keeps the default lift</string>

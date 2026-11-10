@@ -99,9 +99,15 @@ private class LinePlacementModifierNode(
     var delayMillis: Int,
     var jiggle: JiggleSpec?,
     var initialOffsetY: Int,
+    /** Position changes up to this many px in one frame are followed 1:1 (a line growing or shrinking), not glided. 0 = off. */
+    var followThresholdPx: Int,
 ) : Modifier.Node(),
     ApproachLayoutModifierNode {
     private var offsetAnimation = DeferredTargetAnimation(IntOffset.VectorConverter)
+
+    /** Small shifts (e.g. a background vocal expanding above this line) that are applied at once, not glided. */
+    private var followOffset = IntOffset.Zero
+    private var rawLastTarget: IntOffset? = null
     private var isFirstFrame = true
 
     /** Progress 0..1 of the jiggle wobble of the current move. */
@@ -184,8 +190,23 @@ private class LinePlacementModifierNode(
             }
     }
 
+    /**
+     * A line that grows or shrinks (the background vocal reveal) moves the lines below it a little every frame.
+     * Those small shifts are followed at once; only real jumps (a new current line) glide, so the glide is never
+     * restarted every frame and the jiggle does not fire for them.
+     */
+    private fun updatePlacementTarget(rawTarget: IntOffset): IntOffset {
+        val previous = rawLastTarget
+        rawLastTarget = rawTarget
+        if (followThresholdPx > 0 && previous != null && previous != rawTarget) {
+            val delta = rawTarget - previous
+            if (delta.x == 0 && abs(delta.y) <= followThresholdPx) followOffset += delta
+        }
+        return animateToTarget(rawTarget - followOffset) + followOffset
+    }
+
     /** 首次组合的底部歌词先下移，再补间到目标位置。 */
-    private fun updatePlacementTarget(target: IntOffset): IntOffset {
+    private fun animateToTarget(target: IntOffset): IntOffset {
         noteTargetChange(target)
         if (isFirstFrame) {
             isFirstFrame = false
@@ -214,7 +235,9 @@ private class LinePlacementModifierNode(
         newDelayMillis: Int,
         newJiggle: JiggleSpec?,
         newInitialOffsetY: Int,
+        newFollowThresholdPx: Int,
     ) {
+        followThresholdPx = newFollowThresholdPx
         lookaheadScope = newScope
         isManualScrolling = newIsManualScrolling
         durationMillis = newDurationMillis
@@ -231,6 +254,8 @@ private class LinePlacementModifierNode(
         offsetAnimation = DeferredTargetAnimation(IntOffset.VectorConverter)
         isFirstFrame = true
         lastTarget = null
+        followOffset = IntOffset.Zero
+        rawLastTarget = null
         wobbleJob?.cancel()
     }
 }
@@ -243,6 +268,7 @@ private data class LinePlacementNodeElement(
     val delayMillis: Int,
     val jiggle: JiggleSpec?,
     val initialOffsetY: Int,
+    val followThresholdPx: Int,
 ) : ModifierNodeElement<LinePlacementModifierNode>() {
     override fun update(node: LinePlacementModifierNode) {
         node.updateState(
@@ -253,6 +279,7 @@ private data class LinePlacementNodeElement(
             delayMillis,
             jiggle,
             initialOffsetY,
+            followThresholdPx,
         )
     }
 
@@ -265,6 +292,7 @@ private data class LinePlacementNodeElement(
             delayMillis,
             jiggle,
             initialOffsetY,
+            followThresholdPx,
         )
 }
 
@@ -277,6 +305,7 @@ internal fun Modifier.linePlacement(
     delayMillis: Int,
     jiggle: JiggleSpec? = null,
     initialOffsetY: Int = 0,
+    followThresholdPx: Int = 0,
 ): Modifier =
     then(
         LinePlacementNodeElement(
@@ -287,5 +316,6 @@ internal fun Modifier.linePlacement(
             delayMillis = delayMillis,
             jiggle = jiggle,
             initialOffsetY = initialOffsetY,
+            followThresholdPx = followThresholdPx,
         ),
     )

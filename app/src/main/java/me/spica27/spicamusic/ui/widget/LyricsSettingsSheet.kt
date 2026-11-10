@@ -461,6 +461,12 @@ private fun LineAnimationSection(
             )
         }
     }
+    LyricsSettingsToggle(
+        label = stringResource(R.string.lyr_set_fix_anchor),
+        description = stringResource(R.string.lyr_set_fix_anchor_desc),
+        checked = settings.fixAnchorEnabled,
+        onCheckedChange = { v -> onUpdate { it.copy(fixAnchorEnabled = v) } },
+    )
 }
 
 @Composable

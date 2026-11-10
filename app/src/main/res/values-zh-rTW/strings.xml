@@ -921,6 +921,8 @@
   <string name="lyr_set_bg_reveal_blur_desc">伴唱以模糊狀態出現，展開時逐漸清晰，收起時再次模糊</string>
   <string name="lyr_set_bg_reveal_blur_amount">模糊程度</string>
   <string name="lyr_set_bg_reveal_blur_amount_desc">展開時的模糊半徑</string>
+  <string name="lyr_set_fix_anchor">修正錨點</string>
+  <string name="lyr_set_fix_anchor_desc">伴唱展開或收起時，保持目前行和下方歌詞穩定（需開啟伴唱展開）</string>
   <string name="lyr_set_section_progress">歌詞進度</string>
   <string name="lyr_set_word_lift">自訂文字上抬</string>
   <string name="lyr_set_word_lift_desc">關閉則使用預設上抬幅度</string>

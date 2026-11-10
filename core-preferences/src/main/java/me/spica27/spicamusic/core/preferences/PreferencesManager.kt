@@ -89,6 +89,7 @@ class PreferencesManager(
         val LYRIC_BG_REVEAL_DURATION_MS = intPreferencesKey("lyric_bg_reveal_duration_ms")
         val LYRIC_BG_REVEAL_BLUR = booleanPreferencesKey("lyric_bg_reveal_blur")
         val LYRIC_BG_REVEAL_BLUR_AMOUNT = intPreferencesKey("lyric_bg_reveal_blur_amount")
+        val LYRIC_FIX_ANCHOR = booleanPreferencesKey("lyric_fix_anchor")
         val LYRIC_WORD_LIFT_ENABLED = booleanPreferencesKey("lyric_word_lift_enabled")
         val LYRIC_WORD_LIFT = intPreferencesKey("lyric_word_lift")
         val LYRIC_MERGE_WORDS = booleanPreferencesKey("lyric_merge_words")
@@ -170,6 +171,7 @@ class PreferencesManager(
                     bgRevealDurationMs = p[Keys.LYRIC_BG_REVEAL_DURATION_MS] ?: d.bgRevealDurationMs,
                     bgRevealBlurEnabled = p[Keys.LYRIC_BG_REVEAL_BLUR] ?: d.bgRevealBlurEnabled,
                     bgRevealBlurAmount = p[Keys.LYRIC_BG_REVEAL_BLUR_AMOUNT] ?: d.bgRevealBlurAmount,
+                    fixAnchorEnabled = p[Keys.LYRIC_FIX_ANCHOR] ?: d.fixAnchorEnabled,
                     wordLiftEnabled = p[Keys.LYRIC_WORD_LIFT_ENABLED] ?: d.wordLiftEnabled,
                     wordLift = p[Keys.LYRIC_WORD_LIFT] ?: d.wordLift,
                     mergeWords = p[Keys.LYRIC_MERGE_WORDS] ?: d.mergeWords,
@@ -251,6 +253,7 @@ class PreferencesManager(
                     bgRevealDurationMs = p[Keys.LYRIC_BG_REVEAL_DURATION_MS] ?: d.bgRevealDurationMs,
                     bgRevealBlurEnabled = p[Keys.LYRIC_BG_REVEAL_BLUR] ?: d.bgRevealBlurEnabled,
                     bgRevealBlurAmount = p[Keys.LYRIC_BG_REVEAL_BLUR_AMOUNT] ?: d.bgRevealBlurAmount,
+                    fixAnchorEnabled = p[Keys.LYRIC_FIX_ANCHOR] ?: d.fixAnchorEnabled,
                     wordLiftEnabled = p[Keys.LYRIC_WORD_LIFT_ENABLED] ?: d.wordLiftEnabled,
                     wordLift = p[Keys.LYRIC_WORD_LIFT] ?: d.wordLift,
                     mergeWords = p[Keys.LYRIC_MERGE_WORDS] ?: d.mergeWords,
@@ -323,6 +326,7 @@ class PreferencesManager(
             p[Keys.LYRIC_BG_REVEAL_DURATION_MS] = n.bgRevealDurationMs
             p[Keys.LYRIC_BG_REVEAL_BLUR] = n.bgRevealBlurEnabled
             p[Keys.LYRIC_BG_REVEAL_BLUR_AMOUNT] = n.bgRevealBlurAmount
+            p[Keys.LYRIC_FIX_ANCHOR] = n.fixAnchorEnabled
             p[Keys.LYRIC_WORD_LIFT_ENABLED] = n.wordLiftEnabled
             p[Keys.LYRIC_WORD_LIFT] = n.wordLift
             p[Keys.LYRIC_MERGE_WORDS] = n.mergeWords
