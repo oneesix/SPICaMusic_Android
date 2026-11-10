@@ -1005,4 +1005,11 @@
   <string name="lyr_set_jiggle_duration_desc">每一行穩定下來所需的時間</string>
   <string name="lyr_set_jiggle_delay">行間延遲</string>
   <string name="lyr_set_jiggle_delay_desc">每一行在上一行之後等待的時間</string>
+  <string name="lyr_set_section_fx">漸變與光效</string>
+  <string name="lyr_set_gradient">漸變歌詞顏色</string>
+  <string name="lyr_set_gradient_desc">已唱歌詞使用與頂部進度條相同的漸變色</string>
+  <string name="lyr_set_fx_light">光效</string>
+  <string name="lyr_set_fx_light_desc">已唱歌詞周圍的柔光和前沿的亮點，與進度條一致</string>
+  <string name="lyr_set_fx_intensity">光效強度</string>
+  <string name="lyr_set_fx_intensity_desc">柔光和亮點的強度</string>
 </resources>

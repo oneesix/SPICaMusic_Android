@@ -81,6 +81,9 @@ class PreferencesManager(
         val LYRIC_LIGHT_SWEEP_EASE = booleanPreferencesKey("lyric_light_sweep_ease")
         val LYRIC_LIGHT_SWEEP_FLASH = booleanPreferencesKey("lyric_light_sweep_flash")
         val LYRIC_LIGHT_SWEEP_SOFTNESS = intPreferencesKey("lyric_light_sweep_softness")
+        val LYRIC_GRADIENT_ENABLED = booleanPreferencesKey("lyric_gradient_enabled")
+        val LYRIC_LIGHT_ENABLED = booleanPreferencesKey("lyric_light_enabled")
+        val LYRIC_LIGHT_INTENSITY = intPreferencesKey("lyric_light_intensity")
         val LYRIC_LINE_MOVE = booleanPreferencesKey("lyric_line_move")
         val LYRIC_LINE_MOVE_MS = intPreferencesKey("lyric_line_move_ms")
         val LYRIC_BG_REVEAL = booleanPreferencesKey("lyric_bg_reveal")
@@ -163,6 +166,9 @@ class PreferencesManager(
                     lightSweepEase = p[Keys.LYRIC_LIGHT_SWEEP_EASE] ?: d.lightSweepEase,
                     lightSweepFlash = p[Keys.LYRIC_LIGHT_SWEEP_FLASH] ?: d.lightSweepFlash,
                     lightSweepSoftness = p[Keys.LYRIC_LIGHT_SWEEP_SOFTNESS] ?: d.lightSweepSoftness,
+                    gradientLyricsEnabled = p[Keys.LYRIC_GRADIENT_ENABLED] ?: d.gradientLyricsEnabled,
+                    lyricsLightEnabled = p[Keys.LYRIC_LIGHT_ENABLED] ?: d.lyricsLightEnabled,
+                    lyricsLightIntensity = p[Keys.LYRIC_LIGHT_INTENSITY] ?: d.lyricsLightIntensity,
                     lineMoveEnabled = p[Keys.LYRIC_LINE_MOVE] ?: d.lineMoveEnabled,
                     lineMoveMs = p[Keys.LYRIC_LINE_MOVE_MS] ?: d.lineMoveMs,
                     bgRevealEnabled = p[Keys.LYRIC_BG_REVEAL] ?: d.bgRevealEnabled,
@@ -245,6 +251,9 @@ class PreferencesManager(
                     lightSweepEase = p[Keys.LYRIC_LIGHT_SWEEP_EASE] ?: d.lightSweepEase,
                     lightSweepFlash = p[Keys.LYRIC_LIGHT_SWEEP_FLASH] ?: d.lightSweepFlash,
                     lightSweepSoftness = p[Keys.LYRIC_LIGHT_SWEEP_SOFTNESS] ?: d.lightSweepSoftness,
+                    gradientLyricsEnabled = p[Keys.LYRIC_GRADIENT_ENABLED] ?: d.gradientLyricsEnabled,
+                    lyricsLightEnabled = p[Keys.LYRIC_LIGHT_ENABLED] ?: d.lyricsLightEnabled,
+                    lyricsLightIntensity = p[Keys.LYRIC_LIGHT_INTENSITY] ?: d.lyricsLightIntensity,
                     lineMoveEnabled = p[Keys.LYRIC_LINE_MOVE] ?: d.lineMoveEnabled,
                     lineMoveMs = p[Keys.LYRIC_LINE_MOVE_MS] ?: d.lineMoveMs,
                     bgRevealEnabled = p[Keys.LYRIC_BG_REVEAL] ?: d.bgRevealEnabled,
@@ -318,6 +327,9 @@ class PreferencesManager(
             p[Keys.LYRIC_LIGHT_SWEEP_EASE] = n.lightSweepEase
             p[Keys.LYRIC_LIGHT_SWEEP_FLASH] = n.lightSweepFlash
             p[Keys.LYRIC_LIGHT_SWEEP_SOFTNESS] = n.lightSweepSoftness
+            p[Keys.LYRIC_GRADIENT_ENABLED] = n.gradientLyricsEnabled
+            p[Keys.LYRIC_LIGHT_ENABLED] = n.lyricsLightEnabled
+            p[Keys.LYRIC_LIGHT_INTENSITY] = n.lyricsLightIntensity
             p[Keys.LYRIC_LINE_MOVE] = n.lineMoveEnabled
             p[Keys.LYRIC_LINE_MOVE_MS] = n.lineMoveMs
             p[Keys.LYRIC_BG_REVEAL] = n.bgRevealEnabled

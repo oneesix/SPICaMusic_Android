@@ -1006,4 +1006,11 @@
   <string name="lyr_set_jiggle_duration_desc">How long each line takes to settle</string>
   <string name="lyr_set_jiggle_delay">Delay between lines</string>
   <string name="lyr_set_jiggle_delay_desc">How long each line waits after the one above it</string>
+  <string name="lyr_set_section_fx">Gradient and light</string>
+  <string name="lyr_set_gradient">Gradient lyrics color</string>
+  <string name="lyr_set_gradient_desc">Sung lyrics use the same colour gradient as the top progress bar</string>
+  <string name="lyr_set_fx_light">Light effects</string>
+  <string name="lyr_set_fx_light_desc">A soft glow around the sung words and a bright spark at the front, like the progress bar</string>
+  <string name="lyr_set_fx_intensity">Light intensity</string>
+  <string name="lyr_set_fx_intensity_desc">How strong the glow and the spark are</string>
 </resources>

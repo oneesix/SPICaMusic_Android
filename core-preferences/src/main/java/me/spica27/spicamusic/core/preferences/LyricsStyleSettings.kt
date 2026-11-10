@@ -76,6 +76,13 @@ data class LyricsStyleSettings(
     val lightSweepFlash: Boolean = true,
     /** Width of the soft edge of the light, in percent (100 = normal). */
     val lightSweepSoftness: Int = 100,
+    // ---- Lyrics gradient and light effects (off = the original look) ----
+    /** Sung lyrics use the same colour gradient as the top progress bar. */
+    val gradientLyricsEnabled: Boolean = false,
+    /** Glow around the sung word and a bright spark at the front, like the progress bar head. */
+    val lyricsLightEnabled: Boolean = false,
+    /** Strength of the light effects in percent. */
+    val lyricsLightIntensity: Int = 70,
     // ---- Lyrics progress (all off = the original behaviour) ----
     val wordLiftEnabled: Boolean = false,
     /** Custom word lift in tenths of dp (15 = 1.5 dp), used when [wordLiftEnabled]. */
@@ -186,6 +193,7 @@ data class LyricsStyleSettings(
             stretchDelayMs = stretchDelayMs.coerceIn(STRETCH_DELAY_RANGE),
             stretchDurationMs = stretchDurationMs.coerceIn(STRETCH_DURATION_RANGE),
             lightSweepSoftness = lightSweepSoftness.coerceIn(LIGHT_SWEEP_SOFTNESS_RANGE),
+            lyricsLightIntensity = lyricsLightIntensity.coerceIn(LYRICS_LIGHT_RANGE),
             wordLift = wordLift.coerceIn(WORD_LIFT_RANGE),
             heldWordMinMs = heldWordMinMs.coerceIn(HELD_WORD_MIN_RANGE),
             holdScrollLines = holdScrollLines.coerceIn(HOLD_SCROLL_RANGE),
@@ -230,6 +238,7 @@ data class LyricsStyleSettings(
         val STRETCH_DELAY_RANGE = 0..150
         val STRETCH_DURATION_RANGE = 0..2500
         val LIGHT_SWEEP_SOFTNESS_RANGE = 50..200
+        val LYRICS_LIGHT_RANGE = 0..100
         val WORD_LIFT_RANGE = 0..80
         val HELD_WORD_MIN_RANGE = 0..3000
         val HOLD_SCROLL_RANGE = 1..3

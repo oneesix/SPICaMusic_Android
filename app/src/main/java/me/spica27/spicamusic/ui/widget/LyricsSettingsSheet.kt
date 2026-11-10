@@ -52,6 +52,7 @@ fun LyricsSettingsSheet(
                 JiggleSection(settings = settings, onUpdate = onUpdate)
             }
             LightSweepSection(settings = settings, onUpdate = onUpdate)
+            GradientLightSection(settings = settings, onUpdate = onUpdate)
             LyricsProgressSection(settings = settings, onUpdate = onUpdate)
             LineAnimationSection(settings = settings, onUpdate = onUpdate)
             EnhanceHeaderSection(settings = settings, onUpdate = onUpdate)
@@ -379,6 +380,38 @@ private fun LightSweepSection(
             step = 5,
             valueText = { "$it%" },
             onValueChange = { v -> onUpdate { it.copy(lightSweepSoftness = v) } },
+        )
+    }
+}
+
+@Composable
+private fun GradientLightSection(
+    settings: LyricsStyleSettings,
+    onUpdate: ((LyricsStyleSettings) -> LyricsStyleSettings) -> Unit,
+) {
+    LyricsSettingsSection(stringResource(R.string.lyr_set_section_fx))
+
+    LyricsSettingsToggle(
+        label = stringResource(R.string.lyr_set_gradient),
+        description = stringResource(R.string.lyr_set_gradient_desc),
+        checked = settings.gradientLyricsEnabled,
+        onCheckedChange = { v -> onUpdate { it.copy(gradientLyricsEnabled = v) } },
+    )
+    LyricsSettingsToggle(
+        label = stringResource(R.string.lyr_set_fx_light),
+        description = stringResource(R.string.lyr_set_fx_light_desc),
+        checked = settings.lyricsLightEnabled,
+        onCheckedChange = { v -> onUpdate { it.copy(lyricsLightEnabled = v) } },
+    )
+    if (settings.lyricsLightEnabled) {
+        LyricsSettingsSlider(
+            label = stringResource(R.string.lyr_set_fx_intensity),
+            description = stringResource(R.string.lyr_set_fx_intensity_desc),
+            value = settings.lyricsLightIntensity,
+            range = LyricsStyleSettings.LYRICS_LIGHT_RANGE,
+            step = 5,
+            valueText = { "$it%" },
+            onValueChange = { v -> onUpdate { it.copy(lyricsLightIntensity = v) } },
         )
     }
 }
