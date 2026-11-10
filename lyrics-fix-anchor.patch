@@ -1,0 +1,251 @@
+diff --git a/app/src/main/java/me/spica27/spicamusic/ui/widget/LyricUI.kt b/app/src/main/java/me/spica27/spicamusic/ui/widget/LyricUI.kt
+index a2e06ee..5584868 100644
+--- a/app/src/main/java/me/spica27/spicamusic/ui/widget/LyricUI.kt
++++ b/app/src/main/java/me/spica27/spicamusic/ui/widget/LyricUI.kt
+@@ -799,6 +799,29 @@ fun LyricsUI(
+                     JiggleSpec(styleSettings.jiggleStrength, styleSettings.jiggleDurationMs, density.density)
+                 }
+             val keepAliveZonePx = with(density) { keepAliveZone.toPx() }
++            // Biggest per-frame shift that still counts as a line growing or shrinking (not a line change).
++            val revealFollowPx = with(density) { 24.dp.roundToPx() }
++
++            // The background vocal reveal changes line heights; keep the current line on its anchor meanwhile.
++            if (styleSettings.bgRevealEnabled && styleSettings.fixAnchorEnabled) {
++                LaunchedEffect(lazyListState, lyricLines, playbackAnchorOffsetPx, keepAliveZonePx) {
++                    val anchorPx = (playbackAnchorOffsetPx + keepAliveZonePx).roundToInt()
++                    snapshotFlow {
++                        val index = playingIndex
++                        lazyListState.layoutInfo.visibleItemsInfo.firstOrNull { it.index == index }?.offset
++                    }.collect { offset ->
++                        if (offset == null || !hasSyncedInitialPosition || isAutoScrolling ||
++                            showSeekOverlay || isBarSeeking || lazyListState.isScrollInProgress
++                        ) {
++                            return@collect
++                        }
++                        val distance = lazyListState.distanceToAnchor(offset, anchorPx)
++                        if (abs(distance) >= 0.5f && abs(distance) <= revealFollowPx) {
++                            lazyListState.scrollBy(distance)
++                        }
++                    }
++                }
++            }
+ 
+             LaunchedEffect(playingIndex, showSeekOverlay, isBarSeeking, lyricLines) {
+                 val target = playingIndex
+@@ -946,6 +969,8 @@ fun LyricsUI(
+                             jiggle = if (jiggleLine) jiggleSpec else null,
+                             // No fly-in from the bottom: the page slide is the only opening animation.
+                             initialOffsetY = 0,
++                            // Background vocal reveal: lines follow a growing or shrinking line at once.
++                            followThresholdPx = if (styleSettings.bgRevealEnabled && styleSettings.fixAnchorEnabled) revealFollowPx else 0,
+                         ).then(sungMoveModifier)
+ 
+                     if (line.isInterlude()) {
+diff --git a/app/src/main/java/me/spica27/spicamusic/ui/widget/LyricsSettingsSheet.kt b/app/src/main/java/me/spica27/spicamusic/ui/widget/LyricsSettingsSheet.kt
+index 5015f31..963a500 100644
+--- a/app/src/main/java/me/spica27/spicamusic/ui/widget/LyricsSettingsSheet.kt
++++ b/app/src/main/java/me/spica27/spicamusic/ui/widget/LyricsSettingsSheet.kt
+@@ -461,6 +461,12 @@ private fun LineAnimationSection(
+             )
+         }
+     }
++    LyricsSettingsToggle(
++        label = stringResource(R.string.lyr_set_fix_anchor),
++        description = stringResource(R.string.lyr_set_fix_anchor_desc),
++        checked = settings.fixAnchorEnabled,
++        onCheckedChange = { v -> onUpdate { it.copy(fixAnchorEnabled = v) } },
++    )
+ }
+ 
+ @Composable
+diff --git a/app/src/main/java/me/spica27/spicamusic/ui/widget/SpringPlacementModifier.kt b/app/src/main/java/me/spica27/spicamusic/ui/widget/SpringPlacementModifier.kt
+index 269a2d6..bf030af 100644
+--- a/app/src/main/java/me/spica27/spicamusic/ui/widget/SpringPlacementModifier.kt
++++ b/app/src/main/java/me/spica27/spicamusic/ui/widget/SpringPlacementModifier.kt
+@@ -99,9 +99,15 @@ private class LinePlacementModifierNode(
+     var delayMillis: Int,
+     var jiggle: JiggleSpec?,
+     var initialOffsetY: Int,
++    /** Position changes up to this many px in one frame are followed 1:1 (a line growing or shrinking), not glided. 0 = off. */
++    var followThresholdPx: Int,
+ ) : Modifier.Node(),
+     ApproachLayoutModifierNode {
+     private var offsetAnimation = DeferredTargetAnimation(IntOffset.VectorConverter)
++
++    /** Small shifts (e.g. a background vocal expanding above this line) that are applied at once, not glided. */
++    private var followOffset = IntOffset.Zero
++    private var rawLastTarget: IntOffset? = null
+     private var isFirstFrame = true
+ 
+     /** Progress 0..1 of the jiggle wobble of the current move. */
+@@ -184,8 +190,23 @@ private class LinePlacementModifierNode(
+             }
+     }
+ 
++    /**
++     * A line that grows or shrinks (the background vocal reveal) moves the lines below it a little every frame.
++     * Those small shifts are followed at once; only real jumps (a new current line) glide, so the glide is never
++     * restarted every frame and the jiggle does not fire for them.
++     */
++    private fun updatePlacementTarget(rawTarget: IntOffset): IntOffset {
++        val previous = rawLastTarget
++        rawLastTarget = rawTarget
++        if (followThresholdPx > 0 && previous != null && previous != rawTarget) {
++            val delta = rawTarget - previous
++            if (delta.x == 0 && abs(delta.y) <= followThresholdPx) followOffset += delta
++        }
++        return animateToTarget(rawTarget - followOffset) + followOffset
++    }
++
+     /** 首次组合的底部歌词先下移，再补间到目标位置。 */
+-    private fun updatePlacementTarget(target: IntOffset): IntOffset {
++    private fun animateToTarget(target: IntOffset): IntOffset {
+         noteTargetChange(target)
+         if (isFirstFrame) {
+             isFirstFrame = false
+@@ -214,7 +235,9 @@ private class LinePlacementModifierNode(
+         newDelayMillis: Int,
+         newJiggle: JiggleSpec?,
+         newInitialOffsetY: Int,
++        newFollowThresholdPx: Int,
+     ) {
++        followThresholdPx = newFollowThresholdPx
+         lookaheadScope = newScope
+         isManualScrolling = newIsManualScrolling
+         durationMillis = newDurationMillis
+@@ -231,6 +254,8 @@ private class LinePlacementModifierNode(
+         offsetAnimation = DeferredTargetAnimation(IntOffset.VectorConverter)
+         isFirstFrame = true
+         lastTarget = null
++        followOffset = IntOffset.Zero
++        rawLastTarget = null
+         wobbleJob?.cancel()
+     }
+ }
+@@ -243,6 +268,7 @@ private data class LinePlacementNodeElement(
+     val delayMillis: Int,
+     val jiggle: JiggleSpec?,
+     val initialOffsetY: Int,
++    val followThresholdPx: Int,
+ ) : ModifierNodeElement<LinePlacementModifierNode>() {
+     override fun update(node: LinePlacementModifierNode) {
+         node.updateState(
+@@ -253,6 +279,7 @@ private data class LinePlacementNodeElement(
+             delayMillis,
+             jiggle,
+             initialOffsetY,
++            followThresholdPx,
+         )
+     }
+ 
+@@ -265,6 +292,7 @@ private data class LinePlacementNodeElement(
+             delayMillis,
+             jiggle,
+             initialOffsetY,
++            followThresholdPx,
+         )
+ }
+ 
+@@ -277,6 +305,7 @@ internal fun Modifier.linePlacement(
+     delayMillis: Int,
+     jiggle: JiggleSpec? = null,
+     initialOffsetY: Int = 0,
++    followThresholdPx: Int = 0,
+ ): Modifier =
+     then(
+         LinePlacementNodeElement(
+@@ -287,5 +316,6 @@ internal fun Modifier.linePlacement(
+             delayMillis = delayMillis,
+             jiggle = jiggle,
+             initialOffsetY = initialOffsetY,
++            followThresholdPx = followThresholdPx,
+         ),
+     )
+diff --git a/app/src/main/res/values-zh-rTW/strings.xml b/app/src/main/res/values-zh-rTW/strings.xml
+index bd08e8c..626e43c 100644
+--- a/app/src/main/res/values-zh-rTW/strings.xml
++++ b/app/src/main/res/values-zh-rTW/strings.xml
+@@ -921,6 +921,8 @@
+   <string name="lyr_set_bg_reveal_blur_desc">伴唱以模糊狀態出現，展開時逐漸清晰，收起時再次模糊</string>
+   <string name="lyr_set_bg_reveal_blur_amount">模糊程度</string>
+   <string name="lyr_set_bg_reveal_blur_amount_desc">展開時的模糊半徑</string>
++  <string name="lyr_set_fix_anchor">修正錨點</string>
++  <string name="lyr_set_fix_anchor_desc">伴唱展開或收起時，保持目前行和下方歌詞穩定（需開啟伴唱展開）</string>
+   <string name="lyr_set_section_progress">歌詞進度</string>
+   <string name="lyr_set_word_lift">自訂文字上抬</string>
+   <string name="lyr_set_word_lift_desc">關閉則使用預設上抬幅度</string>
+diff --git a/app/src/main/res/values-zh/strings.xml b/app/src/main/res/values-zh/strings.xml
+index 36d7fa2..6a1fd46 100644
+--- a/app/src/main/res/values-zh/strings.xml
++++ b/app/src/main/res/values-zh/strings.xml
+@@ -922,6 +922,8 @@
+   <string name="lyr_set_bg_reveal_blur_desc">伴唱以模糊状态出现，展开时逐渐清晰，收起时再次模糊</string>
+   <string name="lyr_set_bg_reveal_blur_amount">模糊程度</string>
+   <string name="lyr_set_bg_reveal_blur_amount_desc">展开时的模糊半径</string>
++  <string name="lyr_set_fix_anchor">修正锚点</string>
++  <string name="lyr_set_fix_anchor_desc">伴唱展开或收起时，保持当前行和下方歌词稳定（需开启伴唱展开）</string>
+   <string name="lyr_set_section_progress">歌词进度</string>
+   <string name="lyr_set_word_lift">自定义文字上抬</string>
+   <string name="lyr_set_word_lift_desc">关闭则使用默认上抬幅度</string>
+diff --git a/app/src/main/res/values/strings.xml b/app/src/main/res/values/strings.xml
+index a78c49c..c566d96 100644
+--- a/app/src/main/res/values/strings.xml
++++ b/app/src/main/res/values/strings.xml
+@@ -922,6 +922,8 @@
+   <string name="lyr_set_bg_reveal_blur_desc">Background vocals start blurred and sharpen as they expand, and blur again as they collapse</string>
+   <string name="lyr_set_bg_reveal_blur_amount">Blur amount</string>
+   <string name="lyr_set_bg_reveal_blur_amount_desc">Blur radius while revealing</string>
++  <string name="lyr_set_fix_anchor">Fix anchor</string>
++  <string name="lyr_set_fix_anchor_desc">Keeps the current line and the lines below steady while a background vocal expands or collapses (needs Background vocal reveal)</string>
+   <string name="lyr_set_section_progress">Lyrics progress</string>
+   <string name="lyr_set_word_lift">Custom text lift</string>
+   <string name="lyr_set_word_lift_desc">Off keeps the default lift</string>
+diff --git a/core-preferences/src/main/java/me/spica27/spicamusic/core/preferences/LyricsStyleSettings.kt b/core-preferences/src/main/java/me/spica27/spicamusic/core/preferences/LyricsStyleSettings.kt
+index 405dd32..cb94778 100644
+--- a/core-preferences/src/main/java/me/spica27/spicamusic/core/preferences/LyricsStyleSettings.kt
++++ b/core-preferences/src/main/java/me/spica27/spicamusic/core/preferences/LyricsStyleSettings.kt
+@@ -164,6 +164,8 @@ data class LyricsStyleSettings(
+     val bgRevealBlurEnabled: Boolean = true,
+     /** Blur radius in dp. */
+     val bgRevealBlurAmount: Int = 8,
++    /** Keeps lines and the current line steady on their anchor while a background vocal expands or collapses. */
++    val fixAnchorEnabled: Boolean = true,
+ ) {
+     /** Returns a copy with every value forced into its allowed range. */
+     fun sanitized(): LyricsStyleSettings =
+diff --git a/core-preferences/src/main/java/me/spica27/spicamusic/core/preferences/PreferencesManager.kt b/core-preferences/src/main/java/me/spica27/spicamusic/core/preferences/PreferencesManager.kt
+index b082065..4d3ea79 100644
+--- a/core-preferences/src/main/java/me/spica27/spicamusic/core/preferences/PreferencesManager.kt
++++ b/core-preferences/src/main/java/me/spica27/spicamusic/core/preferences/PreferencesManager.kt
+@@ -89,6 +89,7 @@ class PreferencesManager(
+         val LYRIC_BG_REVEAL_DURATION_MS = intPreferencesKey("lyric_bg_reveal_duration_ms")
+         val LYRIC_BG_REVEAL_BLUR = booleanPreferencesKey("lyric_bg_reveal_blur")
+         val LYRIC_BG_REVEAL_BLUR_AMOUNT = intPreferencesKey("lyric_bg_reveal_blur_amount")
++        val LYRIC_FIX_ANCHOR = booleanPreferencesKey("lyric_fix_anchor")
+         val LYRIC_WORD_LIFT_ENABLED = booleanPreferencesKey("lyric_word_lift_enabled")
+         val LYRIC_WORD_LIFT = intPreferencesKey("lyric_word_lift")
+         val LYRIC_MERGE_WORDS = booleanPreferencesKey("lyric_merge_words")
+@@ -170,6 +171,7 @@ class PreferencesManager(
+                     bgRevealDurationMs = p[Keys.LYRIC_BG_REVEAL_DURATION_MS] ?: d.bgRevealDurationMs,
+                     bgRevealBlurEnabled = p[Keys.LYRIC_BG_REVEAL_BLUR] ?: d.bgRevealBlurEnabled,
+                     bgRevealBlurAmount = p[Keys.LYRIC_BG_REVEAL_BLUR_AMOUNT] ?: d.bgRevealBlurAmount,
++                    fixAnchorEnabled = p[Keys.LYRIC_FIX_ANCHOR] ?: d.fixAnchorEnabled,
+                     wordLiftEnabled = p[Keys.LYRIC_WORD_LIFT_ENABLED] ?: d.wordLiftEnabled,
+                     wordLift = p[Keys.LYRIC_WORD_LIFT] ?: d.wordLift,
+                     mergeWords = p[Keys.LYRIC_MERGE_WORDS] ?: d.mergeWords,
+@@ -251,6 +253,7 @@ class PreferencesManager(
+                     bgRevealDurationMs = p[Keys.LYRIC_BG_REVEAL_DURATION_MS] ?: d.bgRevealDurationMs,
+                     bgRevealBlurEnabled = p[Keys.LYRIC_BG_REVEAL_BLUR] ?: d.bgRevealBlurEnabled,
+                     bgRevealBlurAmount = p[Keys.LYRIC_BG_REVEAL_BLUR_AMOUNT] ?: d.bgRevealBlurAmount,
++                    fixAnchorEnabled = p[Keys.LYRIC_FIX_ANCHOR] ?: d.fixAnchorEnabled,
+                     wordLiftEnabled = p[Keys.LYRIC_WORD_LIFT_ENABLED] ?: d.wordLiftEnabled,
+                     wordLift = p[Keys.LYRIC_WORD_LIFT] ?: d.wordLift,
+                     mergeWords = p[Keys.LYRIC_MERGE_WORDS] ?: d.mergeWords,
+@@ -323,6 +326,7 @@ class PreferencesManager(
+             p[Keys.LYRIC_BG_REVEAL_DURATION_MS] = n.bgRevealDurationMs
+             p[Keys.LYRIC_BG_REVEAL_BLUR] = n.bgRevealBlurEnabled
+             p[Keys.LYRIC_BG_REVEAL_BLUR_AMOUNT] = n.bgRevealBlurAmount
++            p[Keys.LYRIC_FIX_ANCHOR] = n.fixAnchorEnabled
+             p[Keys.LYRIC_WORD_LIFT_ENABLED] = n.wordLiftEnabled
+             p[Keys.LYRIC_WORD_LIFT] = n.wordLift
+             p[Keys.LYRIC_MERGE_WORDS] = n.mergeWords
