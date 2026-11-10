@@ -147,6 +147,23 @@ data class LyricsStyleSettings(
     val dockSoftEdge: Boolean = true,
     /** Spread only: height of the fade band above the bar, in dp. */
     val dockEdgeFade: Int = 32,
+    // ---- Line and background vocal animation ----
+    /** A line moves a little (up and smaller) after it has been sung. */
+    val lineMoveEnabled: Boolean = false,
+    /** Duration of that move in ms. */
+    val lineMoveMs: Int = 600,
+    /** Background vocals expand out from behind the main lyric before they are sung and collapse after. */
+    val bgRevealEnabled: Boolean = false,
+    /** Expand starts this long before the background vocal is sung, in ms. */
+    val bgRevealBeforeMs: Int = 1000,
+    /** Collapse starts this long after the background vocal is sung, in ms. */
+    val bgRevealAfterMs: Int = 1000,
+    /** Duration of the expand and of the collapse, in ms. */
+    val bgRevealDurationMs: Int = 800,
+    /** Blur the background vocal while it expands or collapses. */
+    val bgRevealBlurEnabled: Boolean = true,
+    /** Blur radius in dp. */
+    val bgRevealBlurAmount: Int = 8,
 ) {
     /** Returns a copy with every value forced into its allowed range. */
     fun sanitized(): LyricsStyleSettings =
@@ -188,6 +205,11 @@ data class LyricsStyleSettings(
             dockGapLeft = dockGapLeft.coerceIn(DOCK_GAP_RANGE),
             dockGapRight = dockGapRight.coerceIn(DOCK_GAP_RANGE),
             dockEdgeFade = dockEdgeFade.coerceIn(DOCK_EDGE_FADE_RANGE),
+            lineMoveMs = lineMoveMs.coerceIn(LINE_MOVE_AFTER_RANGE),
+            bgRevealBeforeMs = bgRevealBeforeMs.coerceIn(BG_REVEAL_OFFSET_RANGE),
+            bgRevealAfterMs = bgRevealAfterMs.coerceIn(BG_REVEAL_OFFSET_RANGE),
+            bgRevealDurationMs = bgRevealDurationMs.coerceIn(BG_REVEAL_DURATION_RANGE),
+            bgRevealBlurAmount = bgRevealBlurAmount.coerceIn(BG_REVEAL_BLUR_RANGE),
         )
 
     companion object {
@@ -226,5 +248,9 @@ data class LyricsStyleSettings(
         val DOCK_PILL_PADDING_RANGE = 0..16
         val DOCK_GAP_RANGE = 0..32
         val DOCK_EDGE_FADE_RANGE = 0..80
+        val LINE_MOVE_AFTER_RANGE = 200..2000
+        val BG_REVEAL_OFFSET_RANGE = 500..1500
+        val BG_REVEAL_DURATION_RANGE = 500..2000
+        val BG_REVEAL_BLUR_RANGE = 1..20
     }
 }

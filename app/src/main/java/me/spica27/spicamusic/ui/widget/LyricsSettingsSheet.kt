@@ -53,6 +53,7 @@ fun LyricsSettingsSheet(
             }
             LightSweepSection(settings = settings, onUpdate = onUpdate)
             LyricsProgressSection(settings = settings, onUpdate = onUpdate)
+            LineAnimationSection(settings = settings, onUpdate = onUpdate)
             EnhanceHeaderSection(settings = settings, onUpdate = onUpdate)
         }
     }
@@ -379,6 +380,86 @@ private fun LightSweepSection(
             valueText = { "$it%" },
             onValueChange = { v -> onUpdate { it.copy(lightSweepSoftness = v) } },
         )
+    }
+}
+
+private fun secondsText(ms: Int): String = "${ms / 1000}.${(ms % 1000) / 100} s"
+
+@Composable
+private fun LineAnimationSection(
+    settings: LyricsStyleSettings,
+    onUpdate: ((LyricsStyleSettings) -> LyricsStyleSettings) -> Unit,
+) {
+    LyricsSettingsSection(stringResource(R.string.lyr_set_section_line_anim))
+
+    LyricsSettingsToggle(
+        label = stringResource(R.string.lyr_set_line_move),
+        description = stringResource(R.string.lyr_set_line_move_desc),
+        checked = settings.lineMoveEnabled,
+        onCheckedChange = { v -> onUpdate { it.copy(lineMoveEnabled = v) } },
+    )
+    if (settings.lineMoveEnabled) {
+        LyricsSettingsSlider(
+            label = stringResource(R.string.lyr_set_line_move_duration),
+            description = stringResource(R.string.lyr_set_line_move_duration_desc),
+            value = settings.lineMoveMs,
+            range = LyricsStyleSettings.LINE_MOVE_AFTER_RANGE,
+            step = 100,
+            valueText = ::secondsText,
+            onValueChange = { v -> onUpdate { it.copy(lineMoveMs = v) } },
+        )
+    }
+    LyricsSettingsToggle(
+        label = stringResource(R.string.lyr_set_bg_reveal),
+        description = stringResource(R.string.lyr_set_bg_reveal_desc),
+        checked = settings.bgRevealEnabled,
+        onCheckedChange = { v -> onUpdate { it.copy(bgRevealEnabled = v) } },
+    )
+    if (settings.bgRevealEnabled) {
+        LyricsSettingsSlider(
+            label = stringResource(R.string.lyr_set_bg_reveal_before),
+            description = stringResource(R.string.lyr_set_bg_reveal_before_desc),
+            value = settings.bgRevealBeforeMs,
+            range = LyricsStyleSettings.BG_REVEAL_OFFSET_RANGE,
+            step = 100,
+            valueText = ::secondsText,
+            onValueChange = { v -> onUpdate { it.copy(bgRevealBeforeMs = v) } },
+        )
+        LyricsSettingsSlider(
+            label = stringResource(R.string.lyr_set_bg_reveal_after),
+            description = stringResource(R.string.lyr_set_bg_reveal_after_desc),
+            value = settings.bgRevealAfterMs,
+            range = LyricsStyleSettings.BG_REVEAL_OFFSET_RANGE,
+            step = 100,
+            valueText = ::secondsText,
+            onValueChange = { v -> onUpdate { it.copy(bgRevealAfterMs = v) } },
+        )
+        LyricsSettingsSlider(
+            label = stringResource(R.string.lyr_set_bg_reveal_duration),
+            description = stringResource(R.string.lyr_set_bg_reveal_duration_desc),
+            value = settings.bgRevealDurationMs,
+            range = LyricsStyleSettings.BG_REVEAL_DURATION_RANGE,
+            step = 100,
+            valueText = ::secondsText,
+            onValueChange = { v -> onUpdate { it.copy(bgRevealDurationMs = v) } },
+        )
+        LyricsSettingsToggle(
+            label = stringResource(R.string.lyr_set_bg_reveal_blur),
+            description = stringResource(R.string.lyr_set_bg_reveal_blur_desc),
+            checked = settings.bgRevealBlurEnabled,
+            onCheckedChange = { v -> onUpdate { it.copy(bgRevealBlurEnabled = v) } },
+        )
+        if (settings.bgRevealBlurEnabled) {
+            LyricsSettingsSlider(
+                label = stringResource(R.string.lyr_set_bg_reveal_blur_amount),
+                description = stringResource(R.string.lyr_set_bg_reveal_blur_amount_desc),
+                value = settings.bgRevealBlurAmount,
+                range = LyricsStyleSettings.BG_REVEAL_BLUR_RANGE,
+                step = 1,
+                valueText = { "$it dp" },
+                onValueChange = { v -> onUpdate { it.copy(bgRevealBlurAmount = v) } },
+            )
+        }
     }
 }
 

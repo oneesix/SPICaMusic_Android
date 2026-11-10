@@ -494,6 +494,8 @@ private data class LyricsUIStyle(
     /** The light-sweep options (null = the original word sweep). */
     val lightSweep: LightSweepSpec? = null,
     val progress: WordProgressSpec = WordProgressSpec(),
+    /** Background vocal reveal (null = background vocals are always visible). */
+    val bgReveal: BgRevealSpec? = null,
     /** Transliteration above (true) or below (false) the lyric words. */
     val transliterationOnTop: Boolean,
     /** Per-word timed transliteration (true) or a plain static line (false). */
@@ -611,7 +613,21 @@ private fun rememberLyricsUIStyle(
                 )
             }
             }
-        built.withFontFamily(LyricsFontOption.lyricsFamily(settings.lyricsFont))
+        built
+            .withFontFamily(LyricsFontOption.lyricsFamily(settings.lyricsFont))
+            .copy(
+                bgReveal =
+                    if (settings.bgRevealEnabled) {
+                        BgRevealSpec(
+                            beforeMs = settings.bgRevealBeforeMs,
+                            afterMs = settings.bgRevealAfterMs,
+                            durationMs = settings.bgRevealDurationMs,
+                            blurDp = if (settings.bgRevealBlurEnabled) settings.bgRevealBlurAmount else 0,
+                        )
+                    } else {
+                        null
+                    },
+            )
     }
 }
 
@@ -893,6 +909,26 @@ fun LyricsUI(
                         } else {
                             lineMoveDurationMillis
                         }
+                    // Move line after it is sung: a sung line eases up a little and shrinks.
+                    val moveAfterSung = styleSettings.lineMoveEnabled && !line.isInterlude()
+                    val sungEndMs = remember(line) { line.knownEndMs() }
+                    val isSung by remember(sungEndMs, moveAfterSung) {
+                        derivedStateOf {
+                            moveAfterSung && sungEndMs != null && currentTimeState.value >= sungEndMs
+                        }
+                    }
+                    val sungMoveState =
+                        animateFloatAsState(
+                            targetValue = if (isSung) 1f else 0f,
+                            animationSpec = tween(durationMillis = styleSettings.lineMoveMs, easing = LyricLineScaleEasing),
+                            label = "lyricSungMove",
+                        )
+                    val sungMoveModifier =
+                        if (moveAfterSung) {
+                            Modifier.graphicsLayer { translationY = -8.dp.toPx() * sungMoveState.value }
+                        } else {
+                            Modifier
+                        }
                     val songPart = line.songPartLabel()
                     val previousRealLine =
                         lyricLines.getOrNull(index - 1).let { previous ->
@@ -913,7 +949,7 @@ fun LyricsUI(
                             jiggle = if (jiggleLine) jiggleSpec else null,
                             // No fly-in from the bottom: the page slide is the only opening animation.
                             initialOffsetY = 0,
-                        )
+                        ).then(sungMoveModifier)
 
                     if (line.isInterlude()) {
                         InterludeLine(
@@ -942,7 +978,7 @@ fun LyricsUI(
                                 lyric = line,
                                 isActive = isActive,
                                 alphaProvider = { alphaState.value },
-                                scaleProvider = { scaleState.value },
+                                scaleProvider = { scaleState.value * (1f - 0.06f * sungMoveState.value) },
                                 blurRadius = blurRadius.dp,
                                 style = style,
                                 voiceAccent = lineAccent,
@@ -960,7 +996,7 @@ fun LyricsUI(
                                 currentTimeState = currentTimeState,
                                 isActive = isActive,
                                 alphaProvider = { alphaState.value },
-                                scaleProvider = { scaleState.value },
+                                scaleProvider = { scaleState.value * (1f - 0.06f * sungMoveState.value) },
                                 blurRadius = blurRadius.dp,
                                 style = style,
                                 textMeasurer = textMeasurer,
@@ -1856,20 +1892,22 @@ private fun WordsLyricLine(
         if (style.transliterationOnTop && showLineTransliteration) transliterationBlock()
 
         beforeAccompaniment.forEach { background ->
-            AccompanimentLine(
-                background = background,
-                currentTimeState = currentTimeState,
-                litFraction = litFractionState,
-                placement = AccompanimentPlacement.Before,
-                style = style,
-                textMeasurer = textMeasurer,
-                parentAgents = agents,
-                voiceIndexById = voiceIndexById,
-                colorScheme = colorScheme,
-                fallbackAccent = voiceAccent,
-                fallbackAlignEnd = alignEnd,
-                displayOptions = displayOptions,
-            )
+            BackgroundReveal(style.bgReveal, background, currentTimeState) {
+                AccompanimentLine(
+                    background = background,
+                    currentTimeState = currentTimeState,
+                    litFraction = litFractionState,
+                    placement = AccompanimentPlacement.Before,
+                    style = style,
+                    textMeasurer = textMeasurer,
+                    parentAgents = agents,
+                    voiceIndexById = voiceIndexById,
+                    colorScheme = colorScheme,
+                    fallbackAccent = voiceAccent,
+                    fallbackAlignEnd = alignEnd,
+                    displayOptions = displayOptions,
+                )
+            }
         }
 
         if (sentence.isNotBlank()) {
@@ -1894,22 +1932,28 @@ private fun WordsLyricLine(
             )
         }
 
-        afterAccompaniment.forEach { background ->
-            AccompanimentLine(
-                background = background,
-                currentTimeState = currentTimeState,
-                litFraction = litFractionState,
-                placement = AccompanimentPlacement.After,
-                style = style,
-                textMeasurer = textMeasurer,
-                parentAgents = agents,
-                voiceIndexById = voiceIndexById,
-                colorScheme = colorScheme,
-                fallbackAccent = voiceAccent,
-                fallbackAlignEnd = alignEnd,
-                displayOptions = displayOptions,
-            )
+        // With the reveal on, background vocals sit below the translation (main, translation, background).
+        val afterAccompanimentBlock: @Composable () -> Unit = {
+            afterAccompaniment.forEach { background ->
+                BackgroundReveal(style.bgReveal, background, currentTimeState) {
+                    AccompanimentLine(
+                        background = background,
+                        currentTimeState = currentTimeState,
+                        litFraction = litFractionState,
+                        placement = AccompanimentPlacement.After,
+                        style = style,
+                        textMeasurer = textMeasurer,
+                        parentAgents = agents,
+                        voiceIndexById = voiceIndexById,
+                        colorScheme = colorScheme,
+                        fallbackAccent = voiceAccent,
+                        fallbackAlignEnd = alignEnd,
+                        displayOptions = displayOptions,
+                    )
+                }
+            }
         }
+        if (style.bgReveal == null) afterAccompanimentBlock()
 
         if (!style.transliterationOnTop && showLineTransliteration) transliterationBlock()
 
@@ -1935,6 +1979,8 @@ private fun WordsLyricLine(
                 displayOptions = displayOptions,
             )
         }
+
+        if (style.bgReveal != null) afterAccompanimentBlock()
     }
 }
 
@@ -2017,6 +2063,77 @@ private fun attachedRomanizationFor(
             if (ro.isEmpty() || isRomanText(shown[i]) || ro.equals(shown[i], ignoreCase = true)) "" else ro
         }
     return result.takeIf { list -> list.any { it.isNotEmpty() } }
+}
+
+/** Options of the background vocal reveal (Lyrics settings > Line and background vocal animation). */
+@Immutable
+private data class BgRevealSpec(
+    val beforeMs: Int,
+    val afterMs: Int,
+    val durationMs: Int,
+    val blurDp: Int,
+)
+
+private val BgRevealEase = CubicBezierEasing(0.2f, 0.8f, 0.2f, 1f)
+
+/**
+ * Lets a background vocal expand out from behind the main lyric (height, fade, slight rise and scale, optional blur)
+ * [BgRevealSpec.beforeMs] before it is sung, and collapse back [BgRevealSpec.afterMs] after it ends.
+ * Without a [spec] the content is simply shown.
+ */
+@Composable
+private fun BackgroundReveal(
+    spec: BgRevealSpec?,
+    background: LyricItem.WordsLyric.AccompanimentLyric,
+    currentTimeState: State<Long>,
+    content: @Composable () -> Unit,
+) {
+    if (spec == null) {
+        content()
+        return
+    }
+    val open by remember(background, spec, currentTimeState) {
+        derivedStateOf {
+            val time = currentTimeState.value
+            time >= background.startTime - spec.beforeMs && time < background.endTime + spec.afterMs
+        }
+    }
+    val progress =
+        animateFloatAsState(
+            targetValue = if (open) 1f else 0f,
+            animationSpec = tween(durationMillis = spec.durationMs, easing = BgRevealEase),
+            label = "bgReveal",
+        )
+    val density = LocalDensity.current
+    val liftPx = with(density) { 14.dp.toPx() }
+    val blurPx = with(density) { spec.blurDp.dp.toPx() }
+    Box(
+        modifier =
+            Modifier
+                .clipToBounds()
+                .layout { measurable, constraints ->
+                    val placeable = measurable.measure(constraints)
+                    val p = progress.value
+                    layout(placeable.width, (placeable.height * p).roundToInt()) {
+                        placeable.placeWithLayer(0, 0) {
+                            alpha = p
+                            translationY = -(1f - p) * liftPx
+                            val scale = 0.96f + 0.04f * p
+                            scaleX = scale
+                            scaleY = scale
+                            transformOrigin = TransformOrigin(0.5f, 0f)
+                            renderEffect =
+                                if (blurPx > 0f && p < 1f) {
+                                    BlurEffect(blurPx * (1f - p), blurPx * (1f - p), TileMode.Decal)
+                                } else {
+                                    null
+                                }
+                        }
+                    }
+                },
+    ) {
+        content()
+    }
 }
 
 private enum class AccompanimentPlacement {
