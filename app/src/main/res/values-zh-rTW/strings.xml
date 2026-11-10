@@ -911,8 +911,8 @@
   <string name="lyr_set_line_move_duration_desc">移動所需時間</string>
   <string name="lyr_set_bg_reveal">伴唱展開</string>
   <string name="lyr_set_bg_reveal_desc">伴唱從主歌詞後方展開並淡入，隨後收起並淡出</string>
-  <string name="lyr_set_bg_reveal_before">演唱前展開</string>
-  <string name="lyr_set_bg_reveal_before_desc">伴唱開始前多久展開</string>
+  <string name="lyr_set_bg_reveal_before">展開開始時間</string>
+  <string name="lyr_set_bg_reveal_before_desc">負值 = 伴唱開始前（-1.0 s = 提前 1 秒），正值 = 伴唱開始後</string>
   <string name="lyr_set_bg_reveal_after">演唱後收起</string>
   <string name="lyr_set_bg_reveal_after_desc">伴唱結束後多久收起</string>
   <string name="lyr_set_bg_reveal_duration">展開 / 收起時長</string>

@@ -154,8 +154,8 @@ data class LyricsStyleSettings(
     val lineMoveMs: Int = 600,
     /** Background vocals expand out from behind the main lyric before they are sung and collapse after. */
     val bgRevealEnabled: Boolean = false,
-    /** Expand starts this long before the background vocal is sung, in ms. */
-    val bgRevealBeforeMs: Int = 1000,
+    /** When the expand starts, relative to the background vocal start, in ms. Negative = before it starts. */
+    val bgRevealStartOffsetMs: Int = -1000,
     /** Collapse starts this long after the background vocal is sung, in ms. */
     val bgRevealAfterMs: Int = 1000,
     /** Duration of the expand and of the collapse, in ms. */
@@ -208,7 +208,7 @@ data class LyricsStyleSettings(
             dockGapRight = dockGapRight.coerceIn(DOCK_GAP_RANGE),
             dockEdgeFade = dockEdgeFade.coerceIn(DOCK_EDGE_FADE_RANGE),
             lineMoveMs = lineMoveMs.coerceIn(LINE_MOVE_AFTER_RANGE),
-            bgRevealBeforeMs = bgRevealBeforeMs.coerceIn(BG_REVEAL_OFFSET_RANGE),
+            bgRevealStartOffsetMs = bgRevealStartOffsetMs.coerceIn(BG_REVEAL_START_OFFSET_RANGE),
             bgRevealAfterMs = bgRevealAfterMs.coerceIn(BG_REVEAL_OFFSET_RANGE),
             bgRevealDurationMs = bgRevealDurationMs.coerceIn(BG_REVEAL_DURATION_RANGE),
             bgRevealBlurAmount = bgRevealBlurAmount.coerceIn(BG_REVEAL_BLUR_RANGE),
@@ -252,6 +252,9 @@ data class LyricsStyleSettings(
         val DOCK_EDGE_FADE_RANGE = 0..80
         val LINE_MOVE_AFTER_RANGE = 200..2000
         val BG_REVEAL_OFFSET_RANGE = 0..1500
+
+        /** Negative = the expand starts before the background vocal starts, positive = after it has started. */
+        val BG_REVEAL_START_OFFSET_RANGE = -1000..1500
         val BG_REVEAL_DURATION_RANGE = 500..2000
         val BG_REVEAL_BLUR_RANGE = 1..20
     }

@@ -84,7 +84,7 @@ class PreferencesManager(
         val LYRIC_LINE_MOVE = booleanPreferencesKey("lyric_line_move")
         val LYRIC_LINE_MOVE_MS = intPreferencesKey("lyric_line_move_ms")
         val LYRIC_BG_REVEAL = booleanPreferencesKey("lyric_bg_reveal")
-        val LYRIC_BG_REVEAL_BEFORE_MS = intPreferencesKey("lyric_bg_reveal_before_ms")
+        val LYRIC_BG_REVEAL_BEFORE_MS = intPreferencesKey("lyric_bg_reveal_start_offset_ms")
         val LYRIC_BG_REVEAL_AFTER_MS = intPreferencesKey("lyric_bg_reveal_after_ms")
         val LYRIC_BG_REVEAL_DURATION_MS = intPreferencesKey("lyric_bg_reveal_duration_ms")
         val LYRIC_BG_REVEAL_BLUR = booleanPreferencesKey("lyric_bg_reveal_blur")
@@ -166,7 +166,7 @@ class PreferencesManager(
                     lineMoveEnabled = p[Keys.LYRIC_LINE_MOVE] ?: d.lineMoveEnabled,
                     lineMoveMs = p[Keys.LYRIC_LINE_MOVE_MS] ?: d.lineMoveMs,
                     bgRevealEnabled = p[Keys.LYRIC_BG_REVEAL] ?: d.bgRevealEnabled,
-                    bgRevealBeforeMs = p[Keys.LYRIC_BG_REVEAL_BEFORE_MS] ?: d.bgRevealBeforeMs,
+                    bgRevealStartOffsetMs = p[Keys.LYRIC_BG_REVEAL_BEFORE_MS] ?: d.bgRevealStartOffsetMs,
                     bgRevealAfterMs = p[Keys.LYRIC_BG_REVEAL_AFTER_MS] ?: d.bgRevealAfterMs,
                     bgRevealDurationMs = p[Keys.LYRIC_BG_REVEAL_DURATION_MS] ?: d.bgRevealDurationMs,
                     bgRevealBlurEnabled = p[Keys.LYRIC_BG_REVEAL_BLUR] ?: d.bgRevealBlurEnabled,
@@ -248,7 +248,7 @@ class PreferencesManager(
                     lineMoveEnabled = p[Keys.LYRIC_LINE_MOVE] ?: d.lineMoveEnabled,
                     lineMoveMs = p[Keys.LYRIC_LINE_MOVE_MS] ?: d.lineMoveMs,
                     bgRevealEnabled = p[Keys.LYRIC_BG_REVEAL] ?: d.bgRevealEnabled,
-                    bgRevealBeforeMs = p[Keys.LYRIC_BG_REVEAL_BEFORE_MS] ?: d.bgRevealBeforeMs,
+                    bgRevealStartOffsetMs = p[Keys.LYRIC_BG_REVEAL_BEFORE_MS] ?: d.bgRevealStartOffsetMs,
                     bgRevealAfterMs = p[Keys.LYRIC_BG_REVEAL_AFTER_MS] ?: d.bgRevealAfterMs,
                     bgRevealDurationMs = p[Keys.LYRIC_BG_REVEAL_DURATION_MS] ?: d.bgRevealDurationMs,
                     bgRevealBlurEnabled = p[Keys.LYRIC_BG_REVEAL_BLUR] ?: d.bgRevealBlurEnabled,
@@ -321,7 +321,7 @@ class PreferencesManager(
             p[Keys.LYRIC_LINE_MOVE] = n.lineMoveEnabled
             p[Keys.LYRIC_LINE_MOVE_MS] = n.lineMoveMs
             p[Keys.LYRIC_BG_REVEAL] = n.bgRevealEnabled
-            p[Keys.LYRIC_BG_REVEAL_BEFORE_MS] = n.bgRevealBeforeMs
+            p[Keys.LYRIC_BG_REVEAL_BEFORE_MS] = n.bgRevealStartOffsetMs
             p[Keys.LYRIC_BG_REVEAL_AFTER_MS] = n.bgRevealAfterMs
             p[Keys.LYRIC_BG_REVEAL_DURATION_MS] = n.bgRevealDurationMs
             p[Keys.LYRIC_BG_REVEAL_BLUR] = n.bgRevealBlurEnabled

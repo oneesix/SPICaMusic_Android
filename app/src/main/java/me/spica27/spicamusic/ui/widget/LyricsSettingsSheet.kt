@@ -383,7 +383,11 @@ private fun LightSweepSection(
     }
 }
 
-private fun secondsText(ms: Int): String = "${ms / 1000}.${(ms % 1000) / 100} s"
+private fun secondsText(ms: Int): String {
+    val sign = if (ms < 0) "-" else ""
+    val abs = kotlin.math.abs(ms)
+    return "$sign${abs / 1000}.${(abs % 1000) / 100} s"
+}
 
 @Composable
 private fun LineAnimationSection(
@@ -419,11 +423,11 @@ private fun LineAnimationSection(
         LyricsSettingsSlider(
             label = stringResource(R.string.lyr_set_bg_reveal_before),
             description = stringResource(R.string.lyr_set_bg_reveal_before_desc),
-            value = settings.bgRevealBeforeMs,
-            range = LyricsStyleSettings.BG_REVEAL_OFFSET_RANGE,
+            value = settings.bgRevealStartOffsetMs,
+            range = LyricsStyleSettings.BG_REVEAL_START_OFFSET_RANGE,
             step = 100,
             valueText = ::secondsText,
-            onValueChange = { v -> onUpdate { it.copy(bgRevealBeforeMs = v) } },
+            onValueChange = { v -> onUpdate { it.copy(bgRevealStartOffsetMs = v) } },
         )
         LyricsSettingsSlider(
             label = stringResource(R.string.lyr_set_bg_reveal_after),

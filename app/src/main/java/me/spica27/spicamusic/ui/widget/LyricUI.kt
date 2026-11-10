@@ -616,7 +616,7 @@ private fun rememberLyricsUIStyle(
                 bgReveal =
                     if (settings.bgRevealEnabled) {
                         BgRevealSpec(
-                            beforeMs = settings.bgRevealBeforeMs,
+                            beforeMs = -settings.bgRevealStartOffsetMs,
                             afterMs = settings.bgRevealAfterMs,
                             durationMs = settings.bgRevealDurationMs,
                             blurDp = if (settings.bgRevealBlurEnabled) settings.bgRevealBlurAmount else 0,
@@ -2122,7 +2122,9 @@ private fun BackgroundReveal(
     val open by remember(background, spec, currentTimeState) {
         derivedStateOf {
             val time = currentTimeState.value
-            time >= background.startTime - spec.beforeMs && time < background.endTime + spec.afterMs
+            // A negative "before" opens the reveal after the vocal has started, but never after it has ended.
+            val openAt = minOf(background.startTime - spec.beforeMs, background.endTime - 1L)
+            time >= openAt && time < background.endTime + spec.afterMs
         }
     }
     val progress =

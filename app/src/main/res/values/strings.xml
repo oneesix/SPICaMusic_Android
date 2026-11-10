@@ -912,8 +912,8 @@
   <string name="lyr_set_line_move_duration_desc">How long the move takes</string>
   <string name="lyr_set_bg_reveal">Background vocal reveal</string>
   <string name="lyr_set_bg_reveal_desc">Background vocals expand from behind the main lyric and fade in, then collapse and fade out</string>
-  <string name="lyr_set_bg_reveal_before">Expand before it is sung</string>
-  <string name="lyr_set_bg_reveal_before_desc">How long before the background vocal starts that it expands</string>
+  <string name="lyr_set_bg_reveal_before">Expand start</string>
+  <string name="lyr_set_bg_reveal_before_desc">Minus = before the background vocal starts (-1.0 s = 1 s early), plus = after it has started</string>
   <string name="lyr_set_bg_reveal_after">Collapse after it is sung</string>
   <string name="lyr_set_bg_reveal_after_desc">How long after the background vocal ends that it collapses</string>
   <string name="lyr_set_bg_reveal_duration">Expand / collapse duration</string>
