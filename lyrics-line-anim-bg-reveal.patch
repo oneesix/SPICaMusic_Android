@@ -1,0 +1,708 @@
+diff --git a/app/src/main/java/me/spica27/spicamusic/ui/widget/LyricUI.kt b/app/src/main/java/me/spica27/spicamusic/ui/widget/LyricUI.kt
+index dcf806a..0a76e3c 100644
+--- a/app/src/main/java/me/spica27/spicamusic/ui/widget/LyricUI.kt
++++ b/app/src/main/java/me/spica27/spicamusic/ui/widget/LyricUI.kt
+@@ -494,6 +494,8 @@ private data class LyricsUIStyle(
+     /** The light-sweep options (null = the original word sweep). */
+     val lightSweep: LightSweepSpec? = null,
+     val progress: WordProgressSpec = WordProgressSpec(),
++    /** Background vocal reveal (null = background vocals are always visible). */
++    val bgReveal: BgRevealSpec? = null,
+     /** Transliteration above (true) or below (false) the lyric words. */
+     val transliterationOnTop: Boolean,
+     /** Per-word timed transliteration (true) or a plain static line (false). */
+@@ -611,7 +613,21 @@ private fun rememberLyricsUIStyle(
+                 )
+             }
+             }
+-        built.withFontFamily(LyricsFontOption.lyricsFamily(settings.lyricsFont))
++        built
++            .withFontFamily(LyricsFontOption.lyricsFamily(settings.lyricsFont))
++            .copy(
++                bgReveal =
++                    if (settings.bgRevealEnabled) {
++                        BgRevealSpec(
++                            beforeMs = settings.bgRevealBeforeMs,
++                            afterMs = settings.bgRevealAfterMs,
++                            durationMs = settings.bgRevealDurationMs,
++                            blurDp = if (settings.bgRevealBlurEnabled) settings.bgRevealBlurAmount else 0,
++                        )
++                    } else {
++                        null
++                    },
++            )
+     }
+ }
+ 
+@@ -786,6 +802,29 @@ fun LyricsUI(
+                     JiggleSpec(styleSettings.jiggleStrength, styleSettings.jiggleDurationMs, density.density)
+                 }
+             val keepAliveZonePx = with(density) { keepAliveZone.toPx() }
++            // Biggest per-frame shift that still counts as a line growing or shrinking (not a line change).
++            val revealFollowPx = with(density) { 24.dp.roundToPx() }
++
++            // The background vocal reveal changes line heights; keep the current line on its anchor meanwhile.
++            if (styleSettings.bgRevealEnabled && styleSettings.fixAnchorEnabled) {
++                LaunchedEffect(lazyListState, lyricLines, playbackAnchorOffsetPx, keepAliveZonePx) {
++                    val anchorPx = (playbackAnchorOffsetPx + keepAliveZonePx).roundToInt()
++                    snapshotFlow {
++                        val index = playingIndex
++                        lazyListState.layoutInfo.visibleItemsInfo.firstOrNull { it.index == index }?.offset
++                    }.collect { offset ->
++                        if (offset == null || !hasSyncedInitialPosition || isAutoScrolling ||
++                            showSeekOverlay || isBarSeeking || lazyListState.isScrollInProgress
++                        ) {
++                            return@collect
++                        }
++                        val distance = lazyListState.distanceToAnchor(offset, anchorPx)
++                        if (abs(distance) >= 0.5f && abs(distance) <= revealFollowPx) {
++                            lazyListState.scrollBy(distance)
++                        }
++                    }
++                }
++            }
+ 
+             LaunchedEffect(playingIndex, showSeekOverlay, isBarSeeking, lyricLines) {
+                 val target = playingIndex
+@@ -893,6 +932,26 @@ fun LyricsUI(
+                         } else {
+                             lineMoveDurationMillis
+                         }
++                    // Move line after it is sung: a sung line eases up a little and shrinks.
++                    val moveAfterSung = styleSettings.lineMoveEnabled && !line.isInterlude()
++                    val sungEndMs = remember(line) { line.knownEndMs() }
++                    val isSung by remember(sungEndMs, moveAfterSung) {
++                        derivedStateOf {
++                            moveAfterSung && sungEndMs != null && currentTimeState.value >= sungEndMs
++                        }
++                    }
++                    val sungMoveState =
++                        animateFloatAsState(
++                            targetValue = if (isSung) 1f else 0f,
++                            animationSpec = tween(durationMillis = styleSettings.lineMoveMs, easing = LyricLineScaleEasing),
++                            label = "lyricSungMove",
++                        )
++                    val sungMoveModifier =
++                        if (moveAfterSung) {
++                            Modifier.graphicsLayer { translationY = -8.dp.toPx() * sungMoveState.value }
++                        } else {
++                            Modifier
++                        }
+                     val songPart = line.songPartLabel()
+                     val previousRealLine =
+                         lyricLines.getOrNull(index - 1).let { previous ->
+@@ -913,7 +972,9 @@ fun LyricsUI(
+                             jiggle = if (jiggleLine) jiggleSpec else null,
+                             // No fly-in from the bottom: the page slide is the only opening animation.
+                             initialOffsetY = 0,
+-                        )
++                            // Background vocal reveal: lines follow a growing or shrinking line at once.
++                            followThresholdPx = if (styleSettings.bgRevealEnabled && styleSettings.fixAnchorEnabled) revealFollowPx else 0,
++                        ).then(sungMoveModifier)
+ 
+                     if (line.isInterlude()) {
+                         InterludeLine(
+@@ -942,7 +1003,7 @@ fun LyricsUI(
+                                 lyric = line,
+                                 isActive = isActive,
+                                 alphaProvider = { alphaState.value },
+-                                scaleProvider = { scaleState.value },
++                                scaleProvider = { scaleState.value * (1f - 0.06f * sungMoveState.value) },
+                                 blurRadius = blurRadius.dp,
+                                 style = style,
+                                 voiceAccent = lineAccent,
+@@ -960,7 +1021,7 @@ fun LyricsUI(
+                                 currentTimeState = currentTimeState,
+                                 isActive = isActive,
+                                 alphaProvider = { alphaState.value },
+-                                scaleProvider = { scaleState.value },
++                                scaleProvider = { scaleState.value * (1f - 0.06f * sungMoveState.value) },
+                                 blurRadius = blurRadius.dp,
+                                 style = style,
+                                 textMeasurer = textMeasurer,
+@@ -1856,20 +1917,22 @@ private fun WordsLyricLine(
+         if (style.transliterationOnTop && showLineTransliteration) transliterationBlock()
+ 
+         beforeAccompaniment.forEach { background ->
+-            AccompanimentLine(
+-                background = background,
+-                currentTimeState = currentTimeState,
+-                litFraction = litFractionState,
+-                placement = AccompanimentPlacement.Before,
+-                style = style,
+-                textMeasurer = textMeasurer,
+-                parentAgents = agents,
+-                voiceIndexById = voiceIndexById,
+-                colorScheme = colorScheme,
+-                fallbackAccent = voiceAccent,
+-                fallbackAlignEnd = alignEnd,
+-                displayOptions = displayOptions,
+-            )
++            BackgroundReveal(style.bgReveal, background, currentTimeState) {
++                AccompanimentLine(
++                    background = background,
++                    currentTimeState = currentTimeState,
++                    litFraction = litFractionState,
++                    placement = AccompanimentPlacement.Before,
++                    style = style,
++                    textMeasurer = textMeasurer,
++                    parentAgents = agents,
++                    voiceIndexById = voiceIndexById,
++                    colorScheme = colorScheme,
++                    fallbackAccent = voiceAccent,
++                    fallbackAlignEnd = alignEnd,
++                    displayOptions = displayOptions,
++                )
++            }
+         }
+ 
+         if (sentence.isNotBlank()) {
+@@ -1894,22 +1957,28 @@ private fun WordsLyricLine(
+             )
+         }
+ 
+-        afterAccompaniment.forEach { background ->
+-            AccompanimentLine(
+-                background = background,
+-                currentTimeState = currentTimeState,
+-                litFraction = litFractionState,
+-                placement = AccompanimentPlacement.After,
+-                style = style,
+-                textMeasurer = textMeasurer,
+-                parentAgents = agents,
+-                voiceIndexById = voiceIndexById,
+-                colorScheme = colorScheme,
+-                fallbackAccent = voiceAccent,
+-                fallbackAlignEnd = alignEnd,
+-                displayOptions = displayOptions,
+-            )
++        // With the reveal on, background vocals sit below the translation (main, translation, background).
++        val afterAccompanimentBlock: @Composable () -> Unit = {
++            afterAccompaniment.forEach { background ->
++                BackgroundReveal(style.bgReveal, background, currentTimeState) {
++                    AccompanimentLine(
++                        background = background,
++                        currentTimeState = currentTimeState,
++                        litFraction = litFractionState,
++                        placement = AccompanimentPlacement.After,
++                        style = style,
++                        textMeasurer = textMeasurer,
++                        parentAgents = agents,
++                        voiceIndexById = voiceIndexById,
++                        colorScheme = colorScheme,
++                        fallbackAccent = voiceAccent,
++                        fallbackAlignEnd = alignEnd,
++                        displayOptions = displayOptions,
++                    )
++                }
++            }
+         }
++        if (style.bgReveal == null) afterAccompanimentBlock()
+ 
+         if (!style.transliterationOnTop && showLineTransliteration) transliterationBlock()
+ 
+@@ -1935,6 +2004,8 @@ private fun WordsLyricLine(
+                 displayOptions = displayOptions,
+             )
+         }
++
++        if (style.bgReveal != null) afterAccompanimentBlock()
+     }
+ }
+ 
+@@ -2019,6 +2090,77 @@ private fun attachedRomanizationFor(
+     return result.takeIf { list -> list.any { it.isNotEmpty() } }
+ }
+ 
++/** Options of the background vocal reveal (Lyrics settings > Line and background vocal animation). */
++@Immutable
++private data class BgRevealSpec(
++    val beforeMs: Int,
++    val afterMs: Int,
++    val durationMs: Int,
++    val blurDp: Int,
++)
++
++private val BgRevealEase = CubicBezierEasing(0.2f, 0.8f, 0.2f, 1f)
++
++/**
++ * Lets a background vocal expand out from behind the main lyric (height, fade, slight rise and scale, optional blur)
++ * [BgRevealSpec.beforeMs] before it is sung, and collapse back [BgRevealSpec.afterMs] after it ends.
++ * Without a [spec] the content is simply shown.
++ */
++@Composable
++private fun BackgroundReveal(
++    spec: BgRevealSpec?,
++    background: LyricItem.WordsLyric.AccompanimentLyric,
++    currentTimeState: State<Long>,
++    content: @Composable () -> Unit,
++) {
++    if (spec == null) {
++        content()
++        return
++    }
++    val open by remember(background, spec, currentTimeState) {
++        derivedStateOf {
++            val time = currentTimeState.value
++            time >= background.startTime - spec.beforeMs && time < background.endTime + spec.afterMs
++        }
++    }
++    val progress =
++        animateFloatAsState(
++            targetValue = if (open) 1f else 0f,
++            animationSpec = tween(durationMillis = spec.durationMs, easing = BgRevealEase),
++            label = "bgReveal",
++        )
++    val density = LocalDensity.current
++    val liftPx = with(density) { 14.dp.toPx() }
++    val blurPx = with(density) { spec.blurDp.dp.toPx() }
++    Box(
++        modifier =
++            Modifier
++                .clipToBounds()
++                .layout { measurable, constraints ->
++                    val placeable = measurable.measure(constraints)
++                    val p = progress.value
++                    layout(placeable.width, (placeable.height * p).roundToInt()) {
++                        placeable.placeWithLayer(0, 0) {
++                            alpha = p
++                            translationY = -(1f - p) * liftPx
++                            val scale = 0.96f + 0.04f * p
++                            scaleX = scale
++                            scaleY = scale
++                            transformOrigin = TransformOrigin(0.5f, 0f)
++                            renderEffect =
++                                if (blurPx > 0f && p < 1f) {
++                                    BlurEffect(blurPx * (1f - p), blurPx * (1f - p), TileMode.Decal)
++                                } else {
++                                    null
++                                }
++                        }
++                    }
++                },
++    ) {
++        content()
++    }
++}
++
+ private enum class AccompanimentPlacement {
+     Before,
+     After,
+diff --git a/app/src/main/java/me/spica27/spicamusic/ui/widget/LyricsSettingsSheet.kt b/app/src/main/java/me/spica27/spicamusic/ui/widget/LyricsSettingsSheet.kt
+index eb320e6..963a500 100644
+--- a/app/src/main/java/me/spica27/spicamusic/ui/widget/LyricsSettingsSheet.kt
++++ b/app/src/main/java/me/spica27/spicamusic/ui/widget/LyricsSettingsSheet.kt
+@@ -53,6 +53,7 @@ fun LyricsSettingsSheet(
+             }
+             LightSweepSection(settings = settings, onUpdate = onUpdate)
+             LyricsProgressSection(settings = settings, onUpdate = onUpdate)
++            LineAnimationSection(settings = settings, onUpdate = onUpdate)
+             EnhanceHeaderSection(settings = settings, onUpdate = onUpdate)
+         }
+     }
+@@ -382,6 +383,92 @@ private fun LightSweepSection(
+     }
+ }
+ 
++private fun secondsText(ms: Int): String = "${ms / 1000}.${(ms % 1000) / 100} s"
++
++@Composable
++private fun LineAnimationSection(
++    settings: LyricsStyleSettings,
++    onUpdate: ((LyricsStyleSettings) -> LyricsStyleSettings) -> Unit,
++) {
++    LyricsSettingsSection(stringResource(R.string.lyr_set_section_line_anim))
++
++    LyricsSettingsToggle(
++        label = stringResource(R.string.lyr_set_line_move),
++        description = stringResource(R.string.lyr_set_line_move_desc),
++        checked = settings.lineMoveEnabled,
++        onCheckedChange = { v -> onUpdate { it.copy(lineMoveEnabled = v) } },
++    )
++    if (settings.lineMoveEnabled) {
++        LyricsSettingsSlider(
++            label = stringResource(R.string.lyr_set_line_move_duration),
++            description = stringResource(R.string.lyr_set_line_move_duration_desc),
++            value = settings.lineMoveMs,
++            range = LyricsStyleSettings.LINE_MOVE_AFTER_RANGE,
++            step = 100,
++            valueText = ::secondsText,
++            onValueChange = { v -> onUpdate { it.copy(lineMoveMs = v) } },
++        )
++    }
++    LyricsSettingsToggle(
++        label = stringResource(R.string.lyr_set_bg_reveal),
++        description = stringResource(R.string.lyr_set_bg_reveal_desc),
++        checked = settings.bgRevealEnabled,
++        onCheckedChange = { v -> onUpdate { it.copy(bgRevealEnabled = v) } },
++    )
++    if (settings.bgRevealEnabled) {
++        LyricsSettingsSlider(
++            label = stringResource(R.string.lyr_set_bg_reveal_before),
++            description = stringResource(R.string.lyr_set_bg_reveal_before_desc),
++            value = settings.bgRevealBeforeMs,
++            range = LyricsStyleSettings.BG_REVEAL_OFFSET_RANGE,
++            step = 100,
++            valueText = ::secondsText,
++            onValueChange = { v -> onUpdate { it.copy(bgRevealBeforeMs = v) } },
++        )
++        LyricsSettingsSlider(
++            label = stringResource(R.string.lyr_set_bg_reveal_after),
++            description = stringResource(R.string.lyr_set_bg_reveal_after_desc),
++            value = settings.bgRevealAfterMs,
++            range = LyricsStyleSettings.BG_REVEAL_OFFSET_RANGE,
++            step = 100,
++            valueText = ::secondsText,
++            onValueChange = { v -> onUpdate { it.copy(bgRevealAfterMs = v) } },
++        )
++        LyricsSettingsSlider(
++            label = stringResource(R.string.lyr_set_bg_reveal_duration),
++            description = stringResource(R.string.lyr_set_bg_reveal_duration_desc),
++            value = settings.bgRevealDurationMs,
++            range = LyricsStyleSettings.BG_REVEAL_DURATION_RANGE,
++            step = 100,
++            valueText = ::secondsText,
++            onValueChange = { v -> onUpdate { it.copy(bgRevealDurationMs = v) } },
++        )
++        LyricsSettingsToggle(
++            label = stringResource(R.string.lyr_set_bg_reveal_blur),
++            description = stringResource(R.string.lyr_set_bg_reveal_blur_desc),
++            checked = settings.bgRevealBlurEnabled,
++            onCheckedChange = { v -> onUpdate { it.copy(bgRevealBlurEnabled = v) } },
++        )
++        if (settings.bgRevealBlurEnabled) {
++            LyricsSettingsSlider(
++                label = stringResource(R.string.lyr_set_bg_reveal_blur_amount),
++                description = stringResource(R.string.lyr_set_bg_reveal_blur_amount_desc),
++                value = settings.bgRevealBlurAmount,
++                range = LyricsStyleSettings.BG_REVEAL_BLUR_RANGE,
++                step = 1,
++                valueText = { "$it dp" },
++                onValueChange = { v -> onUpdate { it.copy(bgRevealBlurAmount = v) } },
++            )
++        }
++    }
++    LyricsSettingsToggle(
++        label = stringResource(R.string.lyr_set_fix_anchor),
++        description = stringResource(R.string.lyr_set_fix_anchor_desc),
++        checked = settings.fixAnchorEnabled,
++        onCheckedChange = { v -> onUpdate { it.copy(fixAnchorEnabled = v) } },
++    )
++}
++
+ @Composable
+ private fun LineEffectSection(
+     settings: LyricsStyleSettings,
+diff --git a/app/src/main/java/me/spica27/spicamusic/ui/widget/SpringPlacementModifier.kt b/app/src/main/java/me/spica27/spicamusic/ui/widget/SpringPlacementModifier.kt
+index 269a2d6..bf030af 100644
+--- a/app/src/main/java/me/spica27/spicamusic/ui/widget/SpringPlacementModifier.kt
++++ b/app/src/main/java/me/spica27/spicamusic/ui/widget/SpringPlacementModifier.kt
+@@ -99,9 +99,15 @@ private class LinePlacementModifierNode(
+     var delayMillis: Int,
+     var jiggle: JiggleSpec?,
+     var initialOffsetY: Int,
++    /** Position changes up to this many px in one frame are followed 1:1 (a line growing or shrinking), not glided. 0 = off. */
++    var followThresholdPx: Int,
+ ) : Modifier.Node(),
+     ApproachLayoutModifierNode {
+     private var offsetAnimation = DeferredTargetAnimation(IntOffset.VectorConverter)
++
++    /** Small shifts (e.g. a background vocal expanding above this line) that are applied at once, not glided. */
++    private var followOffset = IntOffset.Zero
++    private var rawLastTarget: IntOffset? = null
+     private var isFirstFrame = true
+ 
+     /** Progress 0..1 of the jiggle wobble of the current move. */
+@@ -184,8 +190,23 @@ private class LinePlacementModifierNode(
+             }
+     }
+ 
++    /**
++     * A line that grows or shrinks (the background vocal reveal) moves the lines below it a little every frame.
++     * Those small shifts are followed at once; only real jumps (a new current line) glide, so the glide is never
++     * restarted every frame and the jiggle does not fire for them.
++     */
++    private fun updatePlacementTarget(rawTarget: IntOffset): IntOffset {
++        val previous = rawLastTarget
++        rawLastTarget = rawTarget
++        if (followThresholdPx > 0 && previous != null && previous != rawTarget) {
++            val delta = rawTarget - previous
++            if (delta.x == 0 && abs(delta.y) <= followThresholdPx) followOffset += delta
++        }
++        return animateToTarget(rawTarget - followOffset) + followOffset
++    }
++
+     /** 首次组合的底部歌词先下移，再补间到目标位置。 */
+-    private fun updatePlacementTarget(target: IntOffset): IntOffset {
++    private fun animateToTarget(target: IntOffset): IntOffset {
+         noteTargetChange(target)
+         if (isFirstFrame) {
+             isFirstFrame = false
+@@ -214,7 +235,9 @@ private class LinePlacementModifierNode(
+         newDelayMillis: Int,
+         newJiggle: JiggleSpec?,
+         newInitialOffsetY: Int,
++        newFollowThresholdPx: Int,
+     ) {
++        followThresholdPx = newFollowThresholdPx
+         lookaheadScope = newScope
+         isManualScrolling = newIsManualScrolling
+         durationMillis = newDurationMillis
+@@ -231,6 +254,8 @@ private class LinePlacementModifierNode(
+         offsetAnimation = DeferredTargetAnimation(IntOffset.VectorConverter)
+         isFirstFrame = true
+         lastTarget = null
++        followOffset = IntOffset.Zero
++        rawLastTarget = null
+         wobbleJob?.cancel()
+     }
+ }
+@@ -243,6 +268,7 @@ private data class LinePlacementNodeElement(
+     val delayMillis: Int,
+     val jiggle: JiggleSpec?,
+     val initialOffsetY: Int,
++    val followThresholdPx: Int,
+ ) : ModifierNodeElement<LinePlacementModifierNode>() {
+     override fun update(node: LinePlacementModifierNode) {
+         node.updateState(
+@@ -253,6 +279,7 @@ private data class LinePlacementNodeElement(
+             delayMillis,
+             jiggle,
+             initialOffsetY,
++            followThresholdPx,
+         )
+     }
+ 
+@@ -265,6 +292,7 @@ private data class LinePlacementNodeElement(
+             delayMillis,
+             jiggle,
+             initialOffsetY,
++            followThresholdPx,
+         )
+ }
+ 
+@@ -277,6 +305,7 @@ internal fun Modifier.linePlacement(
+     delayMillis: Int,
+     jiggle: JiggleSpec? = null,
+     initialOffsetY: Int = 0,
++    followThresholdPx: Int = 0,
+ ): Modifier =
+     then(
+         LinePlacementNodeElement(
+@@ -287,5 +316,6 @@ internal fun Modifier.linePlacement(
+             delayMillis = delayMillis,
+             jiggle = jiggle,
+             initialOffsetY = initialOffsetY,
++            followThresholdPx = followThresholdPx,
+         ),
+     )
+diff --git a/app/src/main/res/values-zh-rTW/strings.xml b/app/src/main/res/values-zh-rTW/strings.xml
+index 8fe4d25..626e43c 100644
+--- a/app/src/main/res/values-zh-rTW/strings.xml
++++ b/app/src/main/res/values-zh-rTW/strings.xml
+@@ -904,6 +904,25 @@
+   <string name="lyr_set_sweep_flash_desc">在光的前沿處加強亮度</string>
+   <string name="lyr_set_sweep_softness">柔和度</string>
+   <string name="lyr_set_sweep_softness_desc">光的邊緣有多寬、多柔和</string>
++  <string name="lyr_set_section_line_anim">行與伴唱動畫</string>
++  <string name="lyr_set_line_move">唱完後移動該行</string>
++  <string name="lyr_set_line_move_desc">唱完的歌詞行會稍微上移並縮小</string>
++  <string name="lyr_set_line_move_duration">移動時長</string>
++  <string name="lyr_set_line_move_duration_desc">移動所需時間</string>
++  <string name="lyr_set_bg_reveal">伴唱展開</string>
++  <string name="lyr_set_bg_reveal_desc">伴唱從主歌詞後方展開並淡入，隨後收起並淡出</string>
++  <string name="lyr_set_bg_reveal_before">演唱前展開</string>
++  <string name="lyr_set_bg_reveal_before_desc">伴唱開始前多久展開</string>
++  <string name="lyr_set_bg_reveal_after">演唱後收起</string>
++  <string name="lyr_set_bg_reveal_after_desc">伴唱結束後多久收起</string>
++  <string name="lyr_set_bg_reveal_duration">展開 / 收起時長</string>
++  <string name="lyr_set_bg_reveal_duration_desc">每次展開或收起所需時間</string>
++  <string name="lyr_set_bg_reveal_blur">展開時模糊</string>
++  <string name="lyr_set_bg_reveal_blur_desc">伴唱以模糊狀態出現，展開時逐漸清晰，收起時再次模糊</string>
++  <string name="lyr_set_bg_reveal_blur_amount">模糊程度</string>
++  <string name="lyr_set_bg_reveal_blur_amount_desc">展開時的模糊半徑</string>
++  <string name="lyr_set_fix_anchor">修正錨點</string>
++  <string name="lyr_set_fix_anchor_desc">伴唱展開或收起時，保持目前行和下方歌詞穩定（需開啟伴唱展開）</string>
+   <string name="lyr_set_section_progress">歌詞進度</string>
+   <string name="lyr_set_word_lift">自訂文字上抬</string>
+   <string name="lyr_set_word_lift_desc">關閉則使用預設上抬幅度</string>
+diff --git a/app/src/main/res/values-zh/strings.xml b/app/src/main/res/values-zh/strings.xml
+index d50cac8..6a1fd46 100644
+--- a/app/src/main/res/values-zh/strings.xml
++++ b/app/src/main/res/values-zh/strings.xml
+@@ -905,6 +905,25 @@
+   <string name="lyr_set_sweep_flash_desc">在光的前沿处加强亮度</string>
+   <string name="lyr_set_sweep_softness">柔和度</string>
+   <string name="lyr_set_sweep_softness_desc">光的边缘有多宽、多柔和</string>
++  <string name="lyr_set_section_line_anim">行与伴唱动画</string>
++  <string name="lyr_set_line_move">唱完后移动该行</string>
++  <string name="lyr_set_line_move_desc">唱完的歌词行会稍微上移并缩小</string>
++  <string name="lyr_set_line_move_duration">移动时长</string>
++  <string name="lyr_set_line_move_duration_desc">移动所需时间</string>
++  <string name="lyr_set_bg_reveal">伴唱展开</string>
++  <string name="lyr_set_bg_reveal_desc">伴唱从主歌词后方展开并淡入，随后收起并淡出</string>
++  <string name="lyr_set_bg_reveal_before">演唱前展开</string>
++  <string name="lyr_set_bg_reveal_before_desc">伴唱开始前多久展开</string>
++  <string name="lyr_set_bg_reveal_after">演唱后收起</string>
++  <string name="lyr_set_bg_reveal_after_desc">伴唱结束后多久收起</string>
++  <string name="lyr_set_bg_reveal_duration">展开 / 收起时长</string>
++  <string name="lyr_set_bg_reveal_duration_desc">每次展开或收起所需时间</string>
++  <string name="lyr_set_bg_reveal_blur">展开时模糊</string>
++  <string name="lyr_set_bg_reveal_blur_desc">伴唱以模糊状态出现，展开时逐渐清晰，收起时再次模糊</string>
++  <string name="lyr_set_bg_reveal_blur_amount">模糊程度</string>
++  <string name="lyr_set_bg_reveal_blur_amount_desc">展开时的模糊半径</string>
++  <string name="lyr_set_fix_anchor">修正锚点</string>
++  <string name="lyr_set_fix_anchor_desc">伴唱展开或收起时，保持当前行和下方歌词稳定（需开启伴唱展开）</string>
+   <string name="lyr_set_section_progress">歌词进度</string>
+   <string name="lyr_set_word_lift">自定义文字上抬</string>
+   <string name="lyr_set_word_lift_desc">关闭则使用默认上抬幅度</string>
+diff --git a/app/src/main/res/values/strings.xml b/app/src/main/res/values/strings.xml
+index 5e7bb1d..c566d96 100644
+--- a/app/src/main/res/values/strings.xml
++++ b/app/src/main/res/values/strings.xml
+@@ -905,6 +905,25 @@
+   <string name="lyr_set_sweep_flash_desc">A brighter glow right at the leading edge</string>
+   <string name="lyr_set_sweep_softness">Softness</string>
+   <string name="lyr_set_sweep_softness_desc">How wide and soft the edge of the light is</string>
++  <string name="lyr_set_section_line_anim">Line and background vocal animation</string>
++  <string name="lyr_set_line_move">Move line after it is sung</string>
++  <string name="lyr_set_line_move_desc">A sung line moves up a little and gets smaller</string>
++  <string name="lyr_set_line_move_duration">Move duration</string>
++  <string name="lyr_set_line_move_duration_desc">How long the move takes</string>
++  <string name="lyr_set_bg_reveal">Background vocal reveal</string>
++  <string name="lyr_set_bg_reveal_desc">Background vocals expand from behind the main lyric and fade in, then collapse and fade out</string>
++  <string name="lyr_set_bg_reveal_before">Expand before it is sung</string>
++  <string name="lyr_set_bg_reveal_before_desc">How long before the background vocal starts that it expands</string>
++  <string name="lyr_set_bg_reveal_after">Collapse after it is sung</string>
++  <string name="lyr_set_bg_reveal_after_desc">How long after the background vocal ends that it collapses</string>
++  <string name="lyr_set_bg_reveal_duration">Expand / collapse duration</string>
++  <string name="lyr_set_bg_reveal_duration_desc">How long each expand or collapse takes</string>
++  <string name="lyr_set_bg_reveal_blur">Blur while revealing</string>
++  <string name="lyr_set_bg_reveal_blur_desc">Background vocals start blurred and sharpen as they expand, and blur again as they collapse</string>
++  <string name="lyr_set_bg_reveal_blur_amount">Blur amount</string>
++  <string name="lyr_set_bg_reveal_blur_amount_desc">Blur radius while revealing</string>
++  <string name="lyr_set_fix_anchor">Fix anchor</string>
++  <string name="lyr_set_fix_anchor_desc">Keeps the current line and the lines below steady while a background vocal expands or collapses (needs Background vocal reveal)</string>
+   <string name="lyr_set_section_progress">Lyrics progress</string>
+   <string name="lyr_set_word_lift">Custom text lift</string>
+   <string name="lyr_set_word_lift_desc">Off keeps the default lift</string>
+diff --git a/core-preferences/src/main/java/me/spica27/spicamusic/core/preferences/LyricsStyleSettings.kt b/core-preferences/src/main/java/me/spica27/spicamusic/core/preferences/LyricsStyleSettings.kt
+index 96a834d..cb94778 100644
+--- a/core-preferences/src/main/java/me/spica27/spicamusic/core/preferences/LyricsStyleSettings.kt
++++ b/core-preferences/src/main/java/me/spica27/spicamusic/core/preferences/LyricsStyleSettings.kt
+@@ -147,6 +147,25 @@ data class LyricsStyleSettings(
+     val dockSoftEdge: Boolean = true,
+     /** Spread only: height of the fade band above the bar, in dp. */
+     val dockEdgeFade: Int = 32,
++    // ---- Line and background vocal animation ----
++    /** A line moves a little (up and smaller) after it has been sung. */
++    val lineMoveEnabled: Boolean = false,
++    /** Duration of that move in ms. */
++    val lineMoveMs: Int = 600,
++    /** Background vocals expand out from behind the main lyric before they are sung and collapse after. */
++    val bgRevealEnabled: Boolean = false,
++    /** Expand starts this long before the background vocal is sung, in ms. */
++    val bgRevealBeforeMs: Int = 1000,
++    /** Collapse starts this long after the background vocal is sung, in ms. */
++    val bgRevealAfterMs: Int = 1000,
++    /** Duration of the expand and of the collapse, in ms. */
++    val bgRevealDurationMs: Int = 800,
++    /** Blur the background vocal while it expands or collapses. */
++    val bgRevealBlurEnabled: Boolean = true,
++    /** Blur radius in dp. */
++    val bgRevealBlurAmount: Int = 8,
++    /** Keeps lines and the current line steady on their anchor while a background vocal expands or collapses. */
++    val fixAnchorEnabled: Boolean = true,
+ ) {
+     /** Returns a copy with every value forced into its allowed range. */
+     fun sanitized(): LyricsStyleSettings =
+@@ -188,6 +207,11 @@ data class LyricsStyleSettings(
+             dockGapLeft = dockGapLeft.coerceIn(DOCK_GAP_RANGE),
+             dockGapRight = dockGapRight.coerceIn(DOCK_GAP_RANGE),
+             dockEdgeFade = dockEdgeFade.coerceIn(DOCK_EDGE_FADE_RANGE),
++            lineMoveMs = lineMoveMs.coerceIn(LINE_MOVE_AFTER_RANGE),
++            bgRevealBeforeMs = bgRevealBeforeMs.coerceIn(BG_REVEAL_OFFSET_RANGE),
++            bgRevealAfterMs = bgRevealAfterMs.coerceIn(BG_REVEAL_OFFSET_RANGE),
++            bgRevealDurationMs = bgRevealDurationMs.coerceIn(BG_REVEAL_DURATION_RANGE),
++            bgRevealBlurAmount = bgRevealBlurAmount.coerceIn(BG_REVEAL_BLUR_RANGE),
+         )
+ 
+     companion object {
+@@ -226,5 +250,9 @@ data class LyricsStyleSettings(
+         val DOCK_PILL_PADDING_RANGE = 0..16
+         val DOCK_GAP_RANGE = 0..32
+         val DOCK_EDGE_FADE_RANGE = 0..80
++        val LINE_MOVE_AFTER_RANGE = 200..2000
++        val BG_REVEAL_OFFSET_RANGE = 500..1500
++        val BG_REVEAL_DURATION_RANGE = 500..2000
++        val BG_REVEAL_BLUR_RANGE = 1..20
+     }
+ }
+diff --git a/core-preferences/src/main/java/me/spica27/spicamusic/core/preferences/PreferencesManager.kt b/core-preferences/src/main/java/me/spica27/spicamusic/core/preferences/PreferencesManager.kt
+index 6bb8c9f..4d3ea79 100644
+--- a/core-preferences/src/main/java/me/spica27/spicamusic/core/preferences/PreferencesManager.kt
++++ b/core-preferences/src/main/java/me/spica27/spicamusic/core/preferences/PreferencesManager.kt
+@@ -81,6 +81,15 @@ class PreferencesManager(
+         val LYRIC_LIGHT_SWEEP_EASE = booleanPreferencesKey("lyric_light_sweep_ease")
+         val LYRIC_LIGHT_SWEEP_FLASH = booleanPreferencesKey("lyric_light_sweep_flash")
+         val LYRIC_LIGHT_SWEEP_SOFTNESS = intPreferencesKey("lyric_light_sweep_softness")
++        val LYRIC_LINE_MOVE = booleanPreferencesKey("lyric_line_move")
++        val LYRIC_LINE_MOVE_MS = intPreferencesKey("lyric_line_move_ms")
++        val LYRIC_BG_REVEAL = booleanPreferencesKey("lyric_bg_reveal")
++        val LYRIC_BG_REVEAL_BEFORE_MS = intPreferencesKey("lyric_bg_reveal_before_ms")
++        val LYRIC_BG_REVEAL_AFTER_MS = intPreferencesKey("lyric_bg_reveal_after_ms")
++        val LYRIC_BG_REVEAL_DURATION_MS = intPreferencesKey("lyric_bg_reveal_duration_ms")
++        val LYRIC_BG_REVEAL_BLUR = booleanPreferencesKey("lyric_bg_reveal_blur")
++        val LYRIC_BG_REVEAL_BLUR_AMOUNT = intPreferencesKey("lyric_bg_reveal_blur_amount")
++        val LYRIC_FIX_ANCHOR = booleanPreferencesKey("lyric_fix_anchor")
+         val LYRIC_WORD_LIFT_ENABLED = booleanPreferencesKey("lyric_word_lift_enabled")
+         val LYRIC_WORD_LIFT = intPreferencesKey("lyric_word_lift")
+         val LYRIC_MERGE_WORDS = booleanPreferencesKey("lyric_merge_words")
+@@ -154,6 +163,15 @@ class PreferencesManager(
+                     lightSweepEase = p[Keys.LYRIC_LIGHT_SWEEP_EASE] ?: d.lightSweepEase,
+                     lightSweepFlash = p[Keys.LYRIC_LIGHT_SWEEP_FLASH] ?: d.lightSweepFlash,
+                     lightSweepSoftness = p[Keys.LYRIC_LIGHT_SWEEP_SOFTNESS] ?: d.lightSweepSoftness,
++                    lineMoveEnabled = p[Keys.LYRIC_LINE_MOVE] ?: d.lineMoveEnabled,
++                    lineMoveMs = p[Keys.LYRIC_LINE_MOVE_MS] ?: d.lineMoveMs,
++                    bgRevealEnabled = p[Keys.LYRIC_BG_REVEAL] ?: d.bgRevealEnabled,
++                    bgRevealBeforeMs = p[Keys.LYRIC_BG_REVEAL_BEFORE_MS] ?: d.bgRevealBeforeMs,
++                    bgRevealAfterMs = p[Keys.LYRIC_BG_REVEAL_AFTER_MS] ?: d.bgRevealAfterMs,
++                    bgRevealDurationMs = p[Keys.LYRIC_BG_REVEAL_DURATION_MS] ?: d.bgRevealDurationMs,
++                    bgRevealBlurEnabled = p[Keys.LYRIC_BG_REVEAL_BLUR] ?: d.bgRevealBlurEnabled,
++                    bgRevealBlurAmount = p[Keys.LYRIC_BG_REVEAL_BLUR_AMOUNT] ?: d.bgRevealBlurAmount,
++                    fixAnchorEnabled = p[Keys.LYRIC_FIX_ANCHOR] ?: d.fixAnchorEnabled,
+                     wordLiftEnabled = p[Keys.LYRIC_WORD_LIFT_ENABLED] ?: d.wordLiftEnabled,
+                     wordLift = p[Keys.LYRIC_WORD_LIFT] ?: d.wordLift,
+                     mergeWords = p[Keys.LYRIC_MERGE_WORDS] ?: d.mergeWords,
+@@ -227,6 +245,15 @@ class PreferencesManager(
+                     lightSweepEase = p[Keys.LYRIC_LIGHT_SWEEP_EASE] ?: d.lightSweepEase,
+                     lightSweepFlash = p[Keys.LYRIC_LIGHT_SWEEP_FLASH] ?: d.lightSweepFlash,
+                     lightSweepSoftness = p[Keys.LYRIC_LIGHT_SWEEP_SOFTNESS] ?: d.lightSweepSoftness,
++                    lineMoveEnabled = p[Keys.LYRIC_LINE_MOVE] ?: d.lineMoveEnabled,
++                    lineMoveMs = p[Keys.LYRIC_LINE_MOVE_MS] ?: d.lineMoveMs,
++                    bgRevealEnabled = p[Keys.LYRIC_BG_REVEAL] ?: d.bgRevealEnabled,
++                    bgRevealBeforeMs = p[Keys.LYRIC_BG_REVEAL_BEFORE_MS] ?: d.bgRevealBeforeMs,
++                    bgRevealAfterMs = p[Keys.LYRIC_BG_REVEAL_AFTER_MS] ?: d.bgRevealAfterMs,
++                    bgRevealDurationMs = p[Keys.LYRIC_BG_REVEAL_DURATION_MS] ?: d.bgRevealDurationMs,
++                    bgRevealBlurEnabled = p[Keys.LYRIC_BG_REVEAL_BLUR] ?: d.bgRevealBlurEnabled,
++                    bgRevealBlurAmount = p[Keys.LYRIC_BG_REVEAL_BLUR_AMOUNT] ?: d.bgRevealBlurAmount,
++                    fixAnchorEnabled = p[Keys.LYRIC_FIX_ANCHOR] ?: d.fixAnchorEnabled,
+                     wordLiftEnabled = p[Keys.LYRIC_WORD_LIFT_ENABLED] ?: d.wordLiftEnabled,
+                     wordLift = p[Keys.LYRIC_WORD_LIFT] ?: d.wordLift,
+                     mergeWords = p[Keys.LYRIC_MERGE_WORDS] ?: d.mergeWords,
+@@ -291,6 +318,15 @@ class PreferencesManager(
+             p[Keys.LYRIC_LIGHT_SWEEP_EASE] = n.lightSweepEase
+             p[Keys.LYRIC_LIGHT_SWEEP_FLASH] = n.lightSweepFlash
+             p[Keys.LYRIC_LIGHT_SWEEP_SOFTNESS] = n.lightSweepSoftness
++            p[Keys.LYRIC_LINE_MOVE] = n.lineMoveEnabled
++            p[Keys.LYRIC_LINE_MOVE_MS] = n.lineMoveMs
++            p[Keys.LYRIC_BG_REVEAL] = n.bgRevealEnabled
++            p[Keys.LYRIC_BG_REVEAL_BEFORE_MS] = n.bgRevealBeforeMs
++            p[Keys.LYRIC_BG_REVEAL_AFTER_MS] = n.bgRevealAfterMs
++            p[Keys.LYRIC_BG_REVEAL_DURATION_MS] = n.bgRevealDurationMs
++            p[Keys.LYRIC_BG_REVEAL_BLUR] = n.bgRevealBlurEnabled
++            p[Keys.LYRIC_BG_REVEAL_BLUR_AMOUNT] = n.bgRevealBlurAmount
++            p[Keys.LYRIC_FIX_ANCHOR] = n.fixAnchorEnabled
+             p[Keys.LYRIC_WORD_LIFT_ENABLED] = n.wordLiftEnabled
+             p[Keys.LYRIC_WORD_LIFT] = n.wordLift
+             p[Keys.LYRIC_MERGE_WORDS] = n.mergeWords
