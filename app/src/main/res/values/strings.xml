@@ -1015,4 +1015,15 @@
   <string name="lyr_set_fx_light_desc">A soft glow around the sung words and a bright spark at the front, like the progress bar</string>
   <string name="lyr_set_fx_intensity">Light intensity</string>
   <string name="lyr_set_fx_intensity_desc">How strong the glow and the spark are</string>
+  <string name="lyr_set_section_dyn">Dynamic lyrics color</string>
+  <string name="lyr_set_dyn">Dynamic lyrics color</string>
+  <string name="lyr_set_dyn_desc">Lyrics colour is taken from the album art</string>
+  <string name="lyr_set_dyn_mode">Colour mode</string>
+  <string name="lyr_set_dyn_mode_desc">Auto follows the app theme</string>
+  <string name="lyr_set_dyn_opacity">Color opacity</string>
+  <string name="lyr_set_dyn_opacity_desc">How solid the lyrics colour is</string>
+  <string name="lyr_set_dyn_saturation">Color saturation</string>
+  <string name="lyr_set_dyn_saturation_desc">How vivid the album colour is</string>
+  <string name="lyr_set_dyn_contrast">Color contrast</string>
+  <string name="lyr_set_dyn_contrast_desc">Lighter on dark, darker on light</string>
 </resources>

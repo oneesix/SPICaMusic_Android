@@ -18,6 +18,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.Dp
@@ -35,6 +36,7 @@ import me.spica27.spicamusic.ui.widget.LyricsDisplayMode
 import me.spica27.spicamusic.ui.widget.LyricsDisplayOptions
 import me.spica27.spicamusic.ui.widget.LyricsSettingsSheet
 import me.spica27.spicamusic.ui.widget.LyricsUI
+import me.spica27.spicamusic.utils.rememberDominantColorFromUri
 import org.koin.compose.viewmodel.koinActivityViewModel
 
 /**
@@ -71,6 +73,18 @@ fun LyricsPanel(
     val styleViewModel: LyricsStyleViewModel = koinActivityViewModel()
     val styleSettings by styleViewModel.style.collectAsStateWithLifecycle()
     var showLyricsSettings by remember { mutableStateOf(false) }
+    // Dynamic lyrics colour: the dominant colour of the current album art (null = off).
+    val albumColor: Color? =
+        if (styleSettings.dynamicLyricsEnabled) {
+            val playerViewModel = LocalPlayerViewModel.current
+            val currentMediaItem by playerViewModel.currentMediaItem.collectAsStateWithLifecycle()
+            rememberDominantColorFromUri(
+                uri = currentMediaItem?.mediaMetadata?.artworkUri,
+                fallbackColor = MaterialTheme.colorScheme.primary,
+            )
+        } else {
+            null
+        }
 
     val backStack = LocalBackStack.current
 
@@ -162,6 +176,7 @@ fun LyricsPanel(
                     styleSettings = styleSettings,
                     isSynced = displayed.isSynced,
                     songDurationMs = songDurationMs,
+                    albumColor = albumColor,
                     onSeekToTime = { posMs ->
                         viewModel.seekTo(posMs - uiState.lyricsOffsetMs)
                     },

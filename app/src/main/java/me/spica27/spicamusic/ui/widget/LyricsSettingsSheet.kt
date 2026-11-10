@@ -53,6 +53,7 @@ fun LyricsSettingsSheet(
             }
             LightSweepSection(settings = settings, onUpdate = onUpdate)
             GradientLightSection(settings = settings, onUpdate = onUpdate)
+            DynamicColorSection(settings = settings, onUpdate = onUpdate)
             LyricsProgressSection(settings = settings, onUpdate = onUpdate)
             LineAnimationSection(settings = settings, onUpdate = onUpdate)
             EnhanceHeaderSection(settings = settings, onUpdate = onUpdate)
@@ -420,6 +421,64 @@ private fun GradientLightSection(
             step = 5,
             valueText = { "$it%" },
             onValueChange = { v -> onUpdate { it.copy(lyricsLightIntensity = v) } },
+        )
+    }
+}
+
+@Composable
+private fun DynamicColorSection(
+    settings: LyricsStyleSettings,
+    onUpdate: ((LyricsStyleSettings) -> LyricsStyleSettings) -> Unit,
+) {
+    LyricsSettingsSection(stringResource(R.string.lyr_set_section_dyn))
+
+    LyricsSettingsToggle(
+        label = stringResource(R.string.lyr_set_dyn),
+        description = stringResource(R.string.lyr_set_dyn_desc),
+        checked = settings.dynamicLyricsEnabled,
+        onCheckedChange = { v -> onUpdate { it.copy(dynamicLyricsEnabled = v) } },
+    )
+    if (settings.dynamicLyricsEnabled) {
+        LyricsSettingsChips(
+            label = stringResource(R.string.lyr_set_dyn_mode),
+            description = stringResource(R.string.lyr_set_dyn_mode_desc),
+            options = listOf("auto", "dark", "light"),
+            selected = settings.dynamicLyricsMode,
+            optionLabel = {
+                when (it) {
+                    "dark" -> stringResource(R.string.verse_mode_dark)
+                    "light" -> stringResource(R.string.verse_mode_light)
+                    else -> stringResource(R.string.verse_mode_auto)
+                }
+            },
+            onSelect = { v -> onUpdate { it.copy(dynamicLyricsMode = v) } },
+        )
+        LyricsSettingsSlider(
+            label = stringResource(R.string.lyr_set_dyn_opacity),
+            description = stringResource(R.string.lyr_set_dyn_opacity_desc),
+            value = settings.dynamicLyricsOpacity,
+            range = LyricsStyleSettings.DYNAMIC_OPACITY_RANGE,
+            step = 5,
+            valueText = { "$it%" },
+            onValueChange = { v -> onUpdate { it.copy(dynamicLyricsOpacity = v) } },
+        )
+        LyricsSettingsSlider(
+            label = stringResource(R.string.lyr_set_dyn_saturation),
+            description = stringResource(R.string.lyr_set_dyn_saturation_desc),
+            value = settings.dynamicLyricsSaturation,
+            range = LyricsStyleSettings.DYNAMIC_SATURATION_RANGE,
+            step = 5,
+            valueText = { "$it%" },
+            onValueChange = { v -> onUpdate { it.copy(dynamicLyricsSaturation = v) } },
+        )
+        LyricsSettingsSlider(
+            label = stringResource(R.string.lyr_set_dyn_contrast),
+            description = stringResource(R.string.lyr_set_dyn_contrast_desc),
+            value = settings.dynamicLyricsContrast,
+            range = LyricsStyleSettings.DYNAMIC_CONTRAST_RANGE,
+            step = 5,
+            valueText = { "$it%" },
+            onValueChange = { v -> onUpdate { it.copy(dynamicLyricsContrast = v) } },
         )
     }
 }

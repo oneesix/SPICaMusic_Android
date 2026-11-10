@@ -83,6 +83,16 @@ data class LyricsStyleSettings(
     val lyricsLightEnabled: Boolean = false,
     /** Strength of the light effects in percent. */
     val lyricsLightIntensity: Int = 70,
+    // ---- Dynamic lyrics colour (from the album art; off = the theme text colour) ----
+    val dynamicLyricsEnabled: Boolean = false,
+    /** "auto" follows the app theme, "dark" or "light" forces the tone. */
+    val dynamicLyricsMode: String = "auto",
+    /** Opacity of the lyrics colour in percent. */
+    val dynamicLyricsOpacity: Int = 100,
+    /** Saturation of the album colour in percent (100 = as in the cover). */
+    val dynamicLyricsSaturation: Int = 100,
+    /** Distance from the background in percent: lighter on dark, darker on light. */
+    val dynamicLyricsContrast: Int = 50,
     // ---- Lyrics progress (all off = the original behaviour) ----
     val wordLiftEnabled: Boolean = false,
     /** Custom word lift in tenths of dp (15 = 1.5 dp), used when [wordLiftEnabled]. */
@@ -196,6 +206,9 @@ data class LyricsStyleSettings(
             stretchDurationMs = stretchDurationMs.coerceIn(STRETCH_DURATION_RANGE),
             lightSweepSoftness = lightSweepSoftness.coerceIn(LIGHT_SWEEP_SOFTNESS_RANGE),
             lyricsLightIntensity = lyricsLightIntensity.coerceIn(LYRICS_LIGHT_RANGE),
+            dynamicLyricsOpacity = dynamicLyricsOpacity.coerceIn(DYNAMIC_OPACITY_RANGE),
+            dynamicLyricsSaturation = dynamicLyricsSaturation.coerceIn(DYNAMIC_SATURATION_RANGE),
+            dynamicLyricsContrast = dynamicLyricsContrast.coerceIn(DYNAMIC_CONTRAST_RANGE),
             wordLift = wordLift.coerceIn(WORD_LIFT_RANGE),
             heldWordMinMs = heldWordMinMs.coerceIn(HELD_WORD_MIN_RANGE),
             holdScrollLines = holdScrollLines.coerceIn(HOLD_SCROLL_RANGE),
@@ -241,6 +254,9 @@ data class LyricsStyleSettings(
         val STRETCH_DURATION_RANGE = 0..2500
         val LIGHT_SWEEP_SOFTNESS_RANGE = 50..200
         val LYRICS_LIGHT_RANGE = 0..100
+        val DYNAMIC_OPACITY_RANGE = 20..100
+        val DYNAMIC_SATURATION_RANGE = 0..200
+        val DYNAMIC_CONTRAST_RANGE = 0..100
         val WORD_LIFT_RANGE = 0..80
         val HELD_WORD_MIN_RANGE = 0..3000
         val HOLD_SCROLL_RANGE = 1..3

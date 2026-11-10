@@ -1015,4 +1015,15 @@
   <string name="lyr_set_fx_light_desc">已唱歌词周围的柔光和前沿的亮点，与进度条一致</string>
   <string name="lyr_set_fx_intensity">光效强度</string>
   <string name="lyr_set_fx_intensity_desc">柔光和亮点的强度</string>
+  <string name="lyr_set_section_dyn">动态歌词颜色</string>
+  <string name="lyr_set_dyn">动态歌词颜色</string>
+  <string name="lyr_set_dyn_desc">歌词颜色取自专辑封面</string>
+  <string name="lyr_set_dyn_mode">颜色模式</string>
+  <string name="lyr_set_dyn_mode_desc">自动跟随应用主题</string>
+  <string name="lyr_set_dyn_opacity">颜色不透明度</string>
+  <string name="lyr_set_dyn_opacity_desc">歌词颜色的不透明程度</string>
+  <string name="lyr_set_dyn_saturation">颜色饱和度</string>
+  <string name="lyr_set_dyn_saturation_desc">封面颜色的鲜艳程度</string>
+  <string name="lyr_set_dyn_contrast">颜色对比度</string>
+  <string name="lyr_set_dyn_contrast_desc">深色下更亮，浅色下更暗</string>
 </resources>
