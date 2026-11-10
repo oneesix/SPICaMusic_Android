@@ -251,7 +251,7 @@ data class LyricsStyleSettings(
         val DOCK_GAP_RANGE = 0..32
         val DOCK_EDGE_FADE_RANGE = 0..80
         val LINE_MOVE_AFTER_RANGE = 200..2000
-        val BG_REVEAL_OFFSET_RANGE = 500..1500
+        val BG_REVEAL_OFFSET_RANGE = 0..1500
         val BG_REVEAL_DURATION_RANGE = 500..2000
         val BG_REVEAL_BLUR_RANGE = 1..20
     }
