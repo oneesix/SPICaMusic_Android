@@ -1,0 +1,409 @@
+diff --git a/app/src/main/java/me/spica27/spicamusic/ui/player/LyricsPanel.kt b/app/src/main/java/me/spica27/spicamusic/ui/player/LyricsPanel.kt
+index 88f7066..cd02593 100644
+--- a/app/src/main/java/me/spica27/spicamusic/ui/player/LyricsPanel.kt
++++ b/app/src/main/java/me/spica27/spicamusic/ui/player/LyricsPanel.kt
+@@ -18,6 +18,7 @@ import androidx.compose.runtime.setValue
+ import androidx.compose.runtime.withFrameNanos
+ import androidx.compose.ui.Alignment
+ import androidx.compose.ui.Modifier
++import androidx.compose.ui.graphics.Color
+ import androidx.compose.ui.res.stringResource
+ import androidx.compose.ui.text.style.TextAlign
+ import androidx.compose.ui.unit.Dp
+@@ -35,6 +36,7 @@ import me.spica27.spicamusic.ui.widget.LyricsDisplayMode
+ import me.spica27.spicamusic.ui.widget.LyricsDisplayOptions
+ import me.spica27.spicamusic.ui.widget.LyricsSettingsSheet
+ import me.spica27.spicamusic.ui.widget.LyricsUI
++import me.spica27.spicamusic.utils.rememberDominantColorFromUri
+ import org.koin.compose.viewmodel.koinActivityViewModel
+ 
+ /**
+@@ -71,6 +73,18 @@ fun LyricsPanel(
+     val styleViewModel: LyricsStyleViewModel = koinActivityViewModel()
+     val styleSettings by styleViewModel.style.collectAsStateWithLifecycle()
+     var showLyricsSettings by remember { mutableStateOf(false) }
++    // Dynamic lyrics colour: the dominant colour of the current album art (null = off).
++    val albumColor: Color? =
++        if (styleSettings.dynamicLyricsEnabled) {
++            val playerViewModel = LocalPlayerViewModel.current
++            val currentMediaItem by playerViewModel.currentMediaItem.collectAsStateWithLifecycle()
++            rememberDominantColorFromUri(
++                uri = currentMediaItem?.mediaMetadata?.artworkUri,
++                fallbackColor = MaterialTheme.colorScheme.primary,
++            )
++        } else {
++            null
++        }
+ 
+     val backStack = LocalBackStack.current
+ 
+@@ -162,6 +176,7 @@ fun LyricsPanel(
+                     styleSettings = styleSettings,
+                     isSynced = displayed.isSynced,
+                     songDurationMs = songDurationMs,
++                    albumColor = albumColor,
+                     onSeekToTime = { posMs ->
+                         viewModel.seekTo(posMs - uiState.lyricsOffsetMs)
+                     },
+diff --git a/app/src/main/java/me/spica27/spicamusic/ui/widget/LyricUI.kt b/app/src/main/java/me/spica27/spicamusic/ui/widget/LyricUI.kt
+index 39784f6..846ef8e 100644
+--- a/app/src/main/java/me/spica27/spicamusic/ui/widget/LyricUI.kt
++++ b/app/src/main/java/me/spica27/spicamusic/ui/widget/LyricUI.kt
+@@ -70,6 +70,9 @@ import androidx.compose.ui.graphics.BlurEffect
+ import androidx.compose.ui.graphics.Brush
+ import androidx.compose.ui.graphics.Color
+ import androidx.compose.ui.graphics.lerp as lerpColor
++import androidx.compose.ui.graphics.luminance
++import androidx.compose.ui.graphics.toArgb
++import androidx.core.graphics.ColorUtils
+ import androidx.compose.ui.graphics.CompositingStrategy
+ import androidx.compose.ui.graphics.RenderEffect
+ import androidx.compose.ui.graphics.Shadow
+@@ -494,6 +497,34 @@ private fun LyricsStyleSettings.toFxSpec(primary: Color): LyricsFxSpec? =
+         null
+     }
+ 
++/** Lyrics colour taken from the album art. */
++@Immutable
++private data class DynamicLyricsSpec(
++    val color: Color,
++    val opacity: Float,
++)
++
++private fun LyricsStyleSettings.toDynamicSpec(
++    albumColor: Color?,
++    appDark: Boolean,
++): DynamicLyricsSpec? {
++    if (!dynamicLyricsEnabled || albumColor == null) return null
++    val dark =
++        when (dynamicLyricsMode) {
++            "dark" -> true
++            "light" -> false
++            else -> appDark
++        }
++    val hsl = FloatArray(3)
++    ColorUtils.colorToHSL(albumColor.toArgb(), hsl)
++    val saturation = (hsl[1] * dynamicLyricsSaturation / 100f).coerceIn(0f, 1f)
++    // Light tones on a dark page, dark tones on a light page; contrast moves the tone away from the page.
++    val lightness =
++        if (dark) 0.60f + dynamicLyricsContrast * 0.0035f else 0.45f - dynamicLyricsContrast * 0.0035f
++    val rgb = ColorUtils.HSLToColor(floatArrayOf(hsl[0], saturation, lightness.coerceIn(0f, 1f)))
++    return DynamicLyricsSpec(color = Color(rgb), opacity = dynamicLyricsOpacity / 100f)
++}
++
+ /** 随展示形态变化的排版参数。 */
+ @Immutable
+ private data class LyricsUIStyle(
+@@ -517,6 +548,8 @@ private data class LyricsUIStyle(
+     val progress: WordProgressSpec = WordProgressSpec(),
+     /** Gradient lyrics colour and light effects (null = off). */
+     val fx: LyricsFxSpec? = null,
++    /** Lyrics colour from the album art (null = the theme text colour). */
++    val dynamic: DynamicLyricsSpec? = null,
+     /** Background vocal reveal (null = background vocals are always visible). */
+     val bgReveal: BgRevealSpec? = null,
+     /** Transliteration above (true) or below (false) the lyric words. */
+@@ -533,11 +566,13 @@ private data class LyricsUIStyle(
+ private fun rememberLyricsUIStyle(
+     displayMode: LyricsDisplayMode,
+     settings: LyricsStyleSettings,
++    albumColor: Color? = null,
+ ): LyricsUIStyle {
+     val typography = MaterialTheme.typography
+     val primaryColor = MaterialTheme.colorScheme.primary
++    val appDark = MaterialTheme.colorScheme.surface.luminance() < 0.5f
+     val screenWidthDp = LocalConfiguration.current.screenWidthDp
+-    return remember(typography, displayMode, settings, screenWidthDp, primaryColor) {
++    return remember(typography, displayMode, settings, screenWidthDp, primaryColor, albumColor, appDark) {
+         val built =
+             when (displayMode) {
+             LyricsDisplayMode.Fullscreen -> {
+@@ -641,6 +676,7 @@ private fun rememberLyricsUIStyle(
+             .withFontFamily(LyricsFontOption.lyricsFamily(settings.lyricsFont))
+             .copy(
+                 fx = settings.toFxSpec(primaryColor),
++                dynamic = settings.toDynamicSpec(albumColor, appDark),
+                 bgReveal =
+                     if (settings.bgRevealEnabled) {
+                         BgRevealSpec(
+@@ -691,6 +727,8 @@ fun LyricsUI(
+     seekPreviewTimeProvider: () -> Long? = { null },
+     /** Length of the song in ms (0 = unknown). Used for the break line after the last lyric. */
+     songDurationMs: Long = 0L,
++    /** Dominant colour of the album art, used by the dynamic lyrics colour (null = off). */
++    albumColor: Color? = null,
+ ) {
+     val sortedLines = remember(lyric) { lyric.sortedBy { it.time } }
+ 
+@@ -713,7 +751,7 @@ fun LyricsUI(
+ 
+     // Long intros and instrumental gaps get a break line (three dots and a countdown).
+     val lyricLines = remember(sortedLines, songDurationMs) { insertInterludes(sortedLines, songDurationMs) }
+-    val style = rememberLyricsUIStyle(displayMode, styleSettings)
++    val style = rememberLyricsUIStyle(displayMode, styleSettings, albumColor)
+     val lazyListState = rememberLazyListState()
+     var isAutoScrolling by remember { mutableStateOf(false) }
+     val isManualScrolling by remember {
+@@ -1254,8 +1292,8 @@ private fun LyricLine(
+     displayOptions: LyricsDisplayOptions,
+     modifier: Modifier = Modifier,
+ ) {
+-    val inactiveTextColor = MaterialTheme.colorScheme.onSurface
+-    val activeTextColor = voiceAccent ?: MaterialTheme.colorScheme.onSurface
++    val inactiveTextColor = style.dynamic?.color ?: MaterialTheme.colorScheme.onSurface
++    val activeTextColor = voiceAccent ?: style.dynamic?.color ?: MaterialTheme.colorScheme.onSurface
+     val horizontalAlignment = if (alignEnd) Alignment.End else Alignment.Start
+     val textAlign = if (alignEnd) TextAlign.End else TextAlign.Start
+     val phoneticBlock: @Composable () -> Unit = {
+@@ -1942,7 +1980,7 @@ private fun WordsLyricLine(
+     displayOptions: LyricsDisplayOptions,
+     modifier: Modifier = Modifier,
+ ) {
+-    val textColor = voiceAccent ?: colorScheme.onSurface
++    val textColor = voiceAccent ?: style.dynamic?.color ?: colorScheme.onSurface
+     val translationColor = textColor.copy(alpha = LyricUIConstants.TRANSLATION_TEXT_ALPHA)
+     val transliterationColor = textColor.copy(alpha = LyricUIConstants.TRANSLITERATION_TEXT_ALPHA)
+     val horizontalAlignment = if (alignEnd) Alignment.End else Alignment.Start
+@@ -2093,8 +2131,10 @@ private fun WordsLyricLine(
+                 currentTimeState = currentTimeState,
+                 textStyle = style.wordsTextStyle,
+                 color = textColor,
+-                sungAlpha = LyricUIConstants.WORD_SUNG_ALPHA,
+-                unsungAlpha = (LyricUIConstants.INACTIVE_LINE_ALPHA * style.unsungFactor).coerceIn(0f, 1f),
++                sungAlpha = LyricUIConstants.WORD_SUNG_ALPHA * (style.dynamic?.opacity ?: 1f),
++                unsungAlpha =
++                    (LyricUIConstants.INACTIVE_LINE_ALPHA * style.unsungFactor).coerceIn(0f, 1f) *
++                        (style.dynamic?.opacity ?: 1f),
+                 maskRegistry = maskRegistry,
+                 textMeasurer = textMeasurer,
+                 modifier = Modifier.fillMaxWidth(),
+diff --git a/app/src/main/java/me/spica27/spicamusic/ui/widget/LyricsSettingsSheet.kt b/app/src/main/java/me/spica27/spicamusic/ui/widget/LyricsSettingsSheet.kt
+index 35eac28..4efbb30 100644
+--- a/app/src/main/java/me/spica27/spicamusic/ui/widget/LyricsSettingsSheet.kt
++++ b/app/src/main/java/me/spica27/spicamusic/ui/widget/LyricsSettingsSheet.kt
+@@ -53,6 +53,7 @@ fun LyricsSettingsSheet(
+             }
+             LightSweepSection(settings = settings, onUpdate = onUpdate)
+             GradientLightSection(settings = settings, onUpdate = onUpdate)
++            DynamicColorSection(settings = settings, onUpdate = onUpdate)
+             LyricsProgressSection(settings = settings, onUpdate = onUpdate)
+             LineAnimationSection(settings = settings, onUpdate = onUpdate)
+             EnhanceHeaderSection(settings = settings, onUpdate = onUpdate)
+@@ -416,6 +417,64 @@ private fun GradientLightSection(
+     }
+ }
+ 
++@Composable
++private fun DynamicColorSection(
++    settings: LyricsStyleSettings,
++    onUpdate: ((LyricsStyleSettings) -> LyricsStyleSettings) -> Unit,
++) {
++    LyricsSettingsSection(stringResource(R.string.lyr_set_section_dyn))
++
++    LyricsSettingsToggle(
++        label = stringResource(R.string.lyr_set_dyn),
++        description = stringResource(R.string.lyr_set_dyn_desc),
++        checked = settings.dynamicLyricsEnabled,
++        onCheckedChange = { v -> onUpdate { it.copy(dynamicLyricsEnabled = v) } },
++    )
++    if (settings.dynamicLyricsEnabled) {
++        LyricsSettingsChips(
++            label = stringResource(R.string.lyr_set_dyn_mode),
++            description = stringResource(R.string.lyr_set_dyn_mode_desc),
++            options = listOf("auto", "dark", "light"),
++            selected = settings.dynamicLyricsMode,
++            optionLabel = {
++                when (it) {
++                    "dark" -> stringResource(R.string.verse_mode_dark)
++                    "light" -> stringResource(R.string.verse_mode_light)
++                    else -> stringResource(R.string.verse_mode_auto)
++                }
++            },
++            onSelect = { v -> onUpdate { it.copy(dynamicLyricsMode = v) } },
++        )
++        LyricsSettingsSlider(
++            label = stringResource(R.string.lyr_set_dyn_opacity),
++            description = stringResource(R.string.lyr_set_dyn_opacity_desc),
++            value = settings.dynamicLyricsOpacity,
++            range = LyricsStyleSettings.DYNAMIC_OPACITY_RANGE,
++            step = 5,
++            valueText = { "$it%" },
++            onValueChange = { v -> onUpdate { it.copy(dynamicLyricsOpacity = v) } },
++        )
++        LyricsSettingsSlider(
++            label = stringResource(R.string.lyr_set_dyn_saturation),
++            description = stringResource(R.string.lyr_set_dyn_saturation_desc),
++            value = settings.dynamicLyricsSaturation,
++            range = LyricsStyleSettings.DYNAMIC_SATURATION_RANGE,
++            step = 5,
++            valueText = { "$it%" },
++            onValueChange = { v -> onUpdate { it.copy(dynamicLyricsSaturation = v) } },
++        )
++        LyricsSettingsSlider(
++            label = stringResource(R.string.lyr_set_dyn_contrast),
++            description = stringResource(R.string.lyr_set_dyn_contrast_desc),
++            value = settings.dynamicLyricsContrast,
++            range = LyricsStyleSettings.DYNAMIC_CONTRAST_RANGE,
++            step = 5,
++            valueText = { "$it%" },
++            onValueChange = { v -> onUpdate { it.copy(dynamicLyricsContrast = v) } },
++        )
++    }
++}
++
+ private fun secondsText(ms: Int): String {
+     val sign = if (ms < 0) "-" else ""
+     val abs = kotlin.math.abs(ms)
+diff --git a/app/src/main/res/values-zh-rTW/strings.xml b/app/src/main/res/values-zh-rTW/strings.xml
+index 657e83b..0a92e24 100644
+--- a/app/src/main/res/values-zh-rTW/strings.xml
++++ b/app/src/main/res/values-zh-rTW/strings.xml
+@@ -1012,4 +1012,15 @@
+   <string name="lyr_set_fx_light_desc">已唱歌詞周圍的柔光和前沿的亮點，與進度條一致</string>
+   <string name="lyr_set_fx_intensity">光效強度</string>
+   <string name="lyr_set_fx_intensity_desc">柔光和亮點的強度</string>
++  <string name="lyr_set_section_dyn">動態歌詞顏色</string>
++  <string name="lyr_set_dyn">動態歌詞顏色</string>
++  <string name="lyr_set_dyn_desc">歌詞顏色取自專輯封面</string>
++  <string name="lyr_set_dyn_mode">顏色模式</string>
++  <string name="lyr_set_dyn_mode_desc">自動跟隨應用主題</string>
++  <string name="lyr_set_dyn_opacity">顏色不透明度</string>
++  <string name="lyr_set_dyn_opacity_desc">歌詞顏色的不透明程度</string>
++  <string name="lyr_set_dyn_saturation">顏色飽和度</string>
++  <string name="lyr_set_dyn_saturation_desc">封面顏色的鮮豔程度</string>
++  <string name="lyr_set_dyn_contrast">顏色對比度</string>
++  <string name="lyr_set_dyn_contrast_desc">深色下更亮，淺色下更暗</string>
+ </resources>
+diff --git a/app/src/main/res/values-zh/strings.xml b/app/src/main/res/values-zh/strings.xml
+index d138966..4a97bf4 100644
+--- a/app/src/main/res/values-zh/strings.xml
++++ b/app/src/main/res/values-zh/strings.xml
+@@ -1013,4 +1013,15 @@
+   <string name="lyr_set_fx_light_desc">已唱歌词周围的柔光和前沿的亮点，与进度条一致</string>
+   <string name="lyr_set_fx_intensity">光效强度</string>
+   <string name="lyr_set_fx_intensity_desc">柔光和亮点的强度</string>
++  <string name="lyr_set_section_dyn">动态歌词颜色</string>
++  <string name="lyr_set_dyn">动态歌词颜色</string>
++  <string name="lyr_set_dyn_desc">歌词颜色取自专辑封面</string>
++  <string name="lyr_set_dyn_mode">颜色模式</string>
++  <string name="lyr_set_dyn_mode_desc">自动跟随应用主题</string>
++  <string name="lyr_set_dyn_opacity">颜色不透明度</string>
++  <string name="lyr_set_dyn_opacity_desc">歌词颜色的不透明程度</string>
++  <string name="lyr_set_dyn_saturation">颜色饱和度</string>
++  <string name="lyr_set_dyn_saturation_desc">封面颜色的鲜艳程度</string>
++  <string name="lyr_set_dyn_contrast">颜色对比度</string>
++  <string name="lyr_set_dyn_contrast_desc">深色下更亮，浅色下更暗</string>
+ </resources>
+diff --git a/app/src/main/res/values/strings.xml b/app/src/main/res/values/strings.xml
+index 5f71e09..9a36146 100644
+--- a/app/src/main/res/values/strings.xml
++++ b/app/src/main/res/values/strings.xml
+@@ -1013,4 +1013,15 @@
+   <string name="lyr_set_fx_light_desc">A soft glow around the sung words and a bright spark at the front, like the progress bar</string>
+   <string name="lyr_set_fx_intensity">Light intensity</string>
+   <string name="lyr_set_fx_intensity_desc">How strong the glow and the spark are</string>
++  <string name="lyr_set_section_dyn">Dynamic lyrics color</string>
++  <string name="lyr_set_dyn">Dynamic lyrics color</string>
++  <string name="lyr_set_dyn_desc">Lyrics colour is taken from the album art</string>
++  <string name="lyr_set_dyn_mode">Colour mode</string>
++  <string name="lyr_set_dyn_mode_desc">Auto follows the app theme</string>
++  <string name="lyr_set_dyn_opacity">Color opacity</string>
++  <string name="lyr_set_dyn_opacity_desc">How solid the lyrics colour is</string>
++  <string name="lyr_set_dyn_saturation">Color saturation</string>
++  <string name="lyr_set_dyn_saturation_desc">How vivid the album colour is</string>
++  <string name="lyr_set_dyn_contrast">Color contrast</string>
++  <string name="lyr_set_dyn_contrast_desc">Lighter on dark, darker on light</string>
+ </resources>
+diff --git a/core-preferences/src/main/java/me/spica27/spicamusic/core/preferences/LyricsStyleSettings.kt b/core-preferences/src/main/java/me/spica27/spicamusic/core/preferences/LyricsStyleSettings.kt
+index e5f2b52..b42a633 100644
+--- a/core-preferences/src/main/java/me/spica27/spicamusic/core/preferences/LyricsStyleSettings.kt
++++ b/core-preferences/src/main/java/me/spica27/spicamusic/core/preferences/LyricsStyleSettings.kt
+@@ -83,6 +83,16 @@ data class LyricsStyleSettings(
+     val lyricsLightEnabled: Boolean = false,
+     /** Strength of the light effects in percent. */
+     val lyricsLightIntensity: Int = 70,
++    // ---- Dynamic lyrics colour (from the album art; off = the theme text colour) ----
++    val dynamicLyricsEnabled: Boolean = false,
++    /** "auto" follows the app theme, "dark" or "light" forces the tone. */
++    val dynamicLyricsMode: String = "auto",
++    /** Opacity of the lyrics colour in percent. */
++    val dynamicLyricsOpacity: Int = 100,
++    /** Saturation of the album colour in percent (100 = as in the cover). */
++    val dynamicLyricsSaturation: Int = 100,
++    /** Distance from the background in percent: lighter on dark, darker on light. */
++    val dynamicLyricsContrast: Int = 50,
+     // ---- Lyrics progress (all off = the original behaviour) ----
+     val wordLiftEnabled: Boolean = false,
+     /** Custom word lift in tenths of dp (15 = 1.5 dp), used when [wordLiftEnabled]. */
+@@ -194,6 +204,9 @@ data class LyricsStyleSettings(
+             stretchDurationMs = stretchDurationMs.coerceIn(STRETCH_DURATION_RANGE),
+             lightSweepSoftness = lightSweepSoftness.coerceIn(LIGHT_SWEEP_SOFTNESS_RANGE),
+             lyricsLightIntensity = lyricsLightIntensity.coerceIn(LYRICS_LIGHT_RANGE),
++            dynamicLyricsOpacity = dynamicLyricsOpacity.coerceIn(DYNAMIC_OPACITY_RANGE),
++            dynamicLyricsSaturation = dynamicLyricsSaturation.coerceIn(DYNAMIC_SATURATION_RANGE),
++            dynamicLyricsContrast = dynamicLyricsContrast.coerceIn(DYNAMIC_CONTRAST_RANGE),
+             wordLift = wordLift.coerceIn(WORD_LIFT_RANGE),
+             heldWordMinMs = heldWordMinMs.coerceIn(HELD_WORD_MIN_RANGE),
+             holdScrollLines = holdScrollLines.coerceIn(HOLD_SCROLL_RANGE),
+@@ -239,6 +252,9 @@ data class LyricsStyleSettings(
+         val STRETCH_DURATION_RANGE = 0..2500
+         val LIGHT_SWEEP_SOFTNESS_RANGE = 50..200
+         val LYRICS_LIGHT_RANGE = 0..100
++        val DYNAMIC_OPACITY_RANGE = 20..100
++        val DYNAMIC_SATURATION_RANGE = 0..200
++        val DYNAMIC_CONTRAST_RANGE = 0..100
+         val WORD_LIFT_RANGE = 0..80
+         val HELD_WORD_MIN_RANGE = 0..3000
+         val HOLD_SCROLL_RANGE = 1..3
+diff --git a/core-preferences/src/main/java/me/spica27/spicamusic/core/preferences/PreferencesManager.kt b/core-preferences/src/main/java/me/spica27/spicamusic/core/preferences/PreferencesManager.kt
+index e4aff13..8e8448e 100644
+--- a/core-preferences/src/main/java/me/spica27/spicamusic/core/preferences/PreferencesManager.kt
++++ b/core-preferences/src/main/java/me/spica27/spicamusic/core/preferences/PreferencesManager.kt
+@@ -84,6 +84,11 @@ class PreferencesManager(
+         val LYRIC_GRADIENT_ENABLED = booleanPreferencesKey("lyric_gradient_enabled")
+         val LYRIC_LIGHT_ENABLED = booleanPreferencesKey("lyric_light_enabled")
+         val LYRIC_LIGHT_INTENSITY = intPreferencesKey("lyric_light_intensity")
++        val LYRIC_DYNAMIC_ENABLED = booleanPreferencesKey("lyric_dynamic_enabled")
++        val LYRIC_DYNAMIC_MODE = stringPreferencesKey("lyric_dynamic_mode")
++        val LYRIC_DYNAMIC_OPACITY = intPreferencesKey("lyric_dynamic_opacity")
++        val LYRIC_DYNAMIC_SATURATION = intPreferencesKey("lyric_dynamic_saturation")
++        val LYRIC_DYNAMIC_CONTRAST = intPreferencesKey("lyric_dynamic_contrast")
+         val LYRIC_LINE_MOVE = booleanPreferencesKey("lyric_line_move")
+         val LYRIC_LINE_MOVE_MS = intPreferencesKey("lyric_line_move_ms")
+         val LYRIC_BG_REVEAL = booleanPreferencesKey("lyric_bg_reveal")
+@@ -169,6 +174,11 @@ class PreferencesManager(
+                     gradientLyricsEnabled = p[Keys.LYRIC_GRADIENT_ENABLED] ?: d.gradientLyricsEnabled,
+                     lyricsLightEnabled = p[Keys.LYRIC_LIGHT_ENABLED] ?: d.lyricsLightEnabled,
+                     lyricsLightIntensity = p[Keys.LYRIC_LIGHT_INTENSITY] ?: d.lyricsLightIntensity,
++                    dynamicLyricsEnabled = p[Keys.LYRIC_DYNAMIC_ENABLED] ?: d.dynamicLyricsEnabled,
++                    dynamicLyricsMode = p[Keys.LYRIC_DYNAMIC_MODE] ?: d.dynamicLyricsMode,
++                    dynamicLyricsOpacity = p[Keys.LYRIC_DYNAMIC_OPACITY] ?: d.dynamicLyricsOpacity,
++                    dynamicLyricsSaturation = p[Keys.LYRIC_DYNAMIC_SATURATION] ?: d.dynamicLyricsSaturation,
++                    dynamicLyricsContrast = p[Keys.LYRIC_DYNAMIC_CONTRAST] ?: d.dynamicLyricsContrast,
+                     lineMoveEnabled = p[Keys.LYRIC_LINE_MOVE] ?: d.lineMoveEnabled,
+                     lineMoveMs = p[Keys.LYRIC_LINE_MOVE_MS] ?: d.lineMoveMs,
+                     bgRevealEnabled = p[Keys.LYRIC_BG_REVEAL] ?: d.bgRevealEnabled,
+@@ -254,6 +264,11 @@ class PreferencesManager(
+                     gradientLyricsEnabled = p[Keys.LYRIC_GRADIENT_ENABLED] ?: d.gradientLyricsEnabled,
+                     lyricsLightEnabled = p[Keys.LYRIC_LIGHT_ENABLED] ?: d.lyricsLightEnabled,
+                     lyricsLightIntensity = p[Keys.LYRIC_LIGHT_INTENSITY] ?: d.lyricsLightIntensity,
++                    dynamicLyricsEnabled = p[Keys.LYRIC_DYNAMIC_ENABLED] ?: d.dynamicLyricsEnabled,
++                    dynamicLyricsMode = p[Keys.LYRIC_DYNAMIC_MODE] ?: d.dynamicLyricsMode,
++                    dynamicLyricsOpacity = p[Keys.LYRIC_DYNAMIC_OPACITY] ?: d.dynamicLyricsOpacity,
++                    dynamicLyricsSaturation = p[Keys.LYRIC_DYNAMIC_SATURATION] ?: d.dynamicLyricsSaturation,
++                    dynamicLyricsContrast = p[Keys.LYRIC_DYNAMIC_CONTRAST] ?: d.dynamicLyricsContrast,
+                     lineMoveEnabled = p[Keys.LYRIC_LINE_MOVE] ?: d.lineMoveEnabled,
+                     lineMoveMs = p[Keys.LYRIC_LINE_MOVE_MS] ?: d.lineMoveMs,
+                     bgRevealEnabled = p[Keys.LYRIC_BG_REVEAL] ?: d.bgRevealEnabled,
+@@ -330,6 +345,11 @@ class PreferencesManager(
+             p[Keys.LYRIC_GRADIENT_ENABLED] = n.gradientLyricsEnabled
+             p[Keys.LYRIC_LIGHT_ENABLED] = n.lyricsLightEnabled
+             p[Keys.LYRIC_LIGHT_INTENSITY] = n.lyricsLightIntensity
++            p[Keys.LYRIC_DYNAMIC_ENABLED] = n.dynamicLyricsEnabled
++            p[Keys.LYRIC_DYNAMIC_MODE] = n.dynamicLyricsMode
++            p[Keys.LYRIC_DYNAMIC_OPACITY] = n.dynamicLyricsOpacity
++            p[Keys.LYRIC_DYNAMIC_SATURATION] = n.dynamicLyricsSaturation
++            p[Keys.LYRIC_DYNAMIC_CONTRAST] = n.dynamicLyricsContrast
+             p[Keys.LYRIC_LINE_MOVE] = n.lineMoveEnabled
+             p[Keys.LYRIC_LINE_MOVE_MS] = n.lineMoveMs
+             p[Keys.LYRIC_BG_REVEAL] = n.bgRevealEnabled
