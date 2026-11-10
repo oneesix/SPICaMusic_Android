@@ -436,6 +436,8 @@ private data class WordProgressSpec(
     val heldMinMs: Long? = null,
     /** Smoother held-word drawing: every letter is its own cached layer moved by the GPU. */
     val optimizeHeld: Boolean = false,
+    /** With [optimizeHeld]: the original blurred glow instead of the smooth glow layer. */
+    val defaultGlow: Boolean = false,
 )
 
 private fun LyricsStyleSettings.toProgressSpec(): WordProgressSpec =
@@ -444,6 +446,7 @@ private fun LyricsStyleSettings.toProgressSpec(): WordProgressSpec =
         mergeWords = mergeWords,
         heldMinMs = if (manualHeldWords) heldWordMinMs.toLong() else null,
         optimizeHeld = optimizeHeldWords,
+        defaultGlow = heldDefaultGlow,
     )
 
 /** The light-sweep options from the settings. */
@@ -2862,27 +2865,34 @@ private fun ProgressiveWordsText(
                         }
                         val slowWordLayout = slowWordLayouts[index]
                         if (slowWordLayout != null) {
-                            // A merged held word is animated as one word: its pieces share one progress.
-                            val heldProgressOf =
-                                remember(group, renderWords, index) {
+                            // A merged held word is animated exactly like any other held word: one progress that runs
+                            // evenly from the start of its first piece to the end of its last piece.
+                            val heldProgress =
+                                remember(group, words, sweepState, currentTimeState, index) {
                                     if (group.size > 1) {
-                                        { sweep: SweepPosition -> mergedProgress(sweep, group, renderWords) }
+                                        val start = words[group.first()].startTime
+                                        val last = words[group.last()]
+                                        val next = words.getOrNull(group.last() + 1)
+                                        val end = if (next != null) minOf(last.endTime, next.startTime) else last.endTime
+                                        val duration = (end - start).coerceAtLeast(1L)
+                                        derivedStateOf {
+                                            ((currentTimeState.value - start).toFloat() / duration).coerceIn(0f, 1f)
+                                        }
                                     } else {
-                                        { sweep: SweepPosition -> sweep.progressOf(index) }
+                                        derivedStateOf { sweepState.value.progressOf(index) }
                                     }
                                 }
                             if (maskRegistry.progress.optimizeHeld) {
                                 SlowWordGlyphsSmooth(
                                     layout = slowWordLayout,
-                                    sweepState = sweepState,
-                                    progressOf = heldProgressOf,
+                                    progressState = heldProgress,
                                     color = drawColor,
+                                    registry = maskRegistry,
                                 )
                             } else {
                                 SlowWordGlyphs(
                                     layout = slowWordLayout,
-                                    sweepState = sweepState,
-                                    progressOf = heldProgressOf,
+                                    progressState = heldProgress,
                                     color = drawColor,
                                     registry = maskRegistry,
                                 )
@@ -3009,20 +3019,15 @@ private fun List<LyricItem.WordsLyric.WordWithTiming>.toRenderWords(): List<Rend
 @Composable
 private fun SlowWordGlyphs(
     layout: SlowWordLayout,
-    sweepState: State<SweepPosition>,
-    progressOf: (SweepPosition) -> Float,
+    progressState: State<Float>,
     color: Color,
     registry: SweepMaskRegistry,
 ) {
-    val glow =
-        remember(layout, sweepState, progressOf, color) {
-            SlowWordGlow(layout, sweepState, progressOf, color)
-        }
+    val glow = remember(layout, progressState, color) { SlowWordGlow(layout, progressState, color) }
     DisposableEffect(registry, glow) {
         registry.glows.add(glow)
         onDispose { registry.glows.remove(glow) }
     }
-    val progressState = remember(sweepState, progressOf) { derivedStateOf { progressOf(sweepState.value) } }
     val density = LocalDensity.current
     val canvasSize =
         remember(layout, density) {
@@ -3053,22 +3058,29 @@ private fun SlowWordGlyphs(
 @Composable
 private fun SlowWordGlyphsSmooth(
     layout: SlowWordLayout,
-    sweepState: State<SweepPosition>,
-    progressOf: (SweepPosition) -> Float,
+    progressState: State<Float>,
     color: Color,
+    registry: SweepMaskRegistry,
 ) {
     val density = LocalDensity.current
-    val progressState = remember(sweepState, progressOf) { derivedStateOf { progressOf(sweepState.value) } }
+    val defaultGlow = registry.progress.defaultGlow
+    // "Use default glow": the original blurred glow (drawn over the letters by the line) instead of the glow layer.
+    val originalGlow =
+        remember(layout, progressState, color) { SlowWordGlow(layout, progressState, color) }
+    DisposableEffect(registry, originalGlow, defaultGlow) {
+        if (defaultGlow) registry.glows.add(originalGlow)
+        onDispose { registry.glows.remove(originalGlow) }
+    }
     val padPx = (SMOOTH_GLOW_BLUR_PX * 3f).roundToInt()
     val glowBlur = remember { BlurEffect(SMOOTH_GLOW_BLUR_PX, SMOOTH_GLOW_BLUR_PX, TileMode.Decal) }
     val wordWidth = layout.layout.size.width
     val wordHeight = layout.layout.size.height
     val wordSize = remember(layout, density) { with(density) { DpSize(wordWidth.toDp(), wordHeight.toDp()) } }
-    Box(modifier = Modifier.size(wordSize)) {
+    Box(modifier = Modifier.size(wordSize).onPlaced { originalGlow.coordinates = it }) {
         // The glow: the same animated letters, blurred once as a whole and faded with the swell.
         // It is measured a little bigger than the word (room for the blur) and placed exactly [padPx] up and
         // to the left, so the blurred letters sit right under the sharp ones.
-        Box(
+        if (!defaultGlow) Box(
             modifier =
                 Modifier
                     .layout { measurable, _ ->
@@ -3136,9 +3148,8 @@ private fun SlowWordLetters(
 /** 记录长音词外发光所需的数据。 */
 private class SlowWordGlow(
     val layout: SlowWordLayout,
-    val sweep: State<SweepPosition>,
     /** Progress of the held word (of the whole word when pieces are merged). */
-    val progressOf: (SweepPosition) -> Float,
+    val progress: State<Float>,
     val color: Color,
 ) {
     var coordinates: LayoutCoordinates? = null
@@ -3189,7 +3200,7 @@ private fun DrawScope.drawSlowWordGlows(registry: SweepMaskRegistry) {
     val host = registry.hostCoordinates?.takeIf { it.isAttached } ?: return
     for (glow in registry.glows) {
         val coordinates = glow.coordinates?.takeIf { it.isAttached } ?: continue
-        val progress = glow.progressOf(glow.sweep.value)
+        val progress = glow.progress.value
         val swell = 4f * progress * (1f - progress)
         if (swell <= 0f) continue
         val glowColor = glow.color.copy(alpha = LyricUIConstants.WORD_GLOW_ALPHA * swell)

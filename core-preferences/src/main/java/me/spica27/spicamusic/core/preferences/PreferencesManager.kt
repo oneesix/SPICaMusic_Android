@@ -99,6 +99,7 @@ class PreferencesManager(
         val LYRIC_HELD_MANUAL = booleanPreferencesKey("lyric_held_manual")
         val LYRIC_HELD_MIN_MS = intPreferencesKey("lyric_held_min_ms")
         val LYRIC_HELD_OPTIMIZE = booleanPreferencesKey("lyric_held_optimize")
+        val LYRIC_HELD_DEFAULT_GLOW = booleanPreferencesKey("lyric_held_default_glow")
         val LYRIC_HOLD_SCROLL = booleanPreferencesKey("lyric_hold_scroll")
         val LYRIC_HOLD_SCROLL_LINES = intPreferencesKey("lyric_hold_scroll_lines")
         val LYRIC_HEADER_ENHANCED = booleanPreferencesKey("lyric_header_enhanced")
@@ -184,6 +185,7 @@ class PreferencesManager(
                     manualHeldWords = p[Keys.LYRIC_HELD_MANUAL] ?: d.manualHeldWords,
                     heldWordMinMs = p[Keys.LYRIC_HELD_MIN_MS] ?: d.heldWordMinMs,
                     optimizeHeldWords = p[Keys.LYRIC_HELD_OPTIMIZE] ?: d.optimizeHeldWords,
+                    heldDefaultGlow = p[Keys.LYRIC_HELD_DEFAULT_GLOW] ?: d.heldDefaultGlow,
                     holdScrollEnabled = p[Keys.LYRIC_HOLD_SCROLL] ?: d.holdScrollEnabled,
                     holdScrollLines = p[Keys.LYRIC_HOLD_SCROLL_LINES] ?: d.holdScrollLines,
                     enhanceHeader = p[Keys.LYRIC_HEADER_ENHANCED] ?: d.enhanceHeader,
@@ -269,6 +271,7 @@ class PreferencesManager(
                     manualHeldWords = p[Keys.LYRIC_HELD_MANUAL] ?: d.manualHeldWords,
                     heldWordMinMs = p[Keys.LYRIC_HELD_MIN_MS] ?: d.heldWordMinMs,
                     optimizeHeldWords = p[Keys.LYRIC_HELD_OPTIMIZE] ?: d.optimizeHeldWords,
+                    heldDefaultGlow = p[Keys.LYRIC_HELD_DEFAULT_GLOW] ?: d.heldDefaultGlow,
                     holdScrollEnabled = p[Keys.LYRIC_HOLD_SCROLL] ?: d.holdScrollEnabled,
                     holdScrollLines = p[Keys.LYRIC_HOLD_SCROLL_LINES] ?: d.holdScrollLines,
                     enhanceHeader = p[Keys.LYRIC_HEADER_ENHANCED] ?: d.enhanceHeader,
@@ -345,6 +348,7 @@ class PreferencesManager(
             p[Keys.LYRIC_HELD_MANUAL] = n.manualHeldWords
             p[Keys.LYRIC_HELD_MIN_MS] = n.heldWordMinMs
             p[Keys.LYRIC_HELD_OPTIMIZE] = n.optimizeHeldWords
+            p[Keys.LYRIC_HELD_DEFAULT_GLOW] = n.heldDefaultGlow
             p[Keys.LYRIC_HOLD_SCROLL] = n.holdScrollEnabled
             p[Keys.LYRIC_HOLD_SCROLL_LINES] = n.holdScrollLines
             p[Keys.LYRIC_HEADER_ENHANCED] = n.enhanceHeader

@@ -94,6 +94,8 @@ data class LyricsStyleSettings(
     val heldWordMinMs: Int = 1000,
     /** Smooth the lyrics clock so held-word animations do not step. */
     val optimizeHeldWords: Boolean = false,
+    /** With [optimizeHeldWords]: keep the original blurred glow instead of the smooth one. */
+    val heldDefaultGlow: Boolean = false,
     /** Keep the lyrics on a line that is still being sung while the next line has already started. */
     val holdScrollEnabled: Boolean = false,
     /** How many lines the lyrics may hold back (1..3), used when [holdScrollEnabled]. */

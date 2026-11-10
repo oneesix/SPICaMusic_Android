@@ -314,6 +314,14 @@ private fun LyricsProgressSection(
         checked = settings.optimizeHeldWords,
         onCheckedChange = { v -> onUpdate { it.copy(optimizeHeldWords = v) } },
     )
+    if (settings.optimizeHeldWords) {
+        LyricsSettingsToggle(
+            label = stringResource(R.string.lyr_set_held_default_glow),
+            description = stringResource(R.string.lyr_set_held_default_glow_desc),
+            checked = settings.heldDefaultGlow,
+            onCheckedChange = { v -> onUpdate { it.copy(heldDefaultGlow = v) } },
+        )
+    }
     LyricsSettingsToggle(
         label = stringResource(R.string.lyr_set_hold_scroll),
         description = stringResource(R.string.lyr_set_hold_scroll_desc),

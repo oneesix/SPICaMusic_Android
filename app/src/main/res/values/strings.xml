@@ -937,6 +937,8 @@
   <string name="lyr_set_held_min_desc">A word counts as held when it is at least this long</string>
   <string name="lyr_set_held_optimize">Optimize held words</string>
   <string name="lyr_set_held_optimize_desc">Smooths the lyrics clock so held-word animations do not step</string>
+  <string name="lyr_set_held_default_glow">Use default glow</string>
+  <string name="lyr_set_held_default_glow_desc">Keep the original blurred glow while Optimize is on (heavier to draw)</string>
   <string name="lyr_set_hold_scroll">Hold scroll while singing</string>
   <string name="lyr_set_hold_scroll_desc">Do not scroll to the next line while a previous line (or its background vocal) is still being sung</string>
   <string name="lyr_set_hold_scroll_lines">Lines to hold</string>
