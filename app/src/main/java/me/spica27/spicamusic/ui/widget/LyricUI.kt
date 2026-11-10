@@ -28,9 +28,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.requiredSize
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
@@ -99,7 +97,6 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.DpSize
-import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.util.lerp
@@ -2881,35 +2878,29 @@ private fun SlowWordGlyphsSmooth(
 ) {
     val density = LocalDensity.current
     val progressState = remember(sweepState, progressOf) { derivedStateOf { progressOf(sweepState.value) } }
-    val padPx = SMOOTH_GLOW_BLUR_PX * 3f
+    val padPx = (SMOOTH_GLOW_BLUR_PX * 3f).roundToInt()
     val glowBlur = remember { BlurEffect(SMOOTH_GLOW_BLUR_PX, SMOOTH_GLOW_BLUR_PX, TileMode.Decal) }
-    val wordSize =
-        remember(layout, density) {
-            with(density) { DpSize(layout.layout.size.width.toDp(), layout.layout.size.height.toDp()) }
-        }
-    val glowSize =
-        remember(layout, density) {
-            with(density) {
-                DpSize(
-                    (layout.layout.size.width + 2 * padPx).toDp(),
-                    (layout.layout.size.height + 2 * padPx).toDp(),
-                )
-            }
-        }
+    val wordWidth = layout.layout.size.width
+    val wordHeight = layout.layout.size.height
+    val wordSize = remember(layout, density) { with(density) { DpSize(wordWidth.toDp(), wordHeight.toDp()) } }
     Box(modifier = Modifier.size(wordSize)) {
         // The glow: the same animated letters, blurred once as a whole and faded with the swell.
+        // It is measured a little bigger than the word (room for the blur) and placed exactly [padPx] up and
+        // to the left, so the blurred letters sit right under the sharp ones.
         Box(
             modifier =
                 Modifier
-                    .requiredSize(glowSize)
-                    .offset { IntOffset(-padPx.roundToInt(), -padPx.roundToInt()) }
-                    .graphicsLayer {
+                    .layout { measurable, _ ->
+                        val placeable =
+                            measurable.measure(Constraints.fixed(wordWidth + 2 * padPx, wordHeight + 2 * padPx))
+                        layout(wordWidth, wordHeight) { placeable.place(-padPx, -padPx) }
+                    }.graphicsLayer {
                         val progress = progressState.value
                         alpha = (4f * progress * (1f - progress) * SMOOTH_GLOW_ALPHA).coerceIn(0f, 1f)
                         renderEffect = glowBlur
                     },
         ) {
-            SlowWordLetters(layout, progressState, color, padPx)
+            SlowWordLetters(layout, progressState, color, padPx.toFloat())
         }
         SlowWordLetters(layout, progressState, color, 0f)
     }
