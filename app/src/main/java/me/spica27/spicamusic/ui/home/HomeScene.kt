@@ -43,7 +43,10 @@ import me.spica27.spicamusic.ui.navigation.LocalBackStack
 import me.spica27.spicamusic.ui.player.DEFAULT_PAGE
 import me.spica27.spicamusic.ui.player.ExpandedPlayerScreen
 import me.spica27.spicamusic.ui.player.LocalPlayerViewModel
+import me.spica27.spicamusic.ui.player.LyricsStyleViewModel
 import me.spica27.spicamusic.ui.player.QUEUE_PAGE
+import me.spica27.spicamusic.ui.widget.DynamicPlayerColorScope
+import me.spica27.spicamusic.ui.widget.rememberDynamicPlayerColors
 import me.spica27.spicamusic.ui.theme.LocalReducedMotion
 import org.koin.compose.viewmodel.koinActivityViewModel
 
@@ -66,6 +69,10 @@ fun HomeScreen() {
     val position = playerViewModel.currentPosition.collectAsStateWithLifecycle()
     val duration = playerViewModel.currentDuration.collectAsStateWithLifecycle()
     val reducedMotion = LocalReducedMotion.current
+    // Color player UI: the mini player follows the album colours too (null = off).
+    val dynamicStyleViewModel: LyricsStyleViewModel = koinActivityViewModel()
+    val dynamicStyle by dynamicStyleViewModel.style.collectAsStateWithLifecycle()
+    val dynamicColors = rememberDynamicPlayerColors(dynamicStyle, displayedMediaItem?.mediaMetadata?.artworkUri)
     val sheetState = rememberPlayerSheetState()
     var initialPlayerPage by rememberSaveable { mutableIntStateOf(DEFAULT_PAGE) }
     val pageStateHolder = rememberSaveableStateHolder()
@@ -87,6 +94,7 @@ fun HomeScreen() {
         },
         miniPlayer = { dragModifier ->
             val metadata = displayedMediaItem?.mediaMetadata
+            DynamicPlayerColorScope(colors = dynamicColors) {
             MiniPlayerBar(
                 title = metadata?.title?.toString() ?: stringResource(R.string.unknown_song),
                 artist = metadata?.artist?.toString() ?: stringResource(R.string.unknown_artist),
@@ -107,6 +115,7 @@ fun HomeScreen() {
                 glassEnabled = glassEnabled,
                 layout = bottomBarLayout,
             )
+            }
         },
         fullScreenPlayer = { progress, dragModifier ->
             val collapse = { sheetState.animateTo(false, reducedMotion) }

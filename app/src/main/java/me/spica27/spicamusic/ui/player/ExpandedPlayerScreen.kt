@@ -131,7 +131,10 @@ import me.spica27.spicamusic.ui.theme.Shapes
 import me.spica27.spicamusic.ui.theme.Spacing
 import me.spica27.spicamusic.ui.widget.AudioCover
 import me.spica27.spicamusic.ui.settings.SettingsViewModel
+import me.spica27.spicamusic.ui.widget.DynamicPlayerColorScope
 import me.spica27.spicamusic.ui.widget.FluidMusicBackground
+import me.spica27.spicamusic.ui.widget.rememberDynamicPlayerColors
+import org.koin.compose.viewmodel.koinActivityViewModel
 import me.spica27.spicamusic.ui.widget.VerseFlowBackground
 import me.spica27.spicamusic.ui.widget.VerseFlowThemeScope
 import me.spica27.spicamusic.ui.widget.rememberVerseTheme
@@ -486,6 +489,10 @@ fun ExpandedPlayerScreen(
             vibrancyPercent = verseVibrancy,
             hueShift = verseHue,
         )
+    // Color player UI: colours from the album art (null = off).
+    val dynamicStyleViewModel: LyricsStyleViewModel = koinActivityViewModel()
+    val dynamicStyle by dynamicStyleViewModel.style.collectAsStateWithLifecycle()
+    val dynamicColors = rememberDynamicPlayerColors(dynamicStyle, currentMediaItem?.mediaMetadata?.artworkUri)
     val hazeState = rememberHazeState()
     val lyricsScrimAlpha =
         animateFloatAsState(
@@ -495,7 +502,7 @@ fun ExpandedPlayerScreen(
         )
     val lyricsScrimColor = MaterialTheme.colorScheme.scrim.copy(alpha = 0.14f)
 
-    PlayerThemeScope(isVerseFlow = isVerseFlow, theme = verseTheme) {
+    PlayerThemeScope(isVerseFlow = isVerseFlow, theme = verseTheme, dynamicColors = dynamicColors) {
         Box(
             modifier =
                 modifier
@@ -529,6 +536,17 @@ fun ExpandedPlayerScreen(
                     coverUri = { currentMediaItem?.mediaMetadata?.artworkUri },
                     enabled = animationsEnabled && isAppInForeground,
                 )
+
+                // Color player UI > Color background: an album-colour tint on top of the animated background.
+                dynamicColors?.backgroundTint?.let { tint ->
+                    Box(
+                        modifier =
+                            Modifier
+                                .fillMaxSize()
+                                .hazeSource(hazeState, zIndex = 0.3f)
+                                .background(tint),
+                    )
+                }
 
                 // 歌词模式只压暗同一份动态背景，不创建第二个背景实例。
                 Box(
@@ -761,12 +779,15 @@ fun ExpandedPlayerScreen(
 private fun PlayerThemeScope(
     isVerseFlow: Boolean,
     theme: me.spica27.spicamusic.ui.widget.VerseTheme,
+    dynamicColors: me.spica27.spicamusic.ui.widget.DynamicPlayerColors? = null,
     content: @Composable () -> Unit,
 ) {
-    if (isVerseFlow) {
-        VerseFlowThemeScope(theme = theme, content = content)
-    } else {
-        content()
+    DynamicPlayerColorScope(colors = dynamicColors) {
+        if (isVerseFlow) {
+            VerseFlowThemeScope(theme = theme, content = content)
+        } else {
+            content()
+        }
     }
 }
 

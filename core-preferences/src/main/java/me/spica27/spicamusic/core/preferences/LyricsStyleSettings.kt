@@ -83,8 +83,11 @@ data class LyricsStyleSettings(
     val lyricsLightEnabled: Boolean = false,
     /** Strength of the light effects in percent. */
     val lyricsLightIntensity: Int = 70,
-    // ---- Dynamic lyrics colour (from the album art; off = the theme text colour) ----
+    // ---- Color player UI (player colours from the album art; off = the theme colours) ----
+    /** Colour the player UI (text, icons, buttons, lyrics) from the album art. */
     val dynamicLyricsEnabled: Boolean = false,
+    /** Also tint the player background with the album colour (needs [dynamicLyricsEnabled]). */
+    val dynamicBackgroundEnabled: Boolean = false,
     /** "auto" follows the app theme, "dark" or "light" forces the tone. */
     val dynamicLyricsMode: String = "auto",
     /** Opacity of the lyrics colour in percent. */

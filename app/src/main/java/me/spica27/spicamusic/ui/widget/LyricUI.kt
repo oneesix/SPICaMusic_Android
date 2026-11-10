@@ -70,9 +70,6 @@ import androidx.compose.ui.graphics.BlurEffect
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.lerp as lerpColor
-import androidx.compose.ui.graphics.luminance
-import androidx.compose.ui.graphics.toArgb
-import androidx.core.graphics.ColorUtils
 import androidx.compose.ui.graphics.CompositingStrategy
 import androidx.compose.ui.graphics.RenderEffect
 import androidx.compose.ui.graphics.Shadow
@@ -500,34 +497,6 @@ private fun LyricsStyleSettings.toFxSpec(primary: Color): LyricsFxSpec? =
         null
     }
 
-/** Lyrics colour taken from the album art. */
-@Immutable
-private data class DynamicLyricsSpec(
-    val color: Color,
-    val opacity: Float,
-)
-
-private fun LyricsStyleSettings.toDynamicSpec(
-    albumColor: Color?,
-    appDark: Boolean,
-): DynamicLyricsSpec? {
-    if (!dynamicLyricsEnabled || albumColor == null) return null
-    val dark =
-        when (dynamicLyricsMode) {
-            "dark" -> true
-            "light" -> false
-            else -> appDark
-        }
-    val hsl = FloatArray(3)
-    ColorUtils.colorToHSL(albumColor.toArgb(), hsl)
-    val saturation = (hsl[1] * dynamicLyricsSaturation / 100f).coerceIn(0f, 1f)
-    // Light tones on a dark page, dark tones on a light page; contrast moves the tone away from the page.
-    val lightness =
-        if (dark) 0.60f + dynamicLyricsContrast * 0.0035f else 0.45f - dynamicLyricsContrast * 0.0035f
-    val rgb = ColorUtils.HSLToColor(floatArrayOf(hsl[0], saturation, lightness.coerceIn(0f, 1f)))
-    return DynamicLyricsSpec(color = Color(rgb), opacity = dynamicLyricsOpacity / 100f)
-}
-
 /** 随展示形态变化的排版参数。 */
 @Immutable
 private data class LyricsUIStyle(
@@ -551,8 +520,6 @@ private data class LyricsUIStyle(
     val progress: WordProgressSpec = WordProgressSpec(),
     /** Gradient lyrics colour and light effects (null = off). */
     val fx: LyricsFxSpec? = null,
-    /** Lyrics colour from the album art (null = the theme text colour). */
-    val dynamic: DynamicLyricsSpec? = null,
     /** Background vocal reveal (null = background vocals are always visible). */
     val bgReveal: BgRevealSpec? = null,
     /** Transliteration above (true) or below (false) the lyric words. */
@@ -569,13 +536,11 @@ private data class LyricsUIStyle(
 private fun rememberLyricsUIStyle(
     displayMode: LyricsDisplayMode,
     settings: LyricsStyleSettings,
-    albumColor: Color? = null,
 ): LyricsUIStyle {
     val typography = MaterialTheme.typography
     val primaryColor = MaterialTheme.colorScheme.primary
-    val appDark = MaterialTheme.colorScheme.surface.luminance() < 0.5f
     val screenWidthDp = LocalConfiguration.current.screenWidthDp
-    return remember(typography, displayMode, settings, screenWidthDp, primaryColor, albumColor, appDark) {
+    return remember(typography, displayMode, settings, screenWidthDp, primaryColor) {
         val built =
             when (displayMode) {
             LyricsDisplayMode.Fullscreen -> {
@@ -679,7 +644,6 @@ private fun rememberLyricsUIStyle(
             .withFontFamily(LyricsFontOption.lyricsFamily(settings.lyricsFont))
             .copy(
                 fx = settings.toFxSpec(primaryColor),
-                dynamic = settings.toDynamicSpec(albumColor, appDark),
                 bgReveal =
                     if (settings.bgRevealEnabled) {
                         BgRevealSpec(
@@ -730,8 +694,6 @@ fun LyricsUI(
     seekPreviewTimeProvider: () -> Long? = { null },
     /** Length of the song in ms (0 = unknown). Used for the break line after the last lyric. */
     songDurationMs: Long = 0L,
-    /** Dominant colour of the album art, used by the dynamic lyrics colour (null = off). */
-    albumColor: Color? = null,
 ) {
     val sortedLines = remember(lyric) { lyric.sortedBy { it.time } }
 
@@ -754,7 +716,7 @@ fun LyricsUI(
 
     // Long intros and instrumental gaps get a break line (three dots and a countdown).
     val lyricLines = remember(sortedLines, songDurationMs) { insertInterludes(sortedLines, songDurationMs) }
-    val style = rememberLyricsUIStyle(displayMode, styleSettings, albumColor)
+    val style = rememberLyricsUIStyle(displayMode, styleSettings)
     val lazyListState = rememberLazyListState()
     var isAutoScrolling by remember { mutableStateOf(false) }
     val isManualScrolling by remember {
@@ -1295,8 +1257,8 @@ private fun LyricLine(
     displayOptions: LyricsDisplayOptions,
     modifier: Modifier = Modifier,
 ) {
-    val inactiveTextColor = style.dynamic?.color ?: MaterialTheme.colorScheme.onSurface
-    val activeTextColor = voiceAccent ?: style.dynamic?.color ?: MaterialTheme.colorScheme.onSurface
+    val inactiveTextColor = MaterialTheme.colorScheme.onSurface
+    val activeTextColor = voiceAccent ?: MaterialTheme.colorScheme.onSurface
     val horizontalAlignment = if (alignEnd) Alignment.End else Alignment.Start
     val textAlign = if (alignEnd) TextAlign.End else TextAlign.Start
     val phoneticBlock: @Composable () -> Unit = {
@@ -1983,7 +1945,7 @@ private fun WordsLyricLine(
     displayOptions: LyricsDisplayOptions,
     modifier: Modifier = Modifier,
 ) {
-    val textColor = voiceAccent ?: style.dynamic?.color ?: colorScheme.onSurface
+    val textColor = voiceAccent ?: colorScheme.onSurface
     val translationColor = textColor.copy(alpha = LyricUIConstants.TRANSLATION_TEXT_ALPHA)
     val transliterationColor = textColor.copy(alpha = LyricUIConstants.TRANSLITERATION_TEXT_ALPHA)
     val horizontalAlignment = if (alignEnd) Alignment.End else Alignment.Start
@@ -2134,10 +2096,8 @@ private fun WordsLyricLine(
                 currentTimeState = currentTimeState,
                 textStyle = style.wordsTextStyle,
                 color = textColor,
-                sungAlpha = LyricUIConstants.WORD_SUNG_ALPHA * (style.dynamic?.opacity ?: 1f),
-                unsungAlpha =
-                    (LyricUIConstants.INACTIVE_LINE_ALPHA * style.unsungFactor).coerceIn(0f, 1f) *
-                        (style.dynamic?.opacity ?: 1f),
+                sungAlpha = LyricUIConstants.WORD_SUNG_ALPHA,
+                unsungAlpha = (LyricUIConstants.INACTIVE_LINE_ALPHA * style.unsungFactor).coerceIn(0f, 1f),
                 maskRegistry = maskRegistry,
                 textMeasurer = textMeasurer,
                 modifier = Modifier.fillMaxWidth(),

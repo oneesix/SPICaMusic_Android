@@ -439,6 +439,12 @@ private fun DynamicColorSection(
         onCheckedChange = { v -> onUpdate { it.copy(dynamicLyricsEnabled = v) } },
     )
     if (settings.dynamicLyricsEnabled) {
+        LyricsSettingsToggle(
+            label = stringResource(R.string.lyr_set_dyn_bg),
+            description = stringResource(R.string.lyr_set_dyn_bg_desc),
+            checked = settings.dynamicBackgroundEnabled,
+            onCheckedChange = { v -> onUpdate { it.copy(dynamicBackgroundEnabled = v) } },
+        )
         LyricsSettingsChips(
             label = stringResource(R.string.lyr_set_dyn_mode),
             description = stringResource(R.string.lyr_set_dyn_mode_desc),

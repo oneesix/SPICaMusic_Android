@@ -85,6 +85,7 @@ class PreferencesManager(
         val LYRIC_LIGHT_ENABLED = booleanPreferencesKey("lyric_light_enabled")
         val LYRIC_LIGHT_INTENSITY = intPreferencesKey("lyric_light_intensity")
         val LYRIC_DYNAMIC_ENABLED = booleanPreferencesKey("lyric_dynamic_enabled")
+        val LYRIC_DYNAMIC_BACKGROUND = booleanPreferencesKey("lyric_dynamic_background")
         val LYRIC_DYNAMIC_MODE = stringPreferencesKey("lyric_dynamic_mode")
         val LYRIC_DYNAMIC_OPACITY = intPreferencesKey("lyric_dynamic_opacity")
         val LYRIC_DYNAMIC_SATURATION = intPreferencesKey("lyric_dynamic_saturation")
@@ -176,6 +177,7 @@ class PreferencesManager(
                     lyricsLightEnabled = p[Keys.LYRIC_LIGHT_ENABLED] ?: d.lyricsLightEnabled,
                     lyricsLightIntensity = p[Keys.LYRIC_LIGHT_INTENSITY] ?: d.lyricsLightIntensity,
                     dynamicLyricsEnabled = p[Keys.LYRIC_DYNAMIC_ENABLED] ?: d.dynamicLyricsEnabled,
+                    dynamicBackgroundEnabled = p[Keys.LYRIC_DYNAMIC_BACKGROUND] ?: d.dynamicBackgroundEnabled,
                     dynamicLyricsMode = p[Keys.LYRIC_DYNAMIC_MODE] ?: d.dynamicLyricsMode,
                     dynamicLyricsOpacity = p[Keys.LYRIC_DYNAMIC_OPACITY] ?: d.dynamicLyricsOpacity,
                     dynamicLyricsSaturation = p[Keys.LYRIC_DYNAMIC_SATURATION] ?: d.dynamicLyricsSaturation,
@@ -267,6 +269,7 @@ class PreferencesManager(
                     lyricsLightEnabled = p[Keys.LYRIC_LIGHT_ENABLED] ?: d.lyricsLightEnabled,
                     lyricsLightIntensity = p[Keys.LYRIC_LIGHT_INTENSITY] ?: d.lyricsLightIntensity,
                     dynamicLyricsEnabled = p[Keys.LYRIC_DYNAMIC_ENABLED] ?: d.dynamicLyricsEnabled,
+                    dynamicBackgroundEnabled = p[Keys.LYRIC_DYNAMIC_BACKGROUND] ?: d.dynamicBackgroundEnabled,
                     dynamicLyricsMode = p[Keys.LYRIC_DYNAMIC_MODE] ?: d.dynamicLyricsMode,
                     dynamicLyricsOpacity = p[Keys.LYRIC_DYNAMIC_OPACITY] ?: d.dynamicLyricsOpacity,
                     dynamicLyricsSaturation = p[Keys.LYRIC_DYNAMIC_SATURATION] ?: d.dynamicLyricsSaturation,
@@ -349,6 +352,7 @@ class PreferencesManager(
             p[Keys.LYRIC_LIGHT_ENABLED] = n.lyricsLightEnabled
             p[Keys.LYRIC_LIGHT_INTENSITY] = n.lyricsLightIntensity
             p[Keys.LYRIC_DYNAMIC_ENABLED] = n.dynamicLyricsEnabled
+            p[Keys.LYRIC_DYNAMIC_BACKGROUND] = n.dynamicBackgroundEnabled
             p[Keys.LYRIC_DYNAMIC_MODE] = n.dynamicLyricsMode
             p[Keys.LYRIC_DYNAMIC_OPACITY] = n.dynamicLyricsOpacity
             p[Keys.LYRIC_DYNAMIC_SATURATION] = n.dynamicLyricsSaturation
