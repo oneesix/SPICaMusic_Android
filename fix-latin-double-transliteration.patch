@@ -1,0 +1,87 @@
+diff --git a/app/src/main/java/me/spica27/spicamusic/ui/widget/LyricUI.kt b/app/src/main/java/me/spica27/spicamusic/ui/widget/LyricUI.kt
+index d81959d..626d679 100644
+--- a/app/src/main/java/me/spica27/spicamusic/ui/widget/LyricUI.kt
++++ b/app/src/main/java/me/spica27/spicamusic/ui/widget/LyricUI.kt
+@@ -1137,7 +1137,7 @@ private fun LyricLine(
+     val horizontalAlignment = if (alignEnd) Alignment.End else Alignment.Start
+     val textAlign = if (alignEnd) TextAlign.End else TextAlign.Start
+     val phoneticBlock: @Composable () -> Unit = {
+-        if (!lyric.phonetic.isNullOrBlank()) {
++        if (!lyric.phonetic.isNullOrBlank() && !duplicatesLatinLyric(lyric.content, lyric.phonetic!!)) {
+             val onTop = style.transliterationOnTop
+             if (!onTop) Spacer(modifier = Modifier.height(2.dp))
+             Text(
+@@ -1734,10 +1734,11 @@ private fun WordsLyricLine(
+             SweepMaskRegistry(litFractionState, style.lightSweep, style.progress)
+         }
+     val transliterations =
+-        lyric.transliterations.visibleTransliterations(
+-            displayOptions.transliterationMode,
+-            displayOptions.preferredTransliterationLanguage,
+-        )
++        lyric.transliterations
++            .visibleTransliterations(
++                displayOptions.transliterationMode,
++                displayOptions.preferredTransliterationLanguage,
++            ).filterNot { duplicatesLatinLyric(sentence, it.plainText()) }
+     // Attach to words: each romanization word sits right above/below its own lyric word.
+     val attachedTransliteration =
+         remember(renderWords, transliterations, lyric.phonetic, style.attachTransliterationToWords) {
+@@ -1773,7 +1774,7 @@ private fun WordsLyricLine(
+                 )
+                 if (onTop) Spacer(modifier = Modifier.height(2.dp))
+             }
+-        } else if (!lyric.phonetic.isNullOrBlank()) {
++        } else if (!lyric.phonetic.isNullOrBlank() && !duplicatesLatinLyric(sentence, lyric.phonetic!!)) {
+             if (!onTop) Spacer(modifier = Modifier.height(2.dp))
+             Text(
+                 text = lyric.phonetic!!,
+@@ -1908,6 +1909,18 @@ private fun WordsLyricLine(
+ 
+ private fun isRomanText(text: String): Boolean = text.all { !it.isLetter() || it.code < 0x250 }
+ 
++/** True when a romanization would only repeat a lyric that is already written in Latin letters. */
++private fun duplicatesLatinLyric(
++    lyricText: String,
++    romanization: String,
++): Boolean {
++    val lyric = lyricText.trim()
++    if (lyric.isEmpty()) return false
++    return isRomanText(lyric) || romanization.trim().equals(lyric, ignoreCase = true)
++}
++
++private fun LyricItem.WordsLyric.Translation.plainText(): String = content.ifBlank { words.joinToString(separator = "") { it.content } }
++
+ /** The lyric word a romanization word belongs to: the one it overlaps most in time, else the nearest. */
+ private fun bestWordIndex(
+     words: List<LyricItem.WordsLyric.WordWithTiming>,
+@@ -2298,11 +2311,16 @@ private fun AccompanimentLine(
+                 showEmptyBeat = displayOptions.showEmptyBeat,
+             )
+ 
++            val backgroundSentence =
++                words
++                    .joinToString(separator = "") { it.content }
++                    .ifBlank { background.content.orEmpty() }
+             val transliterations =
+-                background.transliterations.visibleTransliterations(
+-                    displayOptions.transliterationMode,
+-                    displayOptions.preferredTransliterationLanguage,
+-                )
++                background.transliterations
++                    .visibleTransliterations(
++                        displayOptions.transliterationMode,
++                        displayOptions.preferredTransliterationLanguage,
++                    ).filterNot { duplicatesLatinLyric(backgroundSentence, it.plainText()) }
+             if (transliterations.isNotEmpty()) {
+                 transliterations.forEach { transliteration ->
+                     Spacer(modifier = Modifier.height(2.dp))
+@@ -2320,7 +2338,7 @@ private fun AccompanimentLine(
+                         textStyle = style.phoneticTextStyle,
+                     )
+                 }
+-            } else if (!background.phonetic.isNullOrBlank()) {
++            } else if (!background.phonetic.isNullOrBlank() && !duplicatesLatinLyric(backgroundSentence, background.phonetic!!)) {
+                 Spacer(modifier = Modifier.height(2.dp))
+                 Text(
+                     text = background.phonetic!!,
