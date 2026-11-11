@@ -596,6 +596,15 @@ private fun LineAnimationSection(
                 valueText = { "$it°" },
                 onValueChange = { v -> onUpdate { it.copy(bgRevealFlipAngle = v) } },
             )
+            LyricsSettingsSlider(
+                label = stringResource(R.string.lyr_set_bg_reveal_flip_pivot),
+                description = stringResource(R.string.lyr_set_bg_reveal_flip_pivot_desc),
+                value = settings.bgRevealFlipPivot,
+                range = LyricsStyleSettings.BG_REVEAL_FLIP_PIVOT_RANGE,
+                step = 10,
+                valueText = { "$it%" },
+                onValueChange = { v -> onUpdate { it.copy(bgRevealFlipPivot = v) } },
+            )
         } else {
             LyricsSettingsToggle(
                 label = stringResource(R.string.lyr_set_bg_reveal_blur),

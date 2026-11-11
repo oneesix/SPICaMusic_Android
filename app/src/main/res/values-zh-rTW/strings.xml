@@ -933,6 +933,8 @@
   <string name="lyr_set_bg_reveal_fade_duration_desc">每次淡入或淡出所需時間</string>
   <string name="lyr_set_bg_reveal_flip_angle">翻轉角度</string>
   <string name="lyr_set_bg_reveal_flip_angle_desc">伴唱出現時翻轉的角度（360° = 整圈）</string>
+  <string name="lyr_set_bg_reveal_flip_pivot">翻轉支點</string>
+  <string name="lyr_set_bg_reveal_flip_pivot_desc">伴唱翻轉的位置：0% = 文字頂部，100% = 文字底部</string>
   <string name="lyr_set_section_progress">歌詞進度</string>
   <string name="lyr_set_word_lift">自訂文字上抬</string>
   <string name="lyr_set_word_lift_desc">關閉則使用預設上抬幅度</string>

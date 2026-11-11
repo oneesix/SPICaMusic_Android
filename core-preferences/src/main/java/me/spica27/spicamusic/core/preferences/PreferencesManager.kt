@@ -101,6 +101,7 @@ class PreferencesManager(
         val LYRIC_FIX_ANCHOR = booleanPreferencesKey("lyric_fix_anchor")
         val LYRIC_BG_REVEAL_STYLE = intPreferencesKey("lyric_bg_reveal_style")
         val LYRIC_BG_REVEAL_FLIP_ANGLE = intPreferencesKey("lyric_bg_reveal_flip_angle")
+        val LYRIC_BG_REVEAL_FLIP_PIVOT = intPreferencesKey("lyric_bg_reveal_flip_pivot")
         val LYRIC_BG_REVEAL_FADE = booleanPreferencesKey("lyric_bg_reveal_fade")
         val LYRIC_BG_REVEAL_FADE_MS = intPreferencesKey("lyric_bg_reveal_fade_ms")
         val LYRIC_WORD_LIFT_ENABLED = booleanPreferencesKey("lyric_word_lift_enabled")
@@ -197,6 +198,7 @@ class PreferencesManager(
                     fixAnchorEnabled = p[Keys.LYRIC_FIX_ANCHOR] ?: d.fixAnchorEnabled,
                     bgRevealStyle = p[Keys.LYRIC_BG_REVEAL_STYLE] ?: d.bgRevealStyle,
                     bgRevealFlipAngle = p[Keys.LYRIC_BG_REVEAL_FLIP_ANGLE] ?: d.bgRevealFlipAngle,
+                    bgRevealFlipPivot = p[Keys.LYRIC_BG_REVEAL_FLIP_PIVOT] ?: d.bgRevealFlipPivot,
                     bgRevealFadeEnabled = p[Keys.LYRIC_BG_REVEAL_FADE] ?: d.bgRevealFadeEnabled,
                     bgRevealFadeMs = p[Keys.LYRIC_BG_REVEAL_FADE_MS] ?: d.bgRevealFadeMs,
                     wordLiftEnabled = p[Keys.LYRIC_WORD_LIFT_ENABLED] ?: d.wordLiftEnabled,
@@ -293,6 +295,7 @@ class PreferencesManager(
                     fixAnchorEnabled = p[Keys.LYRIC_FIX_ANCHOR] ?: d.fixAnchorEnabled,
                     bgRevealStyle = p[Keys.LYRIC_BG_REVEAL_STYLE] ?: d.bgRevealStyle,
                     bgRevealFlipAngle = p[Keys.LYRIC_BG_REVEAL_FLIP_ANGLE] ?: d.bgRevealFlipAngle,
+                    bgRevealFlipPivot = p[Keys.LYRIC_BG_REVEAL_FLIP_PIVOT] ?: d.bgRevealFlipPivot,
                     bgRevealFadeEnabled = p[Keys.LYRIC_BG_REVEAL_FADE] ?: d.bgRevealFadeEnabled,
                     bgRevealFadeMs = p[Keys.LYRIC_BG_REVEAL_FADE_MS] ?: d.bgRevealFadeMs,
                     wordLiftEnabled = p[Keys.LYRIC_WORD_LIFT_ENABLED] ?: d.wordLiftEnabled,
@@ -380,6 +383,7 @@ class PreferencesManager(
             p[Keys.LYRIC_FIX_ANCHOR] = n.fixAnchorEnabled
             p[Keys.LYRIC_BG_REVEAL_STYLE] = n.bgRevealStyle
             p[Keys.LYRIC_BG_REVEAL_FLIP_ANGLE] = n.bgRevealFlipAngle
+            p[Keys.LYRIC_BG_REVEAL_FLIP_PIVOT] = n.bgRevealFlipPivot
             p[Keys.LYRIC_BG_REVEAL_FADE] = n.bgRevealFadeEnabled
             p[Keys.LYRIC_BG_REVEAL_FADE_MS] = n.bgRevealFadeMs
             p[Keys.LYRIC_WORD_LIFT_ENABLED] = n.wordLiftEnabled

@@ -660,6 +660,7 @@ private fun rememberLyricsUIStyle(
                                 },
                             flip = settings.bgRevealStyle == LyricsStyleSettings.BG_REVEAL_STYLE_FLIP,
                             flipAngle = settings.bgRevealFlipAngle,
+                            flipPivot = settings.bgRevealFlipPivot / 100f,
                             fade = settings.bgRevealFadeEnabled,
                             fadeMs = settings.bgRevealFadeMs,
                         )
@@ -844,44 +845,25 @@ fun LyricsUI(
             // Biggest per-frame shift that still counts as a line growing or shrinking (not a line change).
             val revealFollowPx = with(density) { 24.dp.roundToPx() }
 
-            // The background vocal reveal changes line heights; keep the current line on its anchor meanwhile.
-            if (styleSettings.bgRevealEnabled && styleSettings.fixAnchorEnabled) {
-                val flipStyle = styleSettings.bgRevealStyle == LyricsStyleSettings.BG_REVEAL_STYLE_FLIP
-                LaunchedEffect(lazyListState, lyricLines, playbackAnchorOffsetPx, keepAliveZonePx, flipStyle) {
+            // The Classic background vocal reveal changes line heights; keep the current line on its anchor meanwhile.
+            // Flip style keeps every line the same height, so it needs no help.
+            if (styleSettings.bgRevealEnabled && styleSettings.fixAnchorEnabled &&
+                styleSettings.bgRevealStyle != LyricsStyleSettings.BG_REVEAL_STYLE_FLIP
+            ) {
+                LaunchedEffect(lazyListState, lyricLines, playbackAnchorOffsetPx, keepAliveZonePx) {
                     val anchorPx = (playbackAnchorOffsetPx + keepAliveZonePx).roundToInt()
-                    var lastIndex = -1
-                    var lastBottom = 0
                     snapshotFlow {
                         val index = playingIndex
-                        lazyListState.layoutInfo.visibleItemsInfo
-                            .firstOrNull { it.index == index }
-                            ?.let { Triple(index, it.offset, it.size) }
-                    }.collect { info ->
-                        if (info == null || !hasSyncedInitialPosition || isAutoScrolling ||
+                        lazyListState.layoutInfo.visibleItemsInfo.firstOrNull { it.index == index }?.offset
+                    }.collect { offset ->
+                        if (offset == null || !hasSyncedInitialPosition || isAutoScrolling ||
                             showSeekOverlay || isBarSeeking || lazyListState.isScrollInProgress
                         ) {
-                            lastIndex = -1
                             return@collect
                         }
-                        val (index, offset, size) = info
-                        if (flipStyle) {
-                            // The background vocal grows above the main lyric: keep the bottom of the line
-                            // (the main lyric) still, so the vocal pushes the lines above up instead.
-                            val bottom = offset + size
-                            if (index == lastIndex) {
-                                val delta = bottom - lastBottom
-                                if (delta != 0 && abs(delta) <= revealFollowPx) {
-                                    lazyListState.scrollBy(delta.toFloat())
-                                    return@collect
-                                }
-                            }
-                            lastIndex = index
-                            lastBottom = bottom
-                        } else {
-                            val distance = lazyListState.distanceToAnchor(offset, anchorPx)
-                            if (abs(distance) >= 0.5f && abs(distance) <= revealFollowPx) {
-                                lazyListState.scrollBy(distance)
-                            }
+                        val distance = lazyListState.distanceToAnchor(offset, anchorPx)
+                        if (abs(distance) >= 0.5f && abs(distance) <= revealFollowPx) {
+                            lazyListState.scrollBy(distance)
                         }
                     }
                 }
@@ -2292,6 +2274,8 @@ private data class BgRevealSpec(
     /** Flip style: the background vocal turns out from behind the main lyric, above it. No blur, no rise. */
     val flip: Boolean,
     val flipAngle: Int,
+    /** 0 = top of the vocal's text, 1 = bottom. */
+    val flipPivot: Float,
     val fade: Boolean,
     val fadeMs: Int,
 )
@@ -2341,18 +2325,26 @@ private fun BackgroundReveal(
     Box(
         modifier =
             Modifier
-                .clipToBounds()
+                // Flip style has no mask: the vocal keeps its own space and just flips in it.
+                .then(if (spec.flip) Modifier else Modifier.clipToBounds())
                 .layout { measurable, constraints ->
                     val placeable = measurable.measure(constraints)
                     val p = progress.value
-                    layout(placeable.width, (placeable.height * p).roundToInt()) {
+                    val height = if (spec.flip) placeable.height else (placeable.height * p).roundToInt()
+                    layout(placeable.width, height) {
                         placeable.placeWithLayer(0, 0) {
-                            alpha = if (spec.fade) fadeProgress.value else 1f
+                            alpha =
+                                if (spec.fade) {
+                                    fadeProgress.value
+                                } else if (spec.flip && p <= 0.001f) {
+                                    0f
+                                } else {
+                                    1f
+                                }
                             if (spec.flip) {
-                                // Flip style: turn about the middle of the part that is visible so far.
                                 rotationX = (1f - p) * spec.flipAngle
                                 cameraDistance = cameraPx
-                                transformOrigin = TransformOrigin(0.5f, p * 0.5f)
+                                transformOrigin = TransformOrigin(0.5f, spec.flipPivot)
                             } else {
                                 translationY = -(1f - p) * liftPx
                                 val scale = 0.96f + 0.04f * p

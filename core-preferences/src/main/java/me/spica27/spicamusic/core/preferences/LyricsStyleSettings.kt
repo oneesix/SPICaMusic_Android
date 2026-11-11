@@ -192,6 +192,8 @@ data class LyricsStyleSettings(
     val bgRevealStyle: Int = BG_REVEAL_STYLE_CLASSIC,
     /** Flip style: how far the background vocal turns while it comes in (90..360 degrees). */
     val bgRevealFlipAngle: Int = 360,
+    /** Flip style: where the vocal turns, 0 = top of its text, 100 = bottom of its text. */
+    val bgRevealFlipPivot: Int = 50,
     /** Fade the background vocal in and out (both styles). */
     val bgRevealFadeEnabled: Boolean = true,
     /** Duration of that fade in ms. */
@@ -248,6 +250,7 @@ data class LyricsStyleSettings(
             bgRevealBlurAmount = bgRevealBlurAmount.coerceIn(BG_REVEAL_BLUR_RANGE),
             bgRevealStyle = bgRevealStyle.coerceIn(BG_REVEAL_STYLE_CLASSIC, BG_REVEAL_STYLE_FLIP),
             bgRevealFlipAngle = bgRevealFlipAngle.coerceIn(BG_REVEAL_FLIP_ANGLE_RANGE),
+            bgRevealFlipPivot = bgRevealFlipPivot.coerceIn(BG_REVEAL_FLIP_PIVOT_RANGE),
             bgRevealFadeMs = bgRevealFadeMs.coerceIn(BG_REVEAL_FADE_RANGE),
         )
 
@@ -299,6 +302,7 @@ data class LyricsStyleSettings(
         val BG_REVEAL_DURATION_RANGE = 500..2000
         val BG_REVEAL_BLUR_RANGE = 1..20
         val BG_REVEAL_FLIP_ANGLE_RANGE = 90..360
+        val BG_REVEAL_FLIP_PIVOT_RANGE = 0..100
         val BG_REVEAL_FADE_RANGE = 200..2000
         const val BG_REVEAL_STYLE_CLASSIC = 0
         const val BG_REVEAL_STYLE_FLIP = 1
