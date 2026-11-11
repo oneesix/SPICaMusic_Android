@@ -510,7 +510,7 @@ private fun KineticStage(
             if (settings.kineticStyle == KineticStyle.Auto) chooseKind(line, seed) else settings.kineticStyle
         }
     val highlights = remember(line, seed) { highlightSet(line, seed) }
-    val revealed by remember(line) { derivedStateOf { line.words.count { it.startMs <= timeMs.longValue } } }
+    val revealed by remember(line) { derivedStateOf { line.words.count { it.startMs <= timeMs.value } } }
     val accent = accents[((seed ushr 3) and 0x7fffffff) % 3]
     val density = LocalDensity.current
 
