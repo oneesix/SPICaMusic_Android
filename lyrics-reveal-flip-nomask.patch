@@ -1,0 +1,234 @@
+diff --git a/app/src/main/java/me/spica27/spicamusic/ui/widget/LyricUI.kt b/app/src/main/java/me/spica27/spicamusic/ui/widget/LyricUI.kt
+index 671672f..089f7a4 100644
+--- a/app/src/main/java/me/spica27/spicamusic/ui/widget/LyricUI.kt
++++ b/app/src/main/java/me/spica27/spicamusic/ui/widget/LyricUI.kt
+@@ -629,6 +629,7 @@ private fun rememberLyricsUIStyle(
+                                 },
+                             flip = settings.bgRevealStyle == LyricsStyleSettings.BG_REVEAL_STYLE_FLIP,
+                             flipAngle = settings.bgRevealFlipAngle,
++                            flipPivot = settings.bgRevealFlipPivot / 100f,
+                             fade = settings.bgRevealFadeEnabled,
+                             fadeMs = settings.bgRevealFadeMs,
+                         )
+@@ -813,44 +814,25 @@ fun LyricsUI(
+             // Biggest per-frame shift that still counts as a line growing or shrinking (not a line change).
+             val revealFollowPx = with(density) { 24.dp.roundToPx() }
+ 
+-            // The background vocal reveal changes line heights; keep the current line on its anchor meanwhile.
+-            if (styleSettings.bgRevealEnabled && styleSettings.fixAnchorEnabled) {
+-                val flipStyle = styleSettings.bgRevealStyle == LyricsStyleSettings.BG_REVEAL_STYLE_FLIP
+-                LaunchedEffect(lazyListState, lyricLines, playbackAnchorOffsetPx, keepAliveZonePx, flipStyle) {
++            // The Classic background vocal reveal changes line heights; keep the current line on its anchor meanwhile.
++            // Flip style keeps every line the same height, so it needs no help.
++            if (styleSettings.bgRevealEnabled && styleSettings.fixAnchorEnabled &&
++                styleSettings.bgRevealStyle != LyricsStyleSettings.BG_REVEAL_STYLE_FLIP
++            ) {
++                LaunchedEffect(lazyListState, lyricLines, playbackAnchorOffsetPx, keepAliveZonePx) {
+                     val anchorPx = (playbackAnchorOffsetPx + keepAliveZonePx).roundToInt()
+-                    var lastIndex = -1
+-                    var lastBottom = 0
+                     snapshotFlow {
+                         val index = playingIndex
+-                        lazyListState.layoutInfo.visibleItemsInfo
+-                            .firstOrNull { it.index == index }
+-                            ?.let { Triple(index, it.offset, it.size) }
+-                    }.collect { info ->
+-                        if (info == null || !hasSyncedInitialPosition || isAutoScrolling ||
++                        lazyListState.layoutInfo.visibleItemsInfo.firstOrNull { it.index == index }?.offset
++                    }.collect { offset ->
++                        if (offset == null || !hasSyncedInitialPosition || isAutoScrolling ||
+                             showSeekOverlay || isBarSeeking || lazyListState.isScrollInProgress
+                         ) {
+-                            lastIndex = -1
+                             return@collect
+                         }
+-                        val (index, offset, size) = info
+-                        if (flipStyle) {
+-                            // The background vocal grows above the main lyric: keep the bottom of the line
+-                            // (the main lyric) still, so the vocal pushes the lines above up instead.
+-                            val bottom = offset + size
+-                            if (index == lastIndex) {
+-                                val delta = bottom - lastBottom
+-                                if (delta != 0 && abs(delta) <= revealFollowPx) {
+-                                    lazyListState.scrollBy(delta.toFloat())
+-                                    return@collect
+-                                }
+-                            }
+-                            lastIndex = index
+-                            lastBottom = bottom
+-                        } else {
+-                            val distance = lazyListState.distanceToAnchor(offset, anchorPx)
+-                            if (abs(distance) >= 0.5f && abs(distance) <= revealFollowPx) {
+-                                lazyListState.scrollBy(distance)
+-                            }
++                        val distance = lazyListState.distanceToAnchor(offset, anchorPx)
++                        if (abs(distance) >= 0.5f && abs(distance) <= revealFollowPx) {
++                            lazyListState.scrollBy(distance)
+                         }
+                     }
+                 }
+@@ -2140,6 +2122,8 @@ private data class BgRevealSpec(
+     /** Flip style: the background vocal turns out from behind the main lyric, above it. No blur, no rise. */
+     val flip: Boolean,
+     val flipAngle: Int,
++    /** 0 = top of the vocal's text, 1 = bottom. */
++    val flipPivot: Float,
+     val fade: Boolean,
+     val fadeMs: Int,
+ )
+@@ -2189,18 +2173,26 @@ private fun BackgroundReveal(
+     Box(
+         modifier =
+             Modifier
+-                .clipToBounds()
++                // Flip style has no mask: the vocal keeps its own space and just flips in it.
++                .then(if (spec.flip) Modifier else Modifier.clipToBounds())
+                 .layout { measurable, constraints ->
+                     val placeable = measurable.measure(constraints)
+                     val p = progress.value
+-                    layout(placeable.width, (placeable.height * p).roundToInt()) {
++                    val height = if (spec.flip) placeable.height else (placeable.height * p).roundToInt()
++                    layout(placeable.width, height) {
+                         placeable.placeWithLayer(0, 0) {
+-                            alpha = if (spec.fade) fadeProgress.value else 1f
++                            alpha =
++                                if (spec.fade) {
++                                    fadeProgress.value
++                                } else if (spec.flip && p <= 0.001f) {
++                                    0f
++                                } else {
++                                    1f
++                                }
+                             if (spec.flip) {
+-                                // Flip style: turn about the middle of the part that is visible so far.
+                                 rotationX = (1f - p) * spec.flipAngle
+                                 cameraDistance = cameraPx
+-                                transformOrigin = TransformOrigin(0.5f, p * 0.5f)
++                                transformOrigin = TransformOrigin(0.5f, spec.flipPivot)
+                             } else {
+                                 translationY = -(1f - p) * liftPx
+                                 val scale = 0.96f + 0.04f * p
+diff --git a/app/src/main/java/me/spica27/spicamusic/ui/widget/LyricsSettingsSheet.kt b/app/src/main/java/me/spica27/spicamusic/ui/widget/LyricsSettingsSheet.kt
+index 4fd5e34..03dd5bd 100644
+--- a/app/src/main/java/me/spica27/spicamusic/ui/widget/LyricsSettingsSheet.kt
++++ b/app/src/main/java/me/spica27/spicamusic/ui/widget/LyricsSettingsSheet.kt
+@@ -490,6 +490,15 @@ private fun LineAnimationSection(
+                 valueText = { "$it°" },
+                 onValueChange = { v -> onUpdate { it.copy(bgRevealFlipAngle = v) } },
+             )
++            LyricsSettingsSlider(
++                label = stringResource(R.string.lyr_set_bg_reveal_flip_pivot),
++                description = stringResource(R.string.lyr_set_bg_reveal_flip_pivot_desc),
++                value = settings.bgRevealFlipPivot,
++                range = LyricsStyleSettings.BG_REVEAL_FLIP_PIVOT_RANGE,
++                step = 10,
++                valueText = { "$it%" },
++                onValueChange = { v -> onUpdate { it.copy(bgRevealFlipPivot = v) } },
++            )
+         } else {
+             LyricsSettingsToggle(
+                 label = stringResource(R.string.lyr_set_bg_reveal_blur),
+diff --git a/app/src/main/res/values-zh-rTW/strings.xml b/app/src/main/res/values-zh-rTW/strings.xml
+index 8a45922..1558c95 100644
+--- a/app/src/main/res/values-zh-rTW/strings.xml
++++ b/app/src/main/res/values-zh-rTW/strings.xml
+@@ -933,6 +933,8 @@
+   <string name="lyr_set_bg_reveal_fade_duration_desc">每次淡入或淡出所需時間</string>
+   <string name="lyr_set_bg_reveal_flip_angle">翻轉角度</string>
+   <string name="lyr_set_bg_reveal_flip_angle_desc">伴唱出現時翻轉的角度（360° = 整圈）</string>
++  <string name="lyr_set_bg_reveal_flip_pivot">翻轉支點</string>
++  <string name="lyr_set_bg_reveal_flip_pivot_desc">伴唱翻轉的位置：0% = 文字頂部，100% = 文字底部</string>
+   <string name="lyr_set_section_progress">歌詞進度</string>
+   <string name="lyr_set_word_lift">自訂文字上抬</string>
+   <string name="lyr_set_word_lift_desc">關閉則使用預設上抬幅度</string>
+diff --git a/app/src/main/res/values-zh/strings.xml b/app/src/main/res/values-zh/strings.xml
+index 7154622..7d87762 100644
+--- a/app/src/main/res/values-zh/strings.xml
++++ b/app/src/main/res/values-zh/strings.xml
+@@ -934,6 +934,8 @@
+   <string name="lyr_set_bg_reveal_fade_duration_desc">每次淡入或淡出所需时间</string>
+   <string name="lyr_set_bg_reveal_flip_angle">翻转角度</string>
+   <string name="lyr_set_bg_reveal_flip_angle_desc">伴唱出现时翻转的角度（360° = 整圈）</string>
++  <string name="lyr_set_bg_reveal_flip_pivot">翻转支点</string>
++  <string name="lyr_set_bg_reveal_flip_pivot_desc">伴唱翻转的位置：0% = 文字顶部，100% = 文字底部</string>
+   <string name="lyr_set_section_progress">歌词进度</string>
+   <string name="lyr_set_word_lift">自定义文字上抬</string>
+   <string name="lyr_set_word_lift_desc">关闭则使用默认上抬幅度</string>
+diff --git a/app/src/main/res/values/strings.xml b/app/src/main/res/values/strings.xml
+index a141268..2892ef4 100644
+--- a/app/src/main/res/values/strings.xml
++++ b/app/src/main/res/values/strings.xml
+@@ -934,6 +934,8 @@
+   <string name="lyr_set_bg_reveal_fade_duration_desc">How long each fade in or fade out takes</string>
+   <string name="lyr_set_bg_reveal_flip_angle">Flip angle</string>
+   <string name="lyr_set_bg_reveal_flip_angle_desc">How far the background vocal turns while it comes in (360° = full turn)</string>
++  <string name="lyr_set_bg_reveal_flip_pivot">Flip pivot</string>
++  <string name="lyr_set_bg_reveal_flip_pivot_desc">Where the background vocal turns: 0% = top of its text, 100% = bottom of its text</string>
+   <string name="lyr_set_section_progress">Lyrics progress</string>
+   <string name="lyr_set_word_lift">Custom text lift</string>
+   <string name="lyr_set_word_lift_desc">Off keeps the default lift</string>
+diff --git a/core-preferences/src/main/java/me/spica27/spicamusic/core/preferences/LyricsStyleSettings.kt b/core-preferences/src/main/java/me/spica27/spicamusic/core/preferences/LyricsStyleSettings.kt
+index 9df6653..07aa6b7 100644
+--- a/core-preferences/src/main/java/me/spica27/spicamusic/core/preferences/LyricsStyleSettings.kt
++++ b/core-preferences/src/main/java/me/spica27/spicamusic/core/preferences/LyricsStyleSettings.kt
+@@ -170,6 +170,8 @@ data class LyricsStyleSettings(
+     val bgRevealStyle: Int = BG_REVEAL_STYLE_CLASSIC,
+     /** Flip style: how far the background vocal turns while it comes in (90..360 degrees). */
+     val bgRevealFlipAngle: Int = 360,
++    /** Flip style: where the vocal turns, 0 = top of its text, 100 = bottom of its text. */
++    val bgRevealFlipPivot: Int = 50,
+     /** Fade the background vocal in and out (both styles). */
+     val bgRevealFadeEnabled: Boolean = true,
+     /** Duration of that fade in ms. */
+@@ -222,6 +224,7 @@ data class LyricsStyleSettings(
+             bgRevealBlurAmount = bgRevealBlurAmount.coerceIn(BG_REVEAL_BLUR_RANGE),
+             bgRevealStyle = bgRevealStyle.coerceIn(BG_REVEAL_STYLE_CLASSIC, BG_REVEAL_STYLE_FLIP),
+             bgRevealFlipAngle = bgRevealFlipAngle.coerceIn(BG_REVEAL_FLIP_ANGLE_RANGE),
++            bgRevealFlipPivot = bgRevealFlipPivot.coerceIn(BG_REVEAL_FLIP_PIVOT_RANGE),
+             bgRevealFadeMs = bgRevealFadeMs.coerceIn(BG_REVEAL_FADE_RANGE),
+         )
+ 
+@@ -269,6 +272,7 @@ data class LyricsStyleSettings(
+         val BG_REVEAL_DURATION_RANGE = 500..2000
+         val BG_REVEAL_BLUR_RANGE = 1..20
+         val BG_REVEAL_FLIP_ANGLE_RANGE = 90..360
++        val BG_REVEAL_FLIP_PIVOT_RANGE = 0..100
+         val BG_REVEAL_FADE_RANGE = 200..2000
+         const val BG_REVEAL_STYLE_CLASSIC = 0
+         const val BG_REVEAL_STYLE_FLIP = 1
+diff --git a/core-preferences/src/main/java/me/spica27/spicamusic/core/preferences/PreferencesManager.kt b/core-preferences/src/main/java/me/spica27/spicamusic/core/preferences/PreferencesManager.kt
+index 62888b7..4357bba 100644
+--- a/core-preferences/src/main/java/me/spica27/spicamusic/core/preferences/PreferencesManager.kt
++++ b/core-preferences/src/main/java/me/spica27/spicamusic/core/preferences/PreferencesManager.kt
+@@ -92,6 +92,7 @@ class PreferencesManager(
+         val LYRIC_FIX_ANCHOR = booleanPreferencesKey("lyric_fix_anchor")
+         val LYRIC_BG_REVEAL_STYLE = intPreferencesKey("lyric_bg_reveal_style")
+         val LYRIC_BG_REVEAL_FLIP_ANGLE = intPreferencesKey("lyric_bg_reveal_flip_angle")
++        val LYRIC_BG_REVEAL_FLIP_PIVOT = intPreferencesKey("lyric_bg_reveal_flip_pivot")
+         val LYRIC_BG_REVEAL_FADE = booleanPreferencesKey("lyric_bg_reveal_fade")
+         val LYRIC_BG_REVEAL_FADE_MS = intPreferencesKey("lyric_bg_reveal_fade_ms")
+         val LYRIC_WORD_LIFT_ENABLED = booleanPreferencesKey("lyric_word_lift_enabled")
+@@ -178,6 +179,7 @@ class PreferencesManager(
+                     fixAnchorEnabled = p[Keys.LYRIC_FIX_ANCHOR] ?: d.fixAnchorEnabled,
+                     bgRevealStyle = p[Keys.LYRIC_BG_REVEAL_STYLE] ?: d.bgRevealStyle,
+                     bgRevealFlipAngle = p[Keys.LYRIC_BG_REVEAL_FLIP_ANGLE] ?: d.bgRevealFlipAngle,
++                    bgRevealFlipPivot = p[Keys.LYRIC_BG_REVEAL_FLIP_PIVOT] ?: d.bgRevealFlipPivot,
+                     bgRevealFadeEnabled = p[Keys.LYRIC_BG_REVEAL_FADE] ?: d.bgRevealFadeEnabled,
+                     bgRevealFadeMs = p[Keys.LYRIC_BG_REVEAL_FADE_MS] ?: d.bgRevealFadeMs,
+                     wordLiftEnabled = p[Keys.LYRIC_WORD_LIFT_ENABLED] ?: d.wordLiftEnabled,
+@@ -264,6 +266,7 @@ class PreferencesManager(
+                     fixAnchorEnabled = p[Keys.LYRIC_FIX_ANCHOR] ?: d.fixAnchorEnabled,
+                     bgRevealStyle = p[Keys.LYRIC_BG_REVEAL_STYLE] ?: d.bgRevealStyle,
+                     bgRevealFlipAngle = p[Keys.LYRIC_BG_REVEAL_FLIP_ANGLE] ?: d.bgRevealFlipAngle,
++                    bgRevealFlipPivot = p[Keys.LYRIC_BG_REVEAL_FLIP_PIVOT] ?: d.bgRevealFlipPivot,
+                     bgRevealFadeEnabled = p[Keys.LYRIC_BG_REVEAL_FADE] ?: d.bgRevealFadeEnabled,
+                     bgRevealFadeMs = p[Keys.LYRIC_BG_REVEAL_FADE_MS] ?: d.bgRevealFadeMs,
+                     wordLiftEnabled = p[Keys.LYRIC_WORD_LIFT_ENABLED] ?: d.wordLiftEnabled,
+@@ -341,6 +344,7 @@ class PreferencesManager(
+             p[Keys.LYRIC_FIX_ANCHOR] = n.fixAnchorEnabled
+             p[Keys.LYRIC_BG_REVEAL_STYLE] = n.bgRevealStyle
+             p[Keys.LYRIC_BG_REVEAL_FLIP_ANGLE] = n.bgRevealFlipAngle
++            p[Keys.LYRIC_BG_REVEAL_FLIP_PIVOT] = n.bgRevealFlipPivot
+             p[Keys.LYRIC_BG_REVEAL_FADE] = n.bgRevealFadeEnabled
+             p[Keys.LYRIC_BG_REVEAL_FADE_MS] = n.bgRevealFadeMs
+             p[Keys.LYRIC_WORD_LIFT_ENABLED] = n.wordLiftEnabled
