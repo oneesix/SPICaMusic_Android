@@ -650,7 +650,18 @@ private fun rememberLyricsUIStyle(
                             beforeMs = -settings.bgRevealStartOffsetMs,
                             afterMs = settings.bgRevealAfterMs,
                             durationMs = settings.bgRevealDurationMs,
-                            blurDp = if (settings.bgRevealBlurEnabled) settings.bgRevealBlurAmount else 0,
+                            blurDp =
+                                if (settings.bgRevealStyle == LyricsStyleSettings.BG_REVEAL_STYLE_FLIP ||
+                                    !settings.bgRevealBlurEnabled
+                                ) {
+                                    0
+                                } else {
+                                    settings.bgRevealBlurAmount
+                                },
+                            flip = settings.bgRevealStyle == LyricsStyleSettings.BG_REVEAL_STYLE_FLIP,
+                            flipAngle = settings.bgRevealFlipAngle,
+                            fade = settings.bgRevealFadeEnabled,
+                            fadeMs = settings.bgRevealFadeMs,
                         )
                     } else {
                         null
@@ -835,20 +846,42 @@ fun LyricsUI(
 
             // The background vocal reveal changes line heights; keep the current line on its anchor meanwhile.
             if (styleSettings.bgRevealEnabled && styleSettings.fixAnchorEnabled) {
-                LaunchedEffect(lazyListState, lyricLines, playbackAnchorOffsetPx, keepAliveZonePx) {
+                val flipStyle = styleSettings.bgRevealStyle == LyricsStyleSettings.BG_REVEAL_STYLE_FLIP
+                LaunchedEffect(lazyListState, lyricLines, playbackAnchorOffsetPx, keepAliveZonePx, flipStyle) {
                     val anchorPx = (playbackAnchorOffsetPx + keepAliveZonePx).roundToInt()
+                    var lastIndex = -1
+                    var lastBottom = 0
                     snapshotFlow {
                         val index = playingIndex
-                        lazyListState.layoutInfo.visibleItemsInfo.firstOrNull { it.index == index }?.offset
-                    }.collect { offset ->
-                        if (offset == null || !hasSyncedInitialPosition || isAutoScrolling ||
+                        lazyListState.layoutInfo.visibleItemsInfo
+                            .firstOrNull { it.index == index }
+                            ?.let { Triple(index, it.offset, it.size) }
+                    }.collect { info ->
+                        if (info == null || !hasSyncedInitialPosition || isAutoScrolling ||
                             showSeekOverlay || isBarSeeking || lazyListState.isScrollInProgress
                         ) {
+                            lastIndex = -1
                             return@collect
                         }
-                        val distance = lazyListState.distanceToAnchor(offset, anchorPx)
-                        if (abs(distance) >= 0.5f && abs(distance) <= revealFollowPx) {
-                            lazyListState.scrollBy(distance)
+                        val (index, offset, size) = info
+                        if (flipStyle) {
+                            // The background vocal grows above the main lyric: keep the bottom of the line
+                            // (the main lyric) still, so the vocal pushes the lines above up instead.
+                            val bottom = offset + size
+                            if (index == lastIndex) {
+                                val delta = bottom - lastBottom
+                                if (delta != 0 && abs(delta) <= revealFollowPx) {
+                                    lazyListState.scrollBy(delta.toFloat())
+                                    return@collect
+                                }
+                            }
+                            lastIndex = index
+                            lastBottom = bottom
+                        } else {
+                            val distance = lazyListState.distanceToAnchor(offset, anchorPx)
+                            if (abs(distance) >= 0.5f && abs(distance) <= revealFollowPx) {
+                                lazyListState.scrollBy(distance)
+                            }
                         }
                     }
                 }
@@ -1960,11 +1993,16 @@ private fun WordsLyricLine(
                 .joinToString(separator = "") { it.content }
                 .ifBlank { lyric.getSentenceContent() }
         }
+    // Flip reveal style: every background vocal sits above the main lyric.
+    val flipReveal = style.bgReveal?.flip == true
     val (beforeAccompaniment, afterAccompaniment) =
-        remember(lyric) {
-            lyric.accompaniment
-                .sortedBy { it.startTime }
-                .partition { it.startTime < lyric.startTime }
+        remember(lyric, flipReveal) {
+            val sorted = lyric.accompaniment.sortedBy { it.startTime }
+            if (flipReveal) {
+                sorted to emptyList<LyricItem.WordsLyric.AccompanimentLyric>()
+            } else {
+                sorted.partition { it.startTime < lyric.startTime }
+            }
         }
 
     // 已唱侧随当前行进入和退出渐变。
@@ -2251,6 +2289,11 @@ private data class BgRevealSpec(
     val afterMs: Int,
     val durationMs: Int,
     val blurDp: Int,
+    /** Flip style: the background vocal turns out from behind the main lyric, above it. No blur, no rise. */
+    val flip: Boolean,
+    val flipAngle: Int,
+    val fade: Boolean,
+    val fadeMs: Int,
 )
 
 private val BgRevealEase = CubicBezierEasing(0.2f, 0.8f, 0.2f, 1f)
@@ -2285,7 +2328,14 @@ private fun BackgroundReveal(
             animationSpec = tween(durationMillis = spec.durationMs, easing = BgRevealEase),
             label = "bgReveal",
         )
+    val fadeProgress =
+        animateFloatAsState(
+            targetValue = if (open) 1f else 0f,
+            animationSpec = tween(durationMillis = spec.fadeMs, easing = BgRevealEase),
+            label = "bgRevealFade",
+        )
     val density = LocalDensity.current
+    val cameraPx = with(density) { 24.dp.toPx() }
     val liftPx = with(density) { 14.dp.toPx() }
     val blurPx = with(density) { spec.blurDp.dp.toPx() }
     Box(
@@ -2297,18 +2347,25 @@ private fun BackgroundReveal(
                     val p = progress.value
                     layout(placeable.width, (placeable.height * p).roundToInt()) {
                         placeable.placeWithLayer(0, 0) {
-                            alpha = p
-                            translationY = -(1f - p) * liftPx
-                            val scale = 0.96f + 0.04f * p
-                            scaleX = scale
-                            scaleY = scale
-                            transformOrigin = TransformOrigin(0.5f, 0f)
-                            renderEffect =
-                                if (blurPx > 0f && p < 1f) {
-                                    BlurEffect(blurPx * (1f - p), blurPx * (1f - p), TileMode.Decal)
-                                } else {
-                                    null
-                                }
+                            alpha = if (spec.fade) fadeProgress.value else 1f
+                            if (spec.flip) {
+                                // Flip style: turn about the middle of the part that is visible so far.
+                                rotationX = (1f - p) * spec.flipAngle
+                                cameraDistance = cameraPx
+                                transformOrigin = TransformOrigin(0.5f, p * 0.5f)
+                            } else {
+                                translationY = -(1f - p) * liftPx
+                                val scale = 0.96f + 0.04f * p
+                                scaleX = scale
+                                scaleY = scale
+                                transformOrigin = TransformOrigin(0.5f, 0f)
+                                renderEffect =
+                                    if (blurPx > 0f && p < 1f) {
+                                        BlurEffect(blurPx * (1f - p), blurPx * (1f - p), TileMode.Decal)
+                                    } else {
+                                        null
+                                    }
+                            }
                         }
                     }
                 },

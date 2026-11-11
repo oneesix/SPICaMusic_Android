@@ -923,6 +923,16 @@
   <string name="lyr_set_bg_reveal_blur_amount_desc">展開時的模糊半徑</string>
   <string name="lyr_set_fix_anchor">修正錨點</string>
   <string name="lyr_set_fix_anchor_desc">伴唱展開或收起時，保持目前行和下方歌詞穩定（需開啟伴唱展開）</string>
+  <string name="lyr_set_bg_reveal_style">揭示樣式</string>
+  <string name="lyr_set_bg_reveal_style_desc">經典樣式帶模糊展開。翻轉樣式讓伴唱從主歌詞後方翻出，並顯示在主歌詞上方。</string>
+  <string name="lyr_set_bg_reveal_style_classic">經典</string>
+  <string name="lyr_set_bg_reveal_style_flip">翻轉</string>
+  <string name="lyr_set_bg_reveal_fade">淡入 / 淡出</string>
+  <string name="lyr_set_bg_reveal_fade_desc">伴唱出現時淡入，離開時淡出</string>
+  <string name="lyr_set_bg_reveal_fade_duration">淡入淡出時長</string>
+  <string name="lyr_set_bg_reveal_fade_duration_desc">每次淡入或淡出所需時間</string>
+  <string name="lyr_set_bg_reveal_flip_angle">翻轉角度</string>
+  <string name="lyr_set_bg_reveal_flip_angle_desc">伴唱出現時翻轉的角度（360° = 整圈）</string>
   <string name="lyr_set_section_progress">歌詞進度</string>
   <string name="lyr_set_word_lift">自訂文字上抬</string>
   <string name="lyr_set_word_lift_desc">關閉則使用預設上抬幅度</string>

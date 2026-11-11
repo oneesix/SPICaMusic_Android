@@ -924,6 +924,16 @@
   <string name="lyr_set_bg_reveal_blur_amount_desc">Blur radius while revealing</string>
   <string name="lyr_set_fix_anchor">Fix anchor</string>
   <string name="lyr_set_fix_anchor_desc">Keeps the current line and the lines below steady while a background vocal expands or collapses (needs Background vocal reveal)</string>
+  <string name="lyr_set_bg_reveal_style">Reveal style</string>
+  <string name="lyr_set_bg_reveal_style_desc">Classic expands with blur. Flip turns the background vocal out from behind the main lyric and puts it above it.</string>
+  <string name="lyr_set_bg_reveal_style_classic">Classic</string>
+  <string name="lyr_set_bg_reveal_style_flip">Flip</string>
+  <string name="lyr_set_bg_reveal_fade">Fade in / out</string>
+  <string name="lyr_set_bg_reveal_fade_desc">The background vocal fades in when it appears and fades out when it leaves</string>
+  <string name="lyr_set_bg_reveal_fade_duration">Fade duration</string>
+  <string name="lyr_set_bg_reveal_fade_duration_desc">How long each fade in or fade out takes</string>
+  <string name="lyr_set_bg_reveal_flip_angle">Flip angle</string>
+  <string name="lyr_set_bg_reveal_flip_angle_desc">How far the background vocal turns while it comes in (360° = full turn)</string>
   <string name="lyr_set_section_progress">Lyrics progress</string>
   <string name="lyr_set_word_lift">Custom text lift</string>
   <string name="lyr_set_word_lift_desc">Off keeps the default lift</string>

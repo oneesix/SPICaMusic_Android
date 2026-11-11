@@ -188,6 +188,14 @@ data class LyricsStyleSettings(
     val bgRevealBlurAmount: Int = 8,
     /** Keeps lines and the current line steady on their anchor while a background vocal expands or collapses. */
     val fixAnchorEnabled: Boolean = true,
+    /** Background vocal reveal style: [BG_REVEAL_STYLE_CLASSIC] or [BG_REVEAL_STYLE_FLIP]. */
+    val bgRevealStyle: Int = BG_REVEAL_STYLE_CLASSIC,
+    /** Flip style: how far the background vocal turns while it comes in (90..360 degrees). */
+    val bgRevealFlipAngle: Int = 360,
+    /** Fade the background vocal in and out (both styles). */
+    val bgRevealFadeEnabled: Boolean = true,
+    /** Duration of that fade in ms. */
+    val bgRevealFadeMs: Int = 800,
 ) {
     /** Returns a copy with every value forced into its allowed range. */
     fun sanitized(): LyricsStyleSettings =
@@ -238,6 +246,9 @@ data class LyricsStyleSettings(
             bgRevealAfterMs = bgRevealAfterMs.coerceIn(BG_REVEAL_OFFSET_RANGE),
             bgRevealDurationMs = bgRevealDurationMs.coerceIn(BG_REVEAL_DURATION_RANGE),
             bgRevealBlurAmount = bgRevealBlurAmount.coerceIn(BG_REVEAL_BLUR_RANGE),
+            bgRevealStyle = bgRevealStyle.coerceIn(BG_REVEAL_STYLE_CLASSIC, BG_REVEAL_STYLE_FLIP),
+            bgRevealFlipAngle = bgRevealFlipAngle.coerceIn(BG_REVEAL_FLIP_ANGLE_RANGE),
+            bgRevealFadeMs = bgRevealFadeMs.coerceIn(BG_REVEAL_FADE_RANGE),
         )
 
     companion object {
@@ -287,5 +298,9 @@ data class LyricsStyleSettings(
         val BG_REVEAL_START_OFFSET_RANGE = -1000..1500
         val BG_REVEAL_DURATION_RANGE = 500..2000
         val BG_REVEAL_BLUR_RANGE = 1..20
+        val BG_REVEAL_FLIP_ANGLE_RANGE = 90..360
+        val BG_REVEAL_FADE_RANGE = 200..2000
+        const val BG_REVEAL_STYLE_CLASSIC = 0
+        const val BG_REVEAL_STYLE_FLIP = 1
     }
 }

@@ -526,6 +526,22 @@ private fun LineAnimationSection(
         onCheckedChange = { v -> onUpdate { it.copy(bgRevealEnabled = v) } },
     )
     if (settings.bgRevealEnabled) {
+        LyricsSettingsChips(
+            label = stringResource(R.string.lyr_set_bg_reveal_style),
+            description = stringResource(R.string.lyr_set_bg_reveal_style_desc),
+            options = listOf(LyricsStyleSettings.BG_REVEAL_STYLE_CLASSIC, LyricsStyleSettings.BG_REVEAL_STYLE_FLIP),
+            selected = settings.bgRevealStyle,
+            optionLabel = { style ->
+                stringResource(
+                    if (style == LyricsStyleSettings.BG_REVEAL_STYLE_FLIP) {
+                        R.string.lyr_set_bg_reveal_style_flip
+                    } else {
+                        R.string.lyr_set_bg_reveal_style_classic
+                    },
+                )
+            },
+            onSelect = { style -> onUpdate { it.copy(bgRevealStyle = style) } },
+        )
         LyricsSettingsSlider(
             label = stringResource(R.string.lyr_set_bg_reveal_before),
             description = stringResource(R.string.lyr_set_bg_reveal_before_desc),
@@ -554,21 +570,50 @@ private fun LineAnimationSection(
             onValueChange = { v -> onUpdate { it.copy(bgRevealDurationMs = v) } },
         )
         LyricsSettingsToggle(
-            label = stringResource(R.string.lyr_set_bg_reveal_blur),
-            description = stringResource(R.string.lyr_set_bg_reveal_blur_desc),
-            checked = settings.bgRevealBlurEnabled,
-            onCheckedChange = { v -> onUpdate { it.copy(bgRevealBlurEnabled = v) } },
+            label = stringResource(R.string.lyr_set_bg_reveal_fade),
+            description = stringResource(R.string.lyr_set_bg_reveal_fade_desc),
+            checked = settings.bgRevealFadeEnabled,
+            onCheckedChange = { v -> onUpdate { it.copy(bgRevealFadeEnabled = v) } },
         )
-        if (settings.bgRevealBlurEnabled) {
+        if (settings.bgRevealFadeEnabled) {
             LyricsSettingsSlider(
-                label = stringResource(R.string.lyr_set_bg_reveal_blur_amount),
-                description = stringResource(R.string.lyr_set_bg_reveal_blur_amount_desc),
-                value = settings.bgRevealBlurAmount,
-                range = LyricsStyleSettings.BG_REVEAL_BLUR_RANGE,
-                step = 1,
-                valueText = { "$it dp" },
-                onValueChange = { v -> onUpdate { it.copy(bgRevealBlurAmount = v) } },
+                label = stringResource(R.string.lyr_set_bg_reveal_fade_duration),
+                description = stringResource(R.string.lyr_set_bg_reveal_fade_duration_desc),
+                value = settings.bgRevealFadeMs,
+                range = LyricsStyleSettings.BG_REVEAL_FADE_RANGE,
+                step = 100,
+                valueText = ::secondsText,
+                onValueChange = { v -> onUpdate { it.copy(bgRevealFadeMs = v) } },
             )
+        }
+        if (settings.bgRevealStyle == LyricsStyleSettings.BG_REVEAL_STYLE_FLIP) {
+            LyricsSettingsSlider(
+                label = stringResource(R.string.lyr_set_bg_reveal_flip_angle),
+                description = stringResource(R.string.lyr_set_bg_reveal_flip_angle_desc),
+                value = settings.bgRevealFlipAngle,
+                range = LyricsStyleSettings.BG_REVEAL_FLIP_ANGLE_RANGE,
+                step = 30,
+                valueText = { "$it°" },
+                onValueChange = { v -> onUpdate { it.copy(bgRevealFlipAngle = v) } },
+            )
+        } else {
+            LyricsSettingsToggle(
+                label = stringResource(R.string.lyr_set_bg_reveal_blur),
+                description = stringResource(R.string.lyr_set_bg_reveal_blur_desc),
+                checked = settings.bgRevealBlurEnabled,
+                onCheckedChange = { v -> onUpdate { it.copy(bgRevealBlurEnabled = v) } },
+            )
+            if (settings.bgRevealBlurEnabled) {
+                LyricsSettingsSlider(
+                    label = stringResource(R.string.lyr_set_bg_reveal_blur_amount),
+                    description = stringResource(R.string.lyr_set_bg_reveal_blur_amount_desc),
+                    value = settings.bgRevealBlurAmount,
+                    range = LyricsStyleSettings.BG_REVEAL_BLUR_RANGE,
+                    step = 1,
+                    valueText = { "$it dp" },
+                    onValueChange = { v -> onUpdate { it.copy(bgRevealBlurAmount = v) } },
+                )
+            }
         }
     }
     LyricsSettingsToggle(
