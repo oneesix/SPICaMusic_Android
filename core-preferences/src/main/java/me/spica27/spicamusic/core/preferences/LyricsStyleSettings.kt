@@ -15,6 +15,25 @@ enum class LineEffect(
     }
 }
 
+/** Layout style of the kinetic (animated, word-by-word) lyrics. */
+enum class KineticStyle(
+    val value: String,
+) {
+    Auto("auto"),
+    Stack("stack"),
+    Slide("slide"),
+    Zoom("zoom"),
+    Letters("letters"),
+    Scatter("scatter"),
+    Graph("graph"),
+    Flow("flow"),
+    ;
+
+    companion object {
+        fun fromString(value: String?): KineticStyle = entries.firstOrNull { it.value == value } ?: Auto
+    }
+}
+
 enum class TransliterationPosition(
     val value: String,
 ) {
@@ -198,6 +217,15 @@ data class LyricsStyleSettings(
     val bgRevealFadeEnabled: Boolean = true,
     /** Duration of that fade in ms. */
     val bgRevealFadeMs: Int = 800,
+    // ---- Kinetic lyrics (off = the normal lyrics view) ----
+    val kineticEnabled: Boolean = false,
+    val kineticStyle: KineticStyle = KineticStyle.Auto,
+    /** Size of the kinetic words in percent (100 = fitted to the screen). */
+    val kineticSize: Int = 100,
+    /** Vertical position of the kinetic words: 0 = top, 50 = middle, 100 = bottom. */
+    val kineticPosition: Int = 50,
+    /** Ripples in the kinetic background as words are sung. */
+    val kineticRipples: Boolean = true,
 ) {
     /** Returns a copy with every value forced into its allowed range. */
     fun sanitized(): LyricsStyleSettings =
@@ -252,6 +280,8 @@ data class LyricsStyleSettings(
             bgRevealFlipAngle = bgRevealFlipAngle.coerceIn(BG_REVEAL_FLIP_ANGLE_RANGE),
             bgRevealFlipPivot = bgRevealFlipPivot.coerceIn(BG_REVEAL_FLIP_PIVOT_RANGE),
             bgRevealFadeMs = bgRevealFadeMs.coerceIn(BG_REVEAL_FADE_RANGE),
+            kineticSize = kineticSize.coerceIn(KINETIC_SIZE_RANGE),
+            kineticPosition = kineticPosition.coerceIn(KINETIC_POSITION_RANGE),
         )
 
     companion object {
@@ -304,6 +334,8 @@ data class LyricsStyleSettings(
         val BG_REVEAL_FLIP_ANGLE_RANGE = 90..360
         val BG_REVEAL_FLIP_PIVOT_RANGE = 0..100
         val BG_REVEAL_FADE_RANGE = 200..2000
+        val KINETIC_SIZE_RANGE = 50..150
+        val KINETIC_POSITION_RANGE = 0..100
         const val BG_REVEAL_STYLE_CLASSIC = 0
         const val BG_REVEAL_STYLE_FLIP = 1
     }

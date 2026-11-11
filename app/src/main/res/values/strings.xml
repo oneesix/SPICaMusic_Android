@@ -1040,4 +1040,26 @@
   <string name="lyr_set_dyn_contrast_desc">Lighter on dark, darker on light</string>
   <string name="lyr_set_dyn_bg">Color background</string>
   <string name="lyr_set_dyn_bg_desc">Also tint the background with the album colour</string>
+  <string name="lyr_set_section_kinetic">Kinetic lyrics</string>
+  <string name="lyr_set_kinetic">Kinetic effect</string>
+  <string name="lyr_set_kinetic_desc">Animated words with a flowing glass background</string>
+  <string name="lyr_set_kinetic_style">Style</string>
+  <string name="lyr_set_kinetic_style_desc">Auto picks a style for every line</string>
+  <string name="lyr_set_kinetic_auto">Auto</string>
+  <string name="lyr_set_kinetic_stack">Stack</string>
+  <string name="lyr_set_kinetic_slide">Slide</string>
+  <string name="lyr_set_kinetic_zoom">Zoom</string>
+  <string name="lyr_set_kinetic_letters">Letters</string>
+  <string name="lyr_set_kinetic_scatter">Scatter</string>
+  <string name="lyr_set_kinetic_graph">Graph</string>
+  <string name="lyr_set_kinetic_flow">Flow</string>
+  <string name="lyr_set_kinetic_size">Size</string>
+  <string name="lyr_set_kinetic_size_desc">Size of the kinetic words</string>
+  <string name="lyr_set_kinetic_position">Position</string>
+  <string name="lyr_set_kinetic_position_desc">From the top to the bottom of the screen</string>
+  <string name="lyr_set_kinetic_pos_top">Top</string>
+  <string name="lyr_set_kinetic_pos_middle">Middle</string>
+  <string name="lyr_set_kinetic_pos_bottom">Bottom</string>
+  <string name="lyr_set_kinetic_ripples">Ripple effect</string>
+  <string name="lyr_set_kinetic_ripples_desc">Ripples spread through the background as words are sung</string>
 </resources>

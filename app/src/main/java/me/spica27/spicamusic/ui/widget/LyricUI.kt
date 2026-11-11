@@ -726,6 +726,19 @@ fun LyricsUI(
         return
     }
 
+    // Kinetic lyrics (setting): big animated words over a glass background instead of the list.
+    if (styleSettings.kineticEnabled) {
+        KineticLyricsUI(
+            modifier = modifier,
+            lines = sortedLines,
+            currentTimeProvider = currentTimeProvider,
+            seekPreviewTimeProvider = seekPreviewTimeProvider,
+            settings = styleSettings,
+            displayMode = displayMode,
+        )
+        return
+    }
+
     // Long intros and instrumental gaps get a break line (three dots and a countdown).
     val lyricLines = remember(sortedLines, songDurationMs) { insertInterludes(sortedLines, songDurationMs) }
     val style = rememberLyricsUIStyle(displayMode, styleSettings)

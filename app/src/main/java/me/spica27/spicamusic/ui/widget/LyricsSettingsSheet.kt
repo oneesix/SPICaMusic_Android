@@ -14,6 +14,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import me.spica27.spicamusic.R
+import me.spica27.spicamusic.core.preferences.KineticStyle
 import me.spica27.spicamusic.core.preferences.LineEffect
 import me.spica27.spicamusic.core.preferences.LyricsStyleSettings
 import me.spica27.spicamusic.core.preferences.TransliterationPosition
@@ -43,6 +44,7 @@ fun LyricsSettingsSheet(
                     .navigationBarsPadding()
                     .padding(bottom = 24.dp),
         ) {
+            KineticSection(settings = settings, onUpdate = onUpdate)
             FontSection(settings = settings, onUpdate = onUpdate)
             TextSizeSection(settings = settings, onUpdate = onUpdate)
             TransliterationSection(settings = settings, onUpdate = onUpdate)
@@ -1011,5 +1013,77 @@ private fun EnhanceHeaderSection(
                 )
             }
         },
+    )
+}
+
+@Composable
+private fun KineticSection(
+    settings: LyricsStyleSettings,
+    onUpdate: ((LyricsStyleSettings) -> LyricsStyleSettings) -> Unit,
+) {
+    LyricsSettingsSection(stringResource(R.string.lyr_set_section_kinetic))
+
+    LyricsSettingsToggle(
+        label = stringResource(R.string.lyr_set_kinetic),
+        description = stringResource(R.string.lyr_set_kinetic_desc),
+        checked = settings.kineticEnabled,
+        onCheckedChange = { v -> onUpdate { it.copy(kineticEnabled = v) } },
+    )
+    if (!settings.kineticEnabled) return
+
+    LyricsSettingsChips(
+        label = stringResource(R.string.lyr_set_kinetic_style),
+        description = stringResource(R.string.lyr_set_kinetic_style_desc),
+        options = KineticStyle.entries,
+        selected = settings.kineticStyle,
+        optionLabel = { style ->
+            stringResource(
+                when (style) {
+                    KineticStyle.Auto -> R.string.lyr_set_kinetic_auto
+                    KineticStyle.Stack -> R.string.lyr_set_kinetic_stack
+                    KineticStyle.Slide -> R.string.lyr_set_kinetic_slide
+                    KineticStyle.Zoom -> R.string.lyr_set_kinetic_zoom
+                    KineticStyle.Letters -> R.string.lyr_set_kinetic_letters
+                    KineticStyle.Scatter -> R.string.lyr_set_kinetic_scatter
+                    KineticStyle.Graph -> R.string.lyr_set_kinetic_graph
+                    KineticStyle.Flow -> R.string.lyr_set_kinetic_flow
+                },
+            )
+        },
+        onSelect = { style -> onUpdate { it.copy(kineticStyle = style) } },
+    )
+    LyricsSettingsSlider(
+        label = stringResource(R.string.lyr_set_kinetic_size),
+        description = stringResource(R.string.lyr_set_kinetic_size_desc),
+        value = settings.kineticSize,
+        range = LyricsStyleSettings.KINETIC_SIZE_RANGE,
+        step = 5,
+        valueText = { "$it%" },
+        onValueChange = { v -> onUpdate { it.copy(kineticSize = v) } },
+    )
+    val top = stringResource(R.string.lyr_set_kinetic_pos_top)
+    val middle = stringResource(R.string.lyr_set_kinetic_pos_middle)
+    val bottom = stringResource(R.string.lyr_set_kinetic_pos_bottom)
+    LyricsSettingsSlider(
+        label = stringResource(R.string.lyr_set_kinetic_position),
+        description = stringResource(R.string.lyr_set_kinetic_position_desc),
+        value = settings.kineticPosition,
+        range = LyricsStyleSettings.KINETIC_POSITION_RANGE,
+        step = 1,
+        valueText = { v ->
+            when {
+                v <= 3 -> top
+                v >= 97 -> bottom
+                v in 47..53 -> middle
+                else -> "$v%"
+            }
+        },
+        onValueChange = { v -> onUpdate { it.copy(kineticPosition = v) } },
+    )
+    LyricsSettingsToggle(
+        label = stringResource(R.string.lyr_set_kinetic_ripples),
+        description = stringResource(R.string.lyr_set_kinetic_ripples_desc),
+        checked = settings.kineticRipples,
+        onCheckedChange = { v -> onUpdate { it.copy(kineticRipples = v) } },
     )
 }

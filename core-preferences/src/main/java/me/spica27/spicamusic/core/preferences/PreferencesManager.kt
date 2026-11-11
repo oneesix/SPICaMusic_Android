@@ -140,6 +140,11 @@ class PreferencesManager(
         val LYRIC_DOCK_SPREAD_BLUR = booleanPreferencesKey("lyric_dock_spread_blur")
         val LYRIC_DOCK_SOFT_EDGE = booleanPreferencesKey("lyric_dock_soft_edge")
         val LYRIC_DOCK_EDGE_FADE = intPreferencesKey("lyric_dock_edge_fade")
+        val LYRIC_KINETIC_ENABLED = booleanPreferencesKey("lyric_kinetic_enabled")
+        val LYRIC_KINETIC_STYLE = stringPreferencesKey("lyric_kinetic_style")
+        val LYRIC_KINETIC_SIZE = intPreferencesKey("lyric_kinetic_size")
+        val LYRIC_KINETIC_POSITION = intPreferencesKey("lyric_kinetic_position")
+        val LYRIC_KINETIC_RIPPLES = booleanPreferencesKey("lyric_kinetic_ripples")
     }
 
 
@@ -237,6 +242,11 @@ class PreferencesManager(
                     dockSpreadBlur = p[Keys.LYRIC_DOCK_SPREAD_BLUR] ?: d.dockSpreadBlur,
                     dockSoftEdge = p[Keys.LYRIC_DOCK_SOFT_EDGE] ?: d.dockSoftEdge,
                     dockEdgeFade = p[Keys.LYRIC_DOCK_EDGE_FADE] ?: d.dockEdgeFade,
+                    kineticEnabled = p[Keys.LYRIC_KINETIC_ENABLED] ?: d.kineticEnabled,
+                    kineticStyle = p[Keys.LYRIC_KINETIC_STYLE]?.let(KineticStyle::fromString) ?: d.kineticStyle,
+                    kineticSize = p[Keys.LYRIC_KINETIC_SIZE] ?: d.kineticSize,
+                    kineticPosition = p[Keys.LYRIC_KINETIC_POSITION] ?: d.kineticPosition,
+                    kineticRipples = p[Keys.LYRIC_KINETIC_RIPPLES] ?: d.kineticRipples,
                 ).sanitized()
             }.distinctUntilChanged()
 
@@ -334,6 +344,11 @@ class PreferencesManager(
                     dockSpreadBlur = p[Keys.LYRIC_DOCK_SPREAD_BLUR] ?: d.dockSpreadBlur,
                     dockSoftEdge = p[Keys.LYRIC_DOCK_SOFT_EDGE] ?: d.dockSoftEdge,
                     dockEdgeFade = p[Keys.LYRIC_DOCK_EDGE_FADE] ?: d.dockEdgeFade,
+                    kineticEnabled = p[Keys.LYRIC_KINETIC_ENABLED] ?: d.kineticEnabled,
+                    kineticStyle = p[Keys.LYRIC_KINETIC_STYLE]?.let(KineticStyle::fromString) ?: d.kineticStyle,
+                    kineticSize = p[Keys.LYRIC_KINETIC_SIZE] ?: d.kineticSize,
+                    kineticPosition = p[Keys.LYRIC_KINETIC_POSITION] ?: d.kineticPosition,
+                    kineticRipples = p[Keys.LYRIC_KINETIC_RIPPLES] ?: d.kineticRipples,
                 )
             val n = transform(current).sanitized()
             p[Keys.LYRIC_FONT_STYLE] = n.fontStyle
@@ -422,6 +437,11 @@ class PreferencesManager(
             p[Keys.LYRIC_DOCK_SPREAD_BLUR] = n.dockSpreadBlur
             p[Keys.LYRIC_DOCK_SOFT_EDGE] = n.dockSoftEdge
             p[Keys.LYRIC_DOCK_EDGE_FADE] = n.dockEdgeFade
+            p[Keys.LYRIC_KINETIC_ENABLED] = n.kineticEnabled
+            p[Keys.LYRIC_KINETIC_STYLE] = n.kineticStyle.value
+            p[Keys.LYRIC_KINETIC_SIZE] = n.kineticSize
+            p[Keys.LYRIC_KINETIC_POSITION] = n.kineticPosition
+            p[Keys.LYRIC_KINETIC_RIPPLES] = n.kineticRipples
         }
     }
 

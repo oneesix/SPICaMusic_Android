@@ -1040,4 +1040,26 @@
   <string name="lyr_set_dyn_contrast_desc">深色下更亮，浅色下更暗</string>
   <string name="lyr_set_dyn_bg">背景着色</string>
   <string name="lyr_set_dyn_bg_desc">同时用封面颜色给背景着色</string>
+  <string name="lyr_set_section_kinetic">动态歌词</string>
+  <string name="lyr_set_kinetic">动态效果</string>
+  <string name="lyr_set_kinetic_desc">文字动画配流动玻璃背景</string>
+  <string name="lyr_set_kinetic_style">样式</string>
+  <string name="lyr_set_kinetic_style_desc">自动为每一行选择样式</string>
+  <string name="lyr_set_kinetic_auto">自动</string>
+  <string name="lyr_set_kinetic_stack">堆叠</string>
+  <string name="lyr_set_kinetic_slide">滑动</string>
+  <string name="lyr_set_kinetic_zoom">缩放</string>
+  <string name="lyr_set_kinetic_letters">字母</string>
+  <string name="lyr_set_kinetic_scatter">散落</string>
+  <string name="lyr_set_kinetic_graph">图形</string>
+  <string name="lyr_set_kinetic_flow">流动</string>
+  <string name="lyr_set_kinetic_size">大小</string>
+  <string name="lyr_set_kinetic_size_desc">动态文字的大小</string>
+  <string name="lyr_set_kinetic_position">位置</string>
+  <string name="lyr_set_kinetic_position_desc">从屏幕顶部到底部</string>
+  <string name="lyr_set_kinetic_pos_top">顶部</string>
+  <string name="lyr_set_kinetic_pos_middle">中间</string>
+  <string name="lyr_set_kinetic_pos_bottom">底部</string>
+  <string name="lyr_set_kinetic_ripples">涟漪效果</string>
+  <string name="lyr_set_kinetic_ripples_desc">唱到每个词时背景泛起涟漪</string>
 </resources>
