@@ -1099,4 +1099,9 @@
   <string name="lyr_set_kinetic_bg_quality_desc">越低在高解析度螢幕上越流暢</string>
   <string name="lyr_set_kinetic_bg_strength">背景顏色強度</string>
   <string name="lyr_set_kinetic_bg_strength_desc">背景中專輯顏色更弱或更強</string>
+  <string name="lyr_set_kinetic_bg_default">使用播放器背景</string>
+  <string name="lyr_set_kinetic_bg_default_desc">漣漪繪製在原本的播放器背景上（無玻璃背景）</string>
+  <string name="lyr_set_kinetic_bg_frame">背景影格</string>
+  <string name="lyr_set_kinetic_bg_frame_desc">0 = 即時動態；1 到 360 = 固定在該影格的靜態圖</string>
+  <string name="lyr_set_kinetic_bg_frame_live">即時</string>
 </resources>

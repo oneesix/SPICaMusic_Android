@@ -620,14 +620,20 @@ internal fun KineticLyricsUI(
     ) {
         // Ripple effect off: no glass background, the normal player background shows through.
         if (settings.kineticRipples) {
-            KineticBackground(
-                clock = clock,
-                ripples = ripples,
-                palette = palette,
-                strength = settings.kineticBgStrength,
-                quality = settings.kineticBgQuality,
-                modifier = Modifier.fillMaxSize(),
-            )
+            if (settings.kineticBgDefault) {
+                // Normal player background stays; only the ripple rings are drawn on top.
+                RingsOnly(clock = clock, ripples = ripples, modifier = Modifier.fillMaxSize())
+            } else {
+                KineticBackground(
+                    clock = clock,
+                    ripples = ripples,
+                    palette = palette,
+                    strength = settings.kineticBgStrength,
+                    quality = settings.kineticBgQuality,
+                    frame = settings.kineticBgFrame,
+                    modifier = Modifier.fillMaxSize(),
+                )
+            }
         }
         // The old line fades out quickly instead of vanishing, so a line that is still moving is not cut.
         AnimatedContent(
@@ -1311,6 +1317,7 @@ private fun KineticBackground(
     palette: KPalette,
     strength: Int,
     quality: Int,
+    frame: Int,
     modifier: Modifier,
 ) {
     val shader =
@@ -1323,9 +1330,9 @@ private fun KineticBackground(
         }
     val lowRes = modifier.lowRes(quality / 100f)
     if (shader != null && Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-        AgslBackground(shader, clock, ripples, palette, strength / 100f, lowRes)
+        AgslBackground(shader, clock, ripples, palette, strength / 100f, frame, lowRes)
     } else {
-        FallbackBackground(clock, ripples, palette, strength / 100f, lowRes)
+        FallbackBackground(clock, ripples, palette, strength / 100f, frame, lowRes)
     }
 }
 
@@ -1337,12 +1344,15 @@ private fun AgslBackground(
     ripples: RippleBuffer,
     palette: KPalette,
     k: Float,
+    frame: Int,
     modifier: Modifier,
 ) {
     val brush = remember(shader) { ShaderBrush(shader) }
     Canvas(modifier) {
         shader.setFloatUniform("uRes", size.width, size.height)
         shader.setFloatUniform("uTime", clock.value)
+        // frame 0 = live; 1..360 = frozen background at that second of the animation (ripples keep their own clock)
+        shader.setFloatUniform("uBgTime", if (frame > 0) frame.toFloat() else clock.value)
         palette.pools.forEachIndexed { i, c -> shader.setFloatUniform("uC$i", c.red * k, c.green * k, c.blue * k) }
         val bk = 0.5f + 0.5f * k
         shader.setFloatUniform("uBase", palette.base.red * bk, palette.base.green * bk, palette.base.blue * bk)
@@ -1358,10 +1368,12 @@ private fun FallbackBackground(
     ripples: RippleBuffer,
     palette: KPalette,
     k: Float,
+    frame: Int,
     modifier: Modifier,
 ) {
     Canvas(modifier) {
-        val t = clock.value
+        val t = if (frame > 0) frame.toFloat() else clock.value
+        val rt = clock.value
         drawRect(palette.base)
         val spots =
             listOf(
@@ -1379,10 +1391,32 @@ private fun FallbackBackground(
             )
         }
         for (i in 0 until 8) {
-            val age = t - ripples.data[i * 4 + 2]
+            val age = rt - ripples.data[i * 4 + 2]
             if (ripples.data[i * 4 + 3] <= 0f || age < 0f || age > 3.5f) continue
             drawCircle(
                 color = Color.White.copy(alpha = 0.14f * (1f - age / 3.5f)),
+                radius = age * 0.32f * size.height,
+                center = Offset(ripples.data[i * 4] * size.width, ripples.data[i * 4 + 1] * size.height),
+                style = Stroke(width = 3f),
+            )
+        }
+    }
+}
+
+/** Ripple rings only, drawn over the normal player background. */
+@Composable
+private fun RingsOnly(
+    clock: State<Float>,
+    ripples: RippleBuffer,
+    modifier: Modifier,
+) {
+    Canvas(modifier) {
+        val t = clock.value
+        for (i in 0 until 8) {
+            val age = t - ripples.data[i * 4 + 2]
+            if (ripples.data[i * 4 + 3] <= 0f || age < 0f || age > 3.5f) continue
+            drawCircle(
+                color = Color.White.copy(alpha = 0.22f * (1f - age / 3.5f)),
                 radius = age * 0.32f * size.height,
                 center = Offset(ripples.data[i * 4] * size.width, ripples.data[i * 4 + 1] * size.height),
                 style = Stroke(width = 3f),
@@ -1395,6 +1429,7 @@ private fun FallbackBackground(
 private const val KINETIC_AGSL = """
 uniform float2 uRes;
 uniform float uTime;
+uniform float uBgTime;
 uniform float3 uC0;
 uniform float3 uC1;
 uniform float3 uC2;
@@ -1441,10 +1476,11 @@ half4 main(float2 fragCoord) {
   float aspect = uRes.x / uRes.y;
   float2 p = float2((uv.x - 0.5) * aspect, uv.y - 0.5);
   float t = uTime;
+  float bt = uBgTime;
 
   float2 slope = float2(
-    sin(p.y * 2.3 + t * 0.21) + 0.6 * sin(p.x * 1.7 - p.y * 1.3 + t * 0.17),
-    cos(p.x * 2.1 - t * 0.19) + 0.6 * cos(p.y * 1.9 + p.x * 0.8 - t * 0.23)) * 0.012;
+    sin(p.y * 2.3 + bt * 0.21) + 0.6 * sin(p.x * 1.7 - p.y * 1.3 + bt * 0.17),
+    cos(p.x * 2.1 - bt * 0.19) + 0.6 * cos(p.y * 1.9 + p.x * 0.8 - bt * 0.23)) * 0.012;
 
   float ring = 0.0;
   for (int i = 0; i < 8; i++) {
@@ -1460,7 +1496,7 @@ half4 main(float2 fragCoord) {
     ring += env;
   }
 
-  float3 col = lightField(p + slope * 6.0, t);
+  float3 col = lightField(p + slope * 6.0, bt);
   col += float3(slope.x, 0.3 * (slope.y - slope.x), -slope.y) * 1.6;
 
   float3 n = normalize(float3(-slope * 14.0, 1.0));
@@ -1471,7 +1507,7 @@ half4 main(float2 fragCoord) {
   col *= mix(0.4, 1.0, smoothstep(1.2, 0.3, length(p * float2(0.85, 1.1))));
   col = col / (1.0 + col * 0.7);
   col = pow(col, float3(1.18)) * 0.95;
-  col += (hash(fragCoord + fract(t) * 100.0) - 0.5) * 0.018;
+  col += (hash(fragCoord + fract(bt) * 100.0) - 0.5) * 0.018;
   return half4(half3(col), 1.0);
 }
 """

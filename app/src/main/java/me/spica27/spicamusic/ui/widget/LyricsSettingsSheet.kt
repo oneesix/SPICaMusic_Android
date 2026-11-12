@@ -1254,6 +1254,24 @@ private fun KineticSection(
         onCheckedChange = { v -> onUpdate { it.copy(kineticRipples = v) } },
     )
     if (settings.kineticRipples) {
+        LyricsSettingsToggle(
+            label = stringResource(R.string.lyr_set_kinetic_bg_default),
+            description = stringResource(R.string.lyr_set_kinetic_bg_default_desc),
+            checked = settings.kineticBgDefault,
+            onCheckedChange = { v -> onUpdate { it.copy(kineticBgDefault = v) } },
+        )
+    }
+    if (settings.kineticRipples && !settings.kineticBgDefault) {
+        val liveText = stringResource(R.string.lyr_set_kinetic_bg_frame_live)
+        LyricsSettingsSlider(
+            label = stringResource(R.string.lyr_set_kinetic_bg_frame),
+            description = stringResource(R.string.lyr_set_kinetic_bg_frame_desc),
+            value = settings.kineticBgFrame,
+            range = LyricsStyleSettings.KINETIC_BG_FRAME_RANGE,
+            step = 1,
+            valueText = { if (it == 0) liveText else "$it / 360" },
+            onValueChange = { v -> onUpdate { it.copy(kineticBgFrame = v) } },
+        )
         LyricsSettingsSlider(
             label = stringResource(R.string.lyr_set_kinetic_bg_quality),
             description = stringResource(R.string.lyr_set_kinetic_bg_quality_desc),

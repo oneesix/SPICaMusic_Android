@@ -155,6 +155,8 @@ class PreferencesManager(
         val LYRIC_KINETIC_TEXT_STRENGTH = intPreferencesKey("lyric_kinetic_text_strength")
         val LYRIC_KINETIC_BG_STRENGTH = intPreferencesKey("lyric_kinetic_bg_strength")
         val LYRIC_KINETIC_BG_QUALITY = intPreferencesKey("lyric_kinetic_bg_quality")
+        val LYRIC_KINETIC_BG_FRAME = intPreferencesKey("lyric_kinetic_bg_frame")
+        val LYRIC_KINETIC_BG_DEFAULT = booleanPreferencesKey("lyric_kinetic_bg_default")
         val LYRIC_KINETIC_FONT_MIX = booleanPreferencesKey("lyric_kinetic_font_mix")
         val LYRIC_KINETIC_FONT_COUNT = intPreferencesKey("lyric_kinetic_font_count")
         val LYRIC_KINETIC_FONTS = stringPreferencesKey("lyric_kinetic_fonts")
@@ -270,6 +272,8 @@ class PreferencesManager(
                     kineticTextStrength = p[Keys.LYRIC_KINETIC_TEXT_STRENGTH] ?: d.kineticTextStrength,
                     kineticBgStrength = p[Keys.LYRIC_KINETIC_BG_STRENGTH] ?: d.kineticBgStrength,
                     kineticBgQuality = p[Keys.LYRIC_KINETIC_BG_QUALITY] ?: d.kineticBgQuality,
+                    kineticBgFrame = p[Keys.LYRIC_KINETIC_BG_FRAME] ?: d.kineticBgFrame,
+                    kineticBgDefault = p[Keys.LYRIC_KINETIC_BG_DEFAULT] ?: d.kineticBgDefault,
                     kineticFontMix = p[Keys.LYRIC_KINETIC_FONT_MIX] ?: d.kineticFontMix,
                     kineticFontCount = p[Keys.LYRIC_KINETIC_FONT_COUNT] ?: d.kineticFontCount,
                     kineticFonts = p[Keys.LYRIC_KINETIC_FONTS] ?: d.kineticFonts,
@@ -385,6 +389,8 @@ class PreferencesManager(
                     kineticTextStrength = p[Keys.LYRIC_KINETIC_TEXT_STRENGTH] ?: d.kineticTextStrength,
                     kineticBgStrength = p[Keys.LYRIC_KINETIC_BG_STRENGTH] ?: d.kineticBgStrength,
                     kineticBgQuality = p[Keys.LYRIC_KINETIC_BG_QUALITY] ?: d.kineticBgQuality,
+                    kineticBgFrame = p[Keys.LYRIC_KINETIC_BG_FRAME] ?: d.kineticBgFrame,
+                    kineticBgDefault = p[Keys.LYRIC_KINETIC_BG_DEFAULT] ?: d.kineticBgDefault,
                     kineticFontMix = p[Keys.LYRIC_KINETIC_FONT_MIX] ?: d.kineticFontMix,
                     kineticFontCount = p[Keys.LYRIC_KINETIC_FONT_COUNT] ?: d.kineticFontCount,
                     kineticFonts = p[Keys.LYRIC_KINETIC_FONTS] ?: d.kineticFonts,
@@ -491,6 +497,8 @@ class PreferencesManager(
             p[Keys.LYRIC_KINETIC_TEXT_STRENGTH] = n.kineticTextStrength
             p[Keys.LYRIC_KINETIC_BG_STRENGTH] = n.kineticBgStrength
             p[Keys.LYRIC_KINETIC_BG_QUALITY] = n.kineticBgQuality
+            p[Keys.LYRIC_KINETIC_BG_FRAME] = n.kineticBgFrame
+            p[Keys.LYRIC_KINETIC_BG_DEFAULT] = n.kineticBgDefault
             p[Keys.LYRIC_KINETIC_FONT_MIX] = n.kineticFontMix
             p[Keys.LYRIC_KINETIC_FONT_COUNT] = n.kineticFontCount
             p[Keys.LYRIC_KINETIC_FONTS] = n.kineticFonts

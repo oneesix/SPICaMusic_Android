@@ -1100,4 +1100,9 @@
   <string name="lyr_set_kinetic_bg_quality_desc">Lower is smoother on high-resolution screens</string>
   <string name="lyr_set_kinetic_bg_strength">Background colour strength</string>
   <string name="lyr_set_kinetic_bg_strength_desc">Weaker or stronger album colours in the background</string>
+  <string name="lyr_set_kinetic_bg_default">Use player background</string>
+  <string name="lyr_set_kinetic_bg_default_desc">Ripples are drawn over your normal player background (no glass background)</string>
+  <string name="lyr_set_kinetic_bg_frame">Background frame</string>
+  <string name="lyr_set_kinetic_bg_frame_desc">0 = live, moving. 1 to 360 = still image at that frame</string>
+  <string name="lyr_set_kinetic_bg_frame_live">Live</string>
 </resources>

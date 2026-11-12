@@ -269,6 +269,10 @@ data class LyricsStyleSettings(
     val kineticBgStrength: Int = 100,
     /** Background resolution in percent (lower = smoother on high-resolution screens). */
     val kineticBgQuality: Int = 60,
+    /** Background frame: 0 = live (moving), 1..360 = still image at that frame (1 frame = 1 second). */
+    val kineticBgFrame: Int = 0,
+    /** With ripples on: use the normal player background and draw only the ripple rings. */
+    val kineticBgDefault: Boolean = false,
     // ---- Kinetic fonts ----
     val kineticFontMix: Boolean = false,
     /** How many of the chosen fonts are mixed (each colour gets its own font). */
@@ -337,6 +341,7 @@ data class LyricsStyleSettings(
             kineticTextStrength = kineticTextStrength.coerceIn(KINETIC_TEXT_STRENGTH_RANGE),
             kineticBgStrength = kineticBgStrength.coerceIn(KINETIC_BG_STRENGTH_RANGE),
             kineticBgQuality = kineticBgQuality.coerceIn(KINETIC_BG_QUALITY_RANGE),
+            kineticBgFrame = kineticBgFrame.coerceIn(KINETIC_BG_FRAME_RANGE),
             kineticFontCount = kineticFontCount.coerceIn(KINETIC_FONT_COUNT_RANGE),
             kineticStyles = kineticStyles.ifEmpty { setOf(KineticStyle.Auto) },
         )
@@ -399,6 +404,7 @@ data class LyricsStyleSettings(
         val KINETIC_TEXT_STRENGTH_RANGE = 20..200
         val KINETIC_BG_STRENGTH_RANGE = 0..200
         val KINETIC_BG_QUALITY_RANGE = 30..100
+        val KINETIC_BG_FRAME_RANGE = 0..360
         val KINETIC_FONT_COUNT_RANGE = 2..4
         const val BG_REVEAL_STYLE_CLASSIC = 0
         const val BG_REVEAL_STYLE_FLIP = 1
