@@ -156,6 +156,9 @@ class PreferencesManager(
         val LYRIC_KINETIC_BG_STRENGTH = intPreferencesKey("lyric_kinetic_bg_strength")
         val LYRIC_KINETIC_BG_QUALITY = intPreferencesKey("lyric_kinetic_bg_quality")
         val LYRIC_KINETIC_BG_FRAME = intPreferencesKey("lyric_kinetic_bg_frame")
+        val LYRIC_KINETIC_TEXT_PALETTE = intPreferencesKey("lyric_kinetic_text_palette")
+        val LYRIC_KINETIC_GLOW_WORDS = intPreferencesKey("lyric_kinetic_glow_words")
+        val LYRIC_KINETIC_GLOW_INTENSITY = intPreferencesKey("lyric_kinetic_glow_intensity")
         val LYRIC_KINETIC_BG_DEFAULT = booleanPreferencesKey("lyric_kinetic_bg_default")
         val LYRIC_KINETIC_FONT_MIX = booleanPreferencesKey("lyric_kinetic_font_mix")
         val LYRIC_KINETIC_FONT_COUNT = intPreferencesKey("lyric_kinetic_font_count")
@@ -273,6 +276,9 @@ class PreferencesManager(
                     kineticBgStrength = p[Keys.LYRIC_KINETIC_BG_STRENGTH] ?: d.kineticBgStrength,
                     kineticBgQuality = p[Keys.LYRIC_KINETIC_BG_QUALITY] ?: d.kineticBgQuality,
                     kineticBgFrame = p[Keys.LYRIC_KINETIC_BG_FRAME] ?: d.kineticBgFrame,
+                    kineticTextPalette = p[Keys.LYRIC_KINETIC_TEXT_PALETTE] ?: d.kineticTextPalette,
+                    kineticGlowWords = p[Keys.LYRIC_KINETIC_GLOW_WORDS] ?: d.kineticGlowWords,
+                    kineticGlowIntensity = p[Keys.LYRIC_KINETIC_GLOW_INTENSITY] ?: d.kineticGlowIntensity,
                     kineticBgDefault = p[Keys.LYRIC_KINETIC_BG_DEFAULT] ?: d.kineticBgDefault,
                     kineticFontMix = p[Keys.LYRIC_KINETIC_FONT_MIX] ?: d.kineticFontMix,
                     kineticFontCount = p[Keys.LYRIC_KINETIC_FONT_COUNT] ?: d.kineticFontCount,
@@ -390,6 +396,9 @@ class PreferencesManager(
                     kineticBgStrength = p[Keys.LYRIC_KINETIC_BG_STRENGTH] ?: d.kineticBgStrength,
                     kineticBgQuality = p[Keys.LYRIC_KINETIC_BG_QUALITY] ?: d.kineticBgQuality,
                     kineticBgFrame = p[Keys.LYRIC_KINETIC_BG_FRAME] ?: d.kineticBgFrame,
+                    kineticTextPalette = p[Keys.LYRIC_KINETIC_TEXT_PALETTE] ?: d.kineticTextPalette,
+                    kineticGlowWords = p[Keys.LYRIC_KINETIC_GLOW_WORDS] ?: d.kineticGlowWords,
+                    kineticGlowIntensity = p[Keys.LYRIC_KINETIC_GLOW_INTENSITY] ?: d.kineticGlowIntensity,
                     kineticBgDefault = p[Keys.LYRIC_KINETIC_BG_DEFAULT] ?: d.kineticBgDefault,
                     kineticFontMix = p[Keys.LYRIC_KINETIC_FONT_MIX] ?: d.kineticFontMix,
                     kineticFontCount = p[Keys.LYRIC_KINETIC_FONT_COUNT] ?: d.kineticFontCount,
@@ -498,6 +507,9 @@ class PreferencesManager(
             p[Keys.LYRIC_KINETIC_BG_STRENGTH] = n.kineticBgStrength
             p[Keys.LYRIC_KINETIC_BG_QUALITY] = n.kineticBgQuality
             p[Keys.LYRIC_KINETIC_BG_FRAME] = n.kineticBgFrame
+            p[Keys.LYRIC_KINETIC_TEXT_PALETTE] = n.kineticTextPalette
+            p[Keys.LYRIC_KINETIC_GLOW_WORDS] = n.kineticGlowWords
+            p[Keys.LYRIC_KINETIC_GLOW_INTENSITY] = n.kineticGlowIntensity
             p[Keys.LYRIC_KINETIC_BG_DEFAULT] = n.kineticBgDefault
             p[Keys.LYRIC_KINETIC_FONT_MIX] = n.kineticFontMix
             p[Keys.LYRIC_KINETIC_FONT_COUNT] = n.kineticFontCount

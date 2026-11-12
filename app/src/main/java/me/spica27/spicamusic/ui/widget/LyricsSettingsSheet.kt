@@ -1209,6 +1209,33 @@ private fun KineticSection(
         checked = settings.kineticGlow,
         onCheckedChange = { v -> onUpdate { it.copy(kineticGlow = v) } },
     )
+    if (settings.kineticGlow) {
+        LyricsSettingsChips(
+            label = stringResource(R.string.lyr_set_kinetic_glow_words),
+            description = stringResource(R.string.lyr_set_kinetic_glow_words_desc),
+            options = listOf(0, 1, 2),
+            selected = settings.kineticGlowWords,
+            optionLabel = {
+                stringResource(
+                    when (it) {
+                        0 -> R.string.lyr_set_kinetic_glow_first
+                        1 -> R.string.lyr_set_kinetic_glow_second
+                        else -> R.string.lyr_set_kinetic_glow_random
+                    },
+                )
+            },
+            onSelect = { v -> onUpdate { it.copy(kineticGlowWords = v) } },
+        )
+        LyricsSettingsSlider(
+            label = stringResource(R.string.lyr_set_kinetic_glow_intensity),
+            description = stringResource(R.string.lyr_set_kinetic_glow_intensity_desc),
+            value = settings.kineticGlowIntensity,
+            range = LyricsStyleSettings.KINETIC_GLOW_INTENSITY_RANGE,
+            step = 10,
+            valueText = { "$it%" },
+            onValueChange = { v -> onUpdate { it.copy(kineticGlowIntensity = v) } },
+        )
+    }
     LyricsSettingsToggle(
         label = stringResource(R.string.lyr_set_kinetic_blur),
         description = stringResource(R.string.lyr_set_kinetic_blur_desc),
@@ -1223,6 +1250,22 @@ private fun KineticSection(
     )
 
     // ---- Colours ----
+    LyricsSettingsChips(
+        label = stringResource(R.string.lyr_set_kinetic_palette),
+        description = stringResource(R.string.lyr_set_kinetic_palette_desc),
+        options = listOf(0, 1, 2),
+        selected = settings.kineticTextPalette,
+        optionLabel = {
+            stringResource(
+                when (it) {
+                    0 -> R.string.lyr_set_kinetic_palette_vivid
+                    1 -> R.string.lyr_set_kinetic_palette_soft
+                    else -> R.string.lyr_set_kinetic_palette_true
+                },
+            )
+        },
+        onSelect = { v -> onUpdate { it.copy(kineticTextPalette = v) } },
+    )
     LyricsSettingsSlider(
         label = stringResource(R.string.lyr_set_kinetic_text_colors),
         description = stringResource(R.string.lyr_set_kinetic_text_colors_desc),

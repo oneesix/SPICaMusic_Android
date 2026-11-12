@@ -1105,4 +1105,16 @@
   <string name="lyr_set_kinetic_bg_frame">Background frame</string>
   <string name="lyr_set_kinetic_bg_frame_desc">0 = live, moving. 1 to 360 = still image at that frame</string>
   <string name="lyr_set_kinetic_bg_frame_live">Live</string>
+  <string name="lyr_set_kinetic_palette">Text palette</string>
+  <string name="lyr_set_kinetic_palette_desc">Colours made from the album cover</string>
+  <string name="lyr_set_kinetic_palette_vivid">Vivid</string>
+  <string name="lyr_set_kinetic_palette_soft">Soft</string>
+  <string name="lyr_set_kinetic_palette_true">Cover true</string>
+  <string name="lyr_set_kinetic_glow_words">Glow words</string>
+  <string name="lyr_set_kinetic_glow_words_desc">Which words of the line glow</string>
+  <string name="lyr_set_kinetic_glow_first">First colour</string>
+  <string name="lyr_set_kinetic_glow_second">Second colour</string>
+  <string name="lyr_set_kinetic_glow_random">Random words</string>
+  <string name="lyr_set_kinetic_glow_intensity">Glow intensity</string>
+  <string name="lyr_set_kinetic_glow_intensity_desc">Weaker or stronger glow</string>
 </resources>

@@ -266,6 +266,12 @@ data class LyricsStyleSettings(
     /** How many album colours the words use (each line uses two of them). */
     val kineticTextColors: Int = 4,
     val kineticTextStrength: Int = 100,
+    /** Text palette made from the cover: 0 = Vivid, 1 = Soft, 2 = Cover true. */
+    val kineticTextPalette: Int = 0,
+    /** Which words glow: 0 = first colour of the line, 1 = second colour, 2 = a few random words. */
+    val kineticGlowWords: Int = 1,
+    /** Glow intensity in percent. */
+    val kineticGlowIntensity: Int = 100,
     val kineticBgStrength: Int = 100,
     /** Background resolution in percent (lower = smoother on high-resolution screens). */
     val kineticBgQuality: Int = 60,
@@ -342,6 +348,9 @@ data class LyricsStyleSettings(
             kineticBgStrength = kineticBgStrength.coerceIn(KINETIC_BG_STRENGTH_RANGE),
             kineticBgQuality = kineticBgQuality.coerceIn(KINETIC_BG_QUALITY_RANGE),
             kineticBgFrame = kineticBgFrame.coerceIn(KINETIC_BG_FRAME_RANGE),
+            kineticTextPalette = kineticTextPalette.coerceIn(0, 2),
+            kineticGlowWords = kineticGlowWords.coerceIn(0, 2),
+            kineticGlowIntensity = kineticGlowIntensity.coerceIn(KINETIC_GLOW_INTENSITY_RANGE),
             kineticFontCount = kineticFontCount.coerceIn(KINETIC_FONT_COUNT_RANGE),
             kineticStyles = kineticStyles.ifEmpty { setOf(KineticStyle.Auto) },
         )
@@ -405,6 +414,7 @@ data class LyricsStyleSettings(
         val KINETIC_BG_STRENGTH_RANGE = 0..200
         val KINETIC_BG_QUALITY_RANGE = 30..100
         val KINETIC_BG_FRAME_RANGE = 0..360
+        val KINETIC_GLOW_INTENSITY_RANGE = 20..200
         val KINETIC_FONT_COUNT_RANGE = 2..4
         const val BG_REVEAL_STYLE_CLASSIC = 0
         const val BG_REVEAL_STYLE_FLIP = 1

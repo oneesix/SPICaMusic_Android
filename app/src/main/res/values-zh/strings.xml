@@ -1105,4 +1105,16 @@
   <string name="lyr_set_kinetic_bg_frame">背景帧</string>
   <string name="lyr_set_kinetic_bg_frame_desc">0 = 实时动态；1 到 360 = 固定在该帧的静态图</string>
   <string name="lyr_set_kinetic_bg_frame_live">实时</string>
+  <string name="lyr_set_kinetic_palette">文字配色</string>
+  <string name="lyr_set_kinetic_palette_desc">根据专辑封面生成的颜色</string>
+  <string name="lyr_set_kinetic_palette_vivid">鲜艳</string>
+  <string name="lyr_set_kinetic_palette_soft">柔和</string>
+  <string name="lyr_set_kinetic_palette_true">贴近封面</string>
+  <string name="lyr_set_kinetic_glow_words">发光的词</string>
+  <string name="lyr_set_kinetic_glow_words_desc">每行中哪些词发光</string>
+  <string name="lyr_set_kinetic_glow_first">第一种颜色</string>
+  <string name="lyr_set_kinetic_glow_second">第二种颜色</string>
+  <string name="lyr_set_kinetic_glow_random">随机词</string>
+  <string name="lyr_set_kinetic_glow_intensity">发光强度</string>
+  <string name="lyr_set_kinetic_glow_intensity_desc">更弱或更强的发光</string>
 </resources>

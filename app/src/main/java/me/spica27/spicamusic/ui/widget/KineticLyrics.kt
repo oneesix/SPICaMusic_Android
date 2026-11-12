@@ -384,6 +384,9 @@ private class KLook(
     val fonts: List<FontFamily?>,
     val accent: Color,
     val glowWords: Set<Int>,
+    /** Words in the first colour of the line / in the second colour. */
+    val firstWords: Set<Int>,
+    val secondWords: Set<Int>,
 )
 
 /**
@@ -410,7 +413,14 @@ private fun buildLook(
         val j = 1 + (r.next() * (slots.size - 1)).toInt().coerceIn(0, slots.size - 2)
         slots[j] = if (slots[0] == a) b else a
     }
-    return KLook(slots.map { colors[it] }, slots.map { fonts[it % fonts.size] }, colors[a], pickGlowWords(line, seed))
+    return KLook(
+        slots.map { colors[it] },
+        slots.map { fonts[it % fonts.size] },
+        colors[a],
+        pickGlowWords(line, seed),
+        slots.indices.filter { slots[it] == a }.toSet(),
+        slots.indices.filter { slots[it] == b }.toSet(),
+    )
 }
 
 private fun splitLetters(word: String): List<String> {
@@ -501,6 +511,7 @@ private suspend fun extractSwatches(
 private fun buildPalette(
     source: List<Color>,
     textStrength: Int,
+    paletteMode: Int,
 ): KPalette {
     val distinct = ArrayList<Color>()
     for (c in source) {
@@ -508,6 +519,18 @@ private fun buildPalette(
         if (distinct.none { colorDistance(it, opaque) < 0.2f }) distinct += opaque
     }
     if (distinct.isEmpty()) distinct += Color(0xFF7C5CFF)
+    // Text colours: the real cover colours first. Missing ones are lighter or deeper tints of a real colour
+    // (same hue), never a shifted hue, so every text colour still belongs to the cover.
+    val real = distinct.map { hslOf(it) }
+    val textHsl = ArrayList<FloatArray>(real)
+    var fill = 0
+    while (textHsl.size < 5) {
+        val b = real[fill % real.size]
+        val up = (fill / real.size) % 2 == 0
+        val step = 0.22f + 0.1f * (fill / (2 * real.size))
+        textHsl += floatArrayOf(b[0], b[1], if (up) min(0.85f, b[2] + step) else max(0.3f, b[2] - step))
+        fill++
+    }
     var turn = 0
     while (distinct.size < 5) {
         val h = hslOf(distinct[turn % distinct.size])
@@ -515,10 +538,16 @@ private fun buildPalette(
         turn++
     }
     val k = textStrength / 100f
+    // Lightness ladders spread the colours from dark to light so neighbours are easy to tell apart.
+    val vivid = floatArrayOf(0.72f, 0.52f, 0.84f, 0.40f, 0.62f)
+    val soft = floatArrayOf(0.88f, 0.72f, 0.94f, 0.58f, 0.80f)
     val text =
-        distinct.take(5).map { c ->
-            val h = hslOf(c)
-            fromHsl(h[0], max(h[1], 0.5f) * k, h[2].coerceIn(0.62f, 0.8f))
+        textHsl.take(5).mapIndexed { i, h ->
+            when (paletteMode) {
+                1 -> fromHsl(h[0], max(h[1] * 0.7f, 0.5f) * k, soft[i])
+                2 -> fromHsl(h[0], h[1].coerceIn(0.45f, 0.95f) * k, h[2].coerceIn(0.36f, 0.85f))
+                else -> fromHsl(h[0], max(h[1], 0.8f) * k, vivid[i])
+            }
         }
     val pools =
         distinct.take(3).map { c ->
@@ -533,13 +562,16 @@ private fun buildPalette(
 private fun rememberKineticPalette(
     uri: Uri?,
     textStrength: Int,
+    paletteMode: Int,
 ): KPalette {
     val context = LocalContext.current
     val cs = MaterialTheme.colorScheme
     val fallback = remember(cs.primary, cs.tertiary, cs.secondary) { listOf(cs.primary, cs.tertiary, cs.secondary) }
     var swatches by remember(uri) { mutableStateOf<List<Color>>(emptyList()) }
     LaunchedEffect(uri) { swatches = extractSwatches(context, uri) }
-    return remember(swatches, fallback, textStrength) { buildPalette(swatches.ifEmpty { fallback }, textStrength) }
+    return remember(swatches, fallback, textStrength, paletteMode) {
+        buildPalette(swatches.ifEmpty { fallback }, textStrength, paletteMode)
+    }
 }
 
 // ==================== entry point ====================
@@ -580,7 +612,11 @@ internal fun KineticLyricsUI(
     val salt = remember(kLines) { Random.nextInt() }
     val playerViewModel = LocalPlayerViewModel.current
     val mediaItem by playerViewModel.currentMediaItem.collectAsStateWithLifecycle()
-    val palette = rememberKineticPalette(mediaItem?.mediaMetadata?.artworkUri, settings.kineticTextStrength)
+    val palette = rememberKineticPalette(
+            mediaItem?.mediaMetadata?.artworkUri,
+            settings.kineticTextStrength,
+            settings.kineticTextPalette,
+        )
     val fonts = rememberKineticFontSlots(settings)
     val clock = remember { mutableFloatStateOf(0f) }
     val timeMs = remember { mutableLongStateOf(0L) }
@@ -677,6 +713,8 @@ private class KCtx(
     val speed: Float,
     val shadow: Boolean,
     val glow: Boolean,
+    val glowWords: Int,
+    val glowStrength: Float,
     val blur: Boolean,
     val flip: Boolean,
     val letterDelay: Int,
@@ -706,7 +744,15 @@ private class KCtx(
             color = look.colors[i],
             fontFamily = look.fonts[i],
             shadow = shadow,
-            glow = glow && i in look.glowWords,
+            glow =
+                glow &&
+                    i in
+                    when (glowWords) {
+                        0 -> look.firstWords
+                        1 -> look.secondWords
+                        else -> look.glowWords
+                    },
+            glowStrength = glowStrength,
             modifier = modifier,
             delayMs = delayMs,
             offscreen = offscreen,
@@ -761,6 +807,8 @@ private fun KineticStage(
                 speed = speed,
                 shadow = settings.kineticShadow,
                 glow = settings.kineticGlow,
+                glowWords = settings.kineticGlowWords,
+                glowStrength = settings.kineticGlowIntensity / 100f,
                 blur = settings.kineticBlur,
                 flip = settings.kineticFlip3d,
                 letterDelay = (settings.kineticLetterDelay / speed).toInt(),
@@ -827,6 +875,7 @@ private fun KWordText(
     fontFamily: FontFamily?,
     shadow: Boolean,
     glow: Boolean,
+    glowStrength: Float = 1f,
     modifier: Modifier = Modifier,
     delayMs: Int = 0,
     offscreen: Boolean = true,
@@ -849,16 +898,16 @@ private fun KWordText(
     }
     val fontSp = with(density) { fontPx.toSp() }
     val textShadow =
-        remember(color, fontPx, shadow, glow) {
+        remember(color, fontPx, shadow, glow, glowStrength) {
             when {
-                glow -> Shadow(color.copy(alpha = 0.55f), Offset.Zero, fontPx * 0.6f)
+                glow -> Shadow(color.copy(alpha = (0.55f * glowStrength).coerceIn(0f, 1f)), Offset.Zero, fontPx * 0.6f * glowStrength)
                 shadow -> Shadow(Color.Black.copy(alpha = 0.5f), Offset(0f, fontPx * 0.035f), fontPx * 0.22f)
                 else -> null
             }
         }
     // The word is drawn into a texture the size of its box; the shadow and glow need room outside the text or
     // they get cut off into a rectangle. The room is added inside the texture and removed again from the layout.
-    val padPx = if (offscreen && (glow || shadow)) ceil(fontPx * (if (glow) 0.75f else 0.3f)).toInt() else 0
+    val padPx = if (offscreen && (glow || shadow)) ceil(fontPx * (if (glow) 0.75f * glowStrength.coerceAtLeast(0.6f) else 0.3f)).toInt() else 0
     val padDp = with(density) { padPx.toDp() }
     Text(
         text = text.uppercase(),
