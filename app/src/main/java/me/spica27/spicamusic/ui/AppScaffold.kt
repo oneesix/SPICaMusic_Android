@@ -40,7 +40,7 @@ import me.spica27.spicamusic.ui.navigation.rememberAppNavigator
 import me.spica27.spicamusic.ui.player.LocalPlayerViewModel
 import me.spica27.spicamusic.ui.player.PlayerViewModel
 import me.spica27.spicamusic.ui.theme.SPICaMusicTheme
-import me.spica27.spicamusic.ui.widget.LyricsFontOption
+import me.spica27.spicamusic.ui.widget.rememberAppFontFamily
 import me.spica27.spicamusic.utils.Nav3Transitions
 import org.koin.compose.koinInject
 import org.koin.compose.viewmodel.koinActivityViewModel
@@ -96,11 +96,12 @@ fun AppScaffold() {
 
     val windowLayout = rememberWindowLayout()
 
+    val appFontFamily = rememberAppFontFamily(lyricsStyle.fontStyle)
     SPICaMusicTheme(
         darkTheme = isDarkMode,
         themeColor = color,
         themeColorStyle = ThemeColorStyle.fromString(themeColorStyleValue),
-        fontFamily = LyricsFontOption.fromId(lyricsStyle.fontStyle).family,
+        fontFamily = appFontFamily,
     ) {
         CompositionLocalProvider(
             LocalLiquidGlassConfig provides LiquidGlassConfig(enabled = liquidGlassEnabled),

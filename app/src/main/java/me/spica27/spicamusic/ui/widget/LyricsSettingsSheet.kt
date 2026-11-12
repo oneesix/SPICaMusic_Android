@@ -9,6 +9,7 @@ import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.font.FontFamily
 import kotlinx.coroutines.launch
 import me.spica27.spicamusic.core.preferences.KineticPreset
 import me.spica27.spicamusic.core.preferences.kineticPresetOrNull
@@ -83,33 +84,88 @@ private fun FontSection(
 ) {
     LyricsSettingsSection(stringResource(R.string.lyr_set_section_font))
 
+    // Fonts of the phone, fonts that are downloaded the first time they are picked, and imported TTF / OTF fonts.
+    val context = LocalContext.current
+    val scope = rememberCoroutineScope()
+    val busy = remember { mutableStateListOf<String>() }
+    val storeFonts = rememberKineticFontOptions()
+    val baseIds = LyricsFontOption.entries.map { it.id }
+    val extraFonts = storeFonts.filter { it.id !in baseIds && it.id != "sans" }
+    val playerFontIds = baseIds + extraFonts.map { it.id }
+    val lyricsFontIds = listOf(LyricsFontOption.SAME_AS_PLAYER) + playerFontIds
+    val importFont = rememberFontImporter(onImported = { })
+
+    @Composable
+    fun fontLabel(id: String): String {
+        val base = LyricsFontOption.entries.firstOrNull { it.id == id }
+        return when {
+            id == LyricsFontOption.SAME_AS_PLAYER -> stringResource(R.string.lyr_set_font_same)
+            base != null -> stringResource(base.labelRes)
+            else -> {
+                val option = extraFonts.firstOrNull { it.id == id }
+                val name = option?.label ?: id
+                when {
+                    id in busy -> "$name …"
+                    option != null && !option.available -> "$name ↓"
+                    else -> name
+                }
+            }
+        }
+    }
+
+    fun fontPreview(id: String): FontFamily? {
+        val base = LyricsFontOption.entries.firstOrNull { it.id == id }
+        return when {
+            id == LyricsFontOption.SAME_AS_PLAYER -> null
+            base != null -> base.family
+            else -> KineticFontStore.family(context, id)
+        }
+    }
+
+    fun chooseFont(
+        id: String,
+        apply: (String) -> Unit,
+    ) {
+        val option = extraFonts.firstOrNull { it.id == id }
+        if (option == null || option.available) {
+            apply(id)
+        } else if (id !in busy) {
+            busy.add(id)
+            scope.launch {
+                val ok = KineticFontStore.download(context, option)
+                busy.remove(id)
+                if (ok) {
+                    apply(id)
+                } else {
+                    Toast.makeText(context, R.string.lyr_set_kinetic_font_download_fail, Toast.LENGTH_LONG).show()
+                }
+            }
+        }
+    }
+
     LyricsSettingsChips(
         label = stringResource(R.string.lyr_set_font_style),
         description = stringResource(R.string.lyr_set_font_style_desc),
-        options = LyricsFontOption.entries,
-        selected = LyricsFontOption.fromId(settings.fontStyle),
-        optionLabel = { stringResource(it.labelRes) },
-        optionFont = { it.family },
-        onSelect = { option -> onUpdate { it.copy(fontStyle = option.id) } },
+        options = playerFontIds,
+        selected = settings.fontStyle,
+        optionLabel = { id -> fontLabel(id) },
+        optionFont = { id -> fontPreview(id) },
+        onSelect = { id -> chooseFont(id) { picked -> onUpdate { it.copy(fontStyle = picked) } } },
     )
 
     // "Same as player" + every font
-    val lyricsFontOptions = listOf<String>(LyricsFontOption.SAME_AS_PLAYER) + LyricsFontOption.entries.map { it.id }
     LyricsSettingsChips(
         label = stringResource(R.string.lyr_set_lyrics_font),
         description = stringResource(R.string.lyr_set_lyrics_font_desc),
-        options = lyricsFontOptions,
+        options = lyricsFontIds,
         selected = settings.lyricsFont,
-        optionLabel = { id ->
-            if (id == LyricsFontOption.SAME_AS_PLAYER) {
-                stringResource(R.string.lyr_set_font_same)
-            } else {
-                stringResource(LyricsFontOption.fromId(id).labelRes)
-            }
-        },
-        optionFont = { id -> if (id == LyricsFontOption.SAME_AS_PLAYER) null else LyricsFontOption.fromId(id).family },
-        onSelect = { id -> onUpdate { it.copy(lyricsFont = id) } },
+        optionLabel = { id -> fontLabel(id) },
+        optionFont = { id -> fontPreview(id) },
+        onSelect = { id -> chooseFont(id) { picked -> onUpdate { it.copy(lyricsFont = picked) } } },
     )
+    OutlinedButton(onClick = importFont) {
+        Text(stringResource(R.string.lyr_set_kinetic_font_import))
+    }
 
     val weightLabels =
         mapOf(
@@ -1219,6 +1275,28 @@ private fun KineticSection(
     }
 }
 
+/** Opens the file picker and imports the chosen TTF or OTF; [onImported] gets the new font id. */
+@Composable
+private fun rememberFontImporter(onImported: (String) -> Unit): () -> Unit {
+    val context = LocalContext.current
+    val scope = rememberCoroutineScope()
+    val launcher =
+        rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
+            if (uri != null) {
+                scope.launch {
+                    val id = KineticFontStore.importFont(context, uri)
+                    if (id != null) {
+                        onImported(id)
+                        Toast.makeText(context, R.string.lyr_set_kinetic_font_import_ok, Toast.LENGTH_SHORT).show()
+                    } else {
+                        Toast.makeText(context, R.string.lyr_set_kinetic_font_import_fail, Toast.LENGTH_SHORT).show()
+                    }
+                }
+            }
+        }
+    return { launcher.launch(arrayOf("*/*")) }
+}
+
 @Composable
 private fun KineticFontsSection(
     settings: LyricsStyleSettings,
@@ -1234,20 +1312,7 @@ private fun KineticFontsSection(
         onUpdate { s -> if (id in s.kineticFonts.split(',')) s else s.copy(kineticFonts = (s.kineticFonts.split(',').filter { it.isNotBlank() } + id).joinToString(",")) }
     }
 
-    val importLauncher =
-        rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
-            if (uri != null) {
-                scope.launch {
-                    val id = KineticFontStore.importFont(context, uri)
-                    if (id != null) {
-                        addFont(id)
-                        Toast.makeText(context, R.string.lyr_set_kinetic_font_import_ok, Toast.LENGTH_SHORT).show()
-                    } else {
-                        Toast.makeText(context, R.string.lyr_set_kinetic_font_import_fail, Toast.LENGTH_SHORT).show()
-                    }
-                }
-            }
-        }
+    val importFont = rememberFontImporter(onImported = { id -> addFont(id) })
 
     LyricsSettingsSection(stringResource(R.string.lyr_set_kinetic_section_fonts))
     LyricsSettingsToggle(
@@ -1299,7 +1364,7 @@ private fun KineticFontsSection(
             }
         },
     )
-    OutlinedButton(onClick = { importLauncher.launch(arrayOf("*/*")) }) {
+    OutlinedButton(onClick = importFont) {
         Text(stringResource(R.string.lyr_set_kinetic_font_import))
     }
 }

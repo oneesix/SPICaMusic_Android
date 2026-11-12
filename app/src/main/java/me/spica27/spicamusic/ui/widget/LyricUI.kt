@@ -540,7 +540,8 @@ private fun rememberLyricsUIStyle(
     val typography = MaterialTheme.typography
     val primaryColor = MaterialTheme.colorScheme.primary
     val screenWidthDp = LocalConfiguration.current.screenWidthDp
-    return remember(typography, displayMode, settings, screenWidthDp, primaryColor) {
+    val lyricsFamily = rememberLyricsFontFamily(settings.lyricsFont)
+    return remember(typography, displayMode, settings, screenWidthDp, primaryColor, lyricsFamily) {
         val built =
             when (displayMode) {
             LyricsDisplayMode.Fullscreen -> {
@@ -641,7 +642,7 @@ private fun rememberLyricsUIStyle(
             }
             }
         built
-            .withFontFamily(LyricsFontOption.lyricsFamily(settings.lyricsFont))
+            .withFontFamily(lyricsFamily)
             .copy(
                 fx = settings.toFxSpec(primaryColor),
                 bgReveal =

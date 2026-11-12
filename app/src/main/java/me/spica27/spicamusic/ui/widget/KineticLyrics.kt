@@ -7,11 +7,15 @@ import android.graphics.RuntimeShader
 import android.net.Uri
 import android.os.Build
 import androidx.annotation.RequiresApi
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.EnterTransition
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.AnimationSpec
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -353,11 +357,33 @@ private fun groupRows(
 
 private fun cleanWord(s: String): String = s.lowercase().filter { it.isLetter() || it == '\'' }
 
-/** The colour and font of every word of a line. */
+private val TinyWords =
+    setOf("a", "an", "the", "to", "of", "in", "on", "at", "by", "for", "and", "or", "but", "so", "is", "am", "are", "be", "i", "me", "my", "we", "it", "oh")
+
+/** A few real words of a line (one to four, random but stable for the line) get the glow, like the original. */
+private fun pickGlowWords(
+    line: KLine,
+    seed: Int,
+): Set<Int> {
+    val r = KRng(seed xor 0x51ed27)
+    var pool = line.words.indices.filter { cleanWord(line.words[it].text) !in TinyWords }.toMutableList()
+    if (pool.isEmpty()) pool = line.words.indices.toMutableList()
+    for (i in pool.size - 1 downTo 1) {
+        val j = (r.next() * (i + 1)).toInt().coerceIn(0, i)
+        val tmp = pool[i]
+        pool[i] = pool[j]
+        pool[j] = tmp
+    }
+    val count = (line.words.size * (0.18f + r.next() * 0.17f)).roundToInt().coerceIn(1, min(4, pool.size))
+    return pool.take(count).toSet()
+}
+
+/** The colour and font of every word of a line, and which words glow. */
 private class KLook(
     val colors: List<Color>,
     val fonts: List<FontFamily?>,
     val accent: Color,
+    val glowWords: Set<Int>,
 )
 
 /**
@@ -384,7 +410,7 @@ private fun buildLook(
         val j = 1 + (r.next() * (slots.size - 1)).toInt().coerceIn(0, slots.size - 2)
         slots[j] = if (slots[0] == a) b else a
     }
-    return KLook(slots.map { colors[it] }, slots.map { fonts[it % fonts.size] }, colors[a])
+    return KLook(slots.map { colors[it] }, slots.map { fonts[it % fonts.size] }, colors[a], pickGlowWords(line, seed))
 }
 
 private fun splitLetters(word: String): List<String> {
@@ -603,9 +629,14 @@ internal fun KineticLyricsUI(
                 modifier = Modifier.fillMaxSize(),
             )
         }
-        val index = lineIndex
-        if (index >= 0 && index < kLines.size) {
-            key(index) {
+        // The old line fades out quickly instead of vanishing, so a line that is still moving is not cut.
+        AnimatedContent(
+            targetState = lineIndex,
+            modifier = Modifier.fillMaxSize(),
+            transitionSpec = { (EnterTransition.None togetherWith fadeOut(tween(160))).using(null) },
+            label = "kineticLine",
+        ) { index ->
+            if (index >= 0 && index < kLines.size) {
                 KineticStage(
                     line = kLines[index],
                     salt = salt,
@@ -647,7 +678,7 @@ private class KCtx(
 ) {
     fun shown(i: Int): Boolean = i < revealed
 
-    /** One word (or one letter of it) with its own colour and font. */
+    /** One word (or one letter of it) with its own colour and font. Only the chosen words glow. */
     @Composable
     fun Word(
         i: Int,
@@ -669,7 +700,7 @@ private class KCtx(
             color = look.colors[i],
             fontFamily = look.fonts[i],
             shadow = shadow,
-            glow = glow,
+            glow = glow && i in look.glowWords,
             modifier = modifier,
             delayMs = delayMs,
             offscreen = offscreen,
@@ -773,7 +804,7 @@ private val specCache = HashMap<Float, AnimationSpec<Float>>()
 
 /** One spring per stiffness, so words do not get a new animation spec (and redraw) every time. */
 private fun springSpec(stiffness: Float): AnimationSpec<Float> =
-    specCache.getOrPut(stiffness) { spring<Float>(dampingRatio = 1f, stiffness = stiffness) }
+    specCache.getOrPut(stiffness) { spring<Float>(dampingRatio = 1f, stiffness = stiffness, visibilityThreshold = 0.0005f) }
 
 /**
  * A word that glides from the hidden pose [from] to rest when [shown] becomes true. The word is drawn once into
@@ -819,6 +850,10 @@ private fun KWordText(
                 else -> null
             }
         }
+    // The word is drawn into a texture the size of its box; the shadow and glow need room outside the text or
+    // they get cut off into a rectangle. The room is added inside the texture and removed again from the layout.
+    val padPx = if (offscreen && (glow || shadow)) ceil(fontPx * (if (glow) 0.75f else 0.3f)).toInt() else 0
+    val padDp = with(density) { padPx.toDp() }
     Text(
         text = text.uppercase(),
         color = color,
@@ -832,7 +867,12 @@ private fun KWordText(
         style = TextStyle(shadow = textShadow),
         modifier =
             modifier
-                .onGloballyPositioned { holder[0] = it }
+                .layout { measurable, constraints ->
+                    val placeable = measurable.measure(constraints)
+                    layout(max(0, placeable.width - 2 * padPx), max(0, placeable.height - 2 * padPx)) {
+                        placeable.place(-padPx, -padPx)
+                    }
+                }
                 .graphicsLayer {
                     val p = progress.value
                     val h = 1f - p
@@ -853,7 +893,9 @@ private fun KWordText(
                         } else {
                             null
                         }
-                },
+                }
+                .padding(padDp)
+                .onGloballyPositioned { holder[0] = it },
     )
 }
 

@@ -1074,7 +1074,7 @@
   <string name="lyr_set_kinetic_shadow">文字陰影</string>
   <string name="lyr_set_kinetic_shadow_desc">每個詞下方的柔和陰影</string>
   <string name="lyr_set_kinetic_glow">文字發光</string>
-  <string name="lyr_set_kinetic_glow_desc">每個詞周圍的柔和光暈（較耗效能）</string>
+  <string name="lyr_set_kinetic_glow_desc">每行少數幾個詞帶柔和光暈（較耗效能）</string>
   <string name="lyr_set_kinetic_blur">Zoom 模糊</string>
   <string name="lyr_set_kinetic_blur_desc">Zoom 樣式中文字從模糊開始</string>
   <string name="lyr_set_kinetic_flip">3D 字母翻轉</string>

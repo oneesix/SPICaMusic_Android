@@ -47,6 +47,9 @@ internal object KineticFontStore {
             ("cursive" to "Cursive") to FontFamily.Cursive,
             ("condensed" to "Condensed") to FontFamily(Typeface.create("sans-serif-condensed", Typeface.BOLD)),
             ("casual" to "Casual") to FontFamily(Typeface.create("casual", Typeface.NORMAL)),
+            ("light" to "Light") to FontFamily(Typeface.create("sans-serif-light", Typeface.NORMAL)),
+            ("black" to "Black") to FontFamily(Typeface.create("sans-serif-black", Typeface.NORMAL)),
+            ("serifmono" to "Serif Mono") to FontFamily(Typeface.create("serif-monospace", Typeface.NORMAL)),
         )
     }
 
@@ -63,6 +66,14 @@ internal object KineticFontStore {
             Triple("pacifico", "Pacifico", BASE + "pacifico/Pacifico-Regular.ttf"),
             Triple("dancing", "Dancing Script", BASE + "dancingscript/DancingScript%5Bwght%5D.ttf"),
             Triple("marker", "Permanent Marker", BASE + "permanentmarker/PermanentMarker-Regular.ttf"),
+            Triple("bangers", "Bangers", BASE + "bangers/Bangers-Regular.ttf"),
+            Triple("satisfy", "Satisfy", BASE + "satisfy/Satisfy-Regular.ttf"),
+            Triple("greatvibes", "Great Vibes", BASE + "greatvibes/GreatVibes-Regular.ttf"),
+            Triple("staatliches", "Staatliches", BASE + "staatliches/Staatliches-Regular.ttf"),
+            Triple("pressstart", "Press Start 2P", BASE + "pressstart2p/PressStart2P-Regular.ttf"),
+            Triple("shadows", "Shadows Into Light", BASE + "shadowsintolight/ShadowsIntoLight-Regular.ttf"),
+            Triple("cinzel", "Cinzel", BASE + "cinzel/Cinzel%5Bwght%5D.ttf"),
+            Triple("orbitron", "Orbitron", BASE + "orbitron/Orbitron%5Bwght%5D.ttf"),
         )
 
     private val cache = HashMap<String, FontFamily?>()
@@ -90,21 +101,33 @@ internal object KineticFontStore {
         return out
     }
 
-    /** The font family for [id], or null when it is not available (not downloaded yet or broken). */
+    /**
+     * The font family for [id], or null when it is not available (not downloaded yet or broken).
+     * [allWeights] gives every weight (for the app and the normal lyrics); the kinetic lyrics only need Black.
+     */
     fun family(
         context: Context,
         id: String,
+        allWeights: Boolean = false,
     ): FontFamily? {
         builtin.firstOrNull { it.first.first == id }?.let { return it.second }
-        if (cache.containsKey(id)) return cache[id]
+        val key = "$id:$allWeights"
+        if (cache.containsKey(key)) return cache[key]
         val file = fileFor(context, id)
         val family =
             if (file == null) {
                 null
+            } else if (allWeights) {
+                runCatching {
+                    FontFamily(
+                        listOf(FontWeight.Normal, FontWeight.Medium, FontWeight.SemiBold, FontWeight.Bold, FontWeight.ExtraBold, FontWeight.Black)
+                            .map { Font(file, it) },
+                    )
+                }.getOrNull()
             } else {
                 runCatching { FontFamily(Font(file, FontWeight.Black)) }.getOrNull()
             }
-        if (file != null) cache[id] = family
+        if (file != null) cache[key] = family
         return family
     }
 
@@ -130,7 +153,7 @@ internal object KineticFontStore {
                 val target = File(dir(context), option.id + ".ttf")
                 target.delete()
                 if (!part.renameTo(target)) return@withContext false
-                cache.remove(option.id)
+                cache.keys.removeAll { it.startsWith(option.id + ":") }
                 revision.intValue++
                 true
             } catch (e: Exception) {
@@ -167,7 +190,7 @@ internal object KineticFontStore {
                 dir(context).listFiles()?.filter { it.nameWithoutExtension == id }?.forEach { it.delete() }
                 val target = File(dir(context), "$id.$ext")
                 if (!part.renameTo(target)) return@withContext null
-                cache.remove(id)
+                cache.keys.removeAll { it.startsWith("$id:") }
                 revision.intValue++
                 id
             } catch (e: Exception) {
@@ -220,6 +243,36 @@ internal fun rememberKineticFontSlots(settings: LyricsStyleSettings): List<FontF
                 .mapNotNull { KineticFontStore.family(context, it.trim()) }
                 .take(settings.kineticFontCount)
                 .ifEmpty { listOf(null) }
+        }
+    }
+}
+
+/** The app-wide font ("Font style" setting): the old fonts, plus downloaded and imported ones. Null = default. */
+@Composable
+internal fun rememberAppFontFamily(id: String): FontFamily? {
+    val context = LocalContext.current.applicationContext
+    val revision = KineticFontStore.revision.intValue
+    return remember(id, revision) {
+        val option = LyricsFontOption.entries.firstOrNull { it.id == id }
+        if (option != null) option.family else KineticFontStore.family(context, id, allWeights = true)
+    }
+}
+
+/** The lyrics font: null = same as the player font, the plain default font when a missing font was chosen. */
+@Composable
+internal fun rememberLyricsFontFamily(id: String): FontFamily? {
+    val context = LocalContext.current.applicationContext
+    val revision = KineticFontStore.revision.intValue
+    return remember(id, revision) {
+        if (id == LyricsFontOption.SAME_AS_PLAYER) {
+            null
+        } else {
+            val option = LyricsFontOption.entries.firstOrNull { it.id == id }
+            if (option != null) {
+                option.family ?: FontFamily.Default
+            } else {
+                KineticFontStore.family(context, id, allWeights = true) ?: FontFamily.Default
+            }
         }
     }
 }

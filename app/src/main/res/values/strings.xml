@@ -1075,7 +1075,7 @@
   <string name="lyr_set_kinetic_shadow">Text shadow</string>
   <string name="lyr_set_kinetic_shadow_desc">Soft shadow under every word</string>
   <string name="lyr_set_kinetic_glow">Word glow</string>
-  <string name="lyr_set_kinetic_glow_desc">Soft glow around every word (heavier)</string>
+  <string name="lyr_set_kinetic_glow_desc">Soft glow on a few words in every line (heavier)</string>
   <string name="lyr_set_kinetic_blur">Blur on Zoom</string>
   <string name="lyr_set_kinetic_blur_desc">Words start blurred in the Zoom style</string>
   <string name="lyr_set_kinetic_flip">3D letter flip</string>
