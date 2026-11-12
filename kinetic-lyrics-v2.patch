@@ -1,0 +1,1871 @@
+diff --git a/app/src/main/java/me/spica27/spicamusic/ui/widget/KineticFonts.kt b/app/src/main/java/me/spica27/spicamusic/ui/widget/KineticFonts.kt
+new file mode 100644
+index 0000000..0816d0f
+--- /dev/null
++++ b/app/src/main/java/me/spica27/spicamusic/ui/widget/KineticFonts.kt
+@@ -0,0 +1,225 @@
++package me.spica27.spicamusic.ui.widget
++
++import android.content.Context
++import android.graphics.Typeface
++import android.net.Uri
++import android.provider.OpenableColumns
++import androidx.compose.runtime.Composable
++import androidx.compose.runtime.mutableIntStateOf
++import androidx.compose.runtime.remember
++import androidx.compose.ui.platform.LocalContext
++import androidx.compose.ui.text.font.Font
++import androidx.compose.ui.text.font.FontFamily
++import androidx.compose.ui.text.font.FontWeight
++import kotlinx.coroutines.Dispatchers
++import kotlinx.coroutines.withContext
++import me.spica27.spicamusic.core.preferences.LyricsStyleSettings
++import java.io.File
++import java.io.FileInputStream
++import java.net.HttpURLConnection
++import java.net.URL
++
++/** A font the kinetic lyrics can use. [url] is set for fonts that are downloaded the first time they are picked. */
++internal data class KineticFontOption(
++    val id: String,
++    val label: String,
++    val url: String?,
++    val available: Boolean,
++)
++
++/**
++ * Fonts for the kinetic lyrics: a few fonts that every phone has, fonts that are downloaded on first use
++ * (Playfair Display and more) and fonts the user imports (TTF or OTF). Downloaded and imported files are
++ * kept in the app's private storage.
++ */
++internal object KineticFontStore {
++    /** Changes whenever a font file is added, so lists and previews refresh. */
++    val revision = mutableIntStateOf(0)
++
++    private const val BASE = "https://raw.githubusercontent.com/google/fonts/main/ofl/"
++    private const val IMPORT_PREFIX = "imp_"
++
++    private val builtin: List<Pair<Pair<String, String>, FontFamily>> by lazy {
++        listOf(
++            ("sans" to "Sans") to FontFamily.SansSerif,
++            ("serif" to "Serif") to FontFamily.Serif,
++            ("mono" to "Mono") to FontFamily.Monospace,
++            ("cursive" to "Cursive") to FontFamily.Cursive,
++            ("condensed" to "Condensed") to FontFamily(Typeface.create("sans-serif-condensed", Typeface.BOLD)),
++            ("casual" to "Casual") to FontFamily(Typeface.create("casual", Typeface.NORMAL)),
++        )
++    }
++
++    private val downloadable =
++        listOf(
++            Triple("playfair", "Playfair Display", BASE + "playfairdisplay/PlayfairDisplay%5Bwght%5D.ttf"),
++            Triple("abril", "Abril Fatface", BASE + "abrilfatface/AbrilFatface-Regular.ttf"),
++            Triple("bebas", "Bebas Neue", BASE + "bebasneue/BebasNeue-Regular.ttf"),
++            Triple("anton", "Anton", BASE + "anton/Anton-Regular.ttf"),
++            Triple("archivoblack", "Archivo Black", BASE + "archivoblack/ArchivoBlack-Regular.ttf"),
++            Triple("bungee", "Bungee", BASE + "bungee/Bungee-Regular.ttf"),
++            Triple("righteous", "Righteous", BASE + "righteous/Righteous-Regular.ttf"),
++            Triple("lobster", "Lobster", BASE + "lobster/Lobster-Regular.ttf"),
++            Triple("pacifico", "Pacifico", BASE + "pacifico/Pacifico-Regular.ttf"),
++            Triple("dancing", "Dancing Script", BASE + "dancingscript/DancingScript%5Bwght%5D.ttf"),
++            Triple("marker", "Permanent Marker", BASE + "permanentmarker/PermanentMarker-Regular.ttf"),
++        )
++
++    private val cache = HashMap<String, FontFamily?>()
++
++    private fun dir(context: Context): File = File(context.filesDir, "kinetic_fonts").apply { mkdirs() }
++
++    private fun fileFor(
++        context: Context,
++        id: String,
++    ): File? = dir(context).listFiles()?.firstOrNull { it.nameWithoutExtension == id && (it.extension == "ttf" || it.extension == "otf") }
++
++    fun options(context: Context): List<KineticFontOption> {
++        val out = ArrayList<KineticFontOption>()
++        builtin.forEach { (key, _) -> out += KineticFontOption(key.first, key.second, null, true) }
++        downloadable.forEach { (id, label, url) -> out += KineticFontOption(id, label, url, fileFor(context, id) != null) }
++        dir(context)
++            .listFiles()
++            .orEmpty()
++            .filter { it.name.startsWith(IMPORT_PREFIX) && (it.extension == "ttf" || it.extension == "otf") }
++            .sortedBy { it.name }
++            .forEach { f ->
++                val id = f.nameWithoutExtension
++                out += KineticFontOption(id, id.removePrefix(IMPORT_PREFIX).replace('_', ' '), null, true)
++            }
++        return out
++    }
++
++    /** The font family for [id], or null when it is not available (not downloaded yet or broken). */
++    fun family(
++        context: Context,
++        id: String,
++    ): FontFamily? {
++        builtin.firstOrNull { it.first.first == id }?.let { return it.second }
++        if (cache.containsKey(id)) return cache[id]
++        val file = fileFor(context, id)
++        val family =
++            if (file == null) {
++                null
++            } else {
++                runCatching { FontFamily(Font(file, FontWeight.Black)) }.getOrNull()
++            }
++        if (file != null) cache[id] = family
++        return family
++    }
++
++    /** Downloads a font to the app's storage. Returns true when it is ready to use. */
++    suspend fun download(
++        context: Context,
++        option: KineticFontOption,
++    ): Boolean =
++        withContext(Dispatchers.IO) {
++            val url = option.url ?: return@withContext option.available
++            try {
++                val connection = URL(url).openConnection() as HttpURLConnection
++                connection.connectTimeout = 15_000
++                connection.readTimeout = 30_000
++                connection.instanceFollowRedirects = true
++                if (connection.responseCode != HttpURLConnection.HTTP_OK) return@withContext false
++                val part = File(dir(context), option.id + ".part")
++                connection.inputStream.use { input -> part.outputStream().use { output -> input.copyTo(output) } }
++                if (!looksLikeFont(part)) {
++                    part.delete()
++                    return@withContext false
++                }
++                val target = File(dir(context), option.id + ".ttf")
++                target.delete()
++                if (!part.renameTo(target)) return@withContext false
++                cache.remove(option.id)
++                revision.intValue++
++                true
++            } catch (e: Exception) {
++                false
++            }
++        }
++
++    /** Copies a TTF or OTF the user picked into the app's storage. Returns the new font id, or null. */
++    suspend fun importFont(
++        context: Context,
++        uri: Uri,
++    ): String? =
++        withContext(Dispatchers.IO) {
++            try {
++                val name = displayName(context, uri) ?: "font.ttf"
++                val ext = name.substringAfterLast('.', "ttf").lowercase()
++                if (ext != "ttf" && ext != "otf") return@withContext null
++                val base =
++                    name
++                        .substringBeforeLast('.')
++                        .replace(Regex("[^A-Za-z0-9 _-]"), "")
++                        .trim()
++                        .replace(' ', '_')
++                        .take(40)
++                        .ifEmpty { "Font" }
++                val id = IMPORT_PREFIX + base
++                val part = File(dir(context), "$id.part")
++                context.contentResolver.openInputStream(uri)?.use { input -> part.outputStream().use { output -> input.copyTo(output) } }
++                    ?: return@withContext null
++                if (!looksLikeFont(part)) {
++                    part.delete()
++                    return@withContext null
++                }
++                dir(context).listFiles()?.filter { it.nameWithoutExtension == id }?.forEach { it.delete() }
++                val target = File(dir(context), "$id.$ext")
++                if (!part.renameTo(target)) return@withContext null
++                cache.remove(id)
++                revision.intValue++
++                id
++            } catch (e: Exception) {
++                null
++            }
++        }
++
++    private fun displayName(
++        context: Context,
++        uri: Uri,
++    ): String? =
++        context.contentResolver.query(uri, arrayOf(OpenableColumns.DISPLAY_NAME), null, null, null)?.use { c ->
++            if (c.moveToFirst()) c.getString(0) else null
++        }
++
++    /** TrueType / OpenType files start with a known tag. */
++    private fun looksLikeFont(file: File): Boolean {
++        val head = ByteArray(4)
++        val read = FileInputStream(file).use { it.read(head) }
++        if (read < 4) return false
++        val tag = String(head, Charsets.ISO_8859_1)
++        return tag == "OTTO" || tag == "true" || tag == "ttcf" ||
++            (head[0].toInt() == 0 && head[1].toInt() == 1 && head[2].toInt() == 0 && head[3].toInt() == 0)
++    }
++}
++
++/** The font list for the settings sheet; refreshes after a download or an import. */
++@Composable
++internal fun rememberKineticFontOptions(): List<KineticFontOption> {
++    val context = LocalContext.current.applicationContext
++    val revision = KineticFontStore.revision.intValue
++    return remember(revision) { KineticFontStore.options(context) }
++}
++
++/**
++ * The font slots of the kinetic lyrics. Slot k belongs to colour k, so a colour always comes with the same font.
++ * A null entry means the app's normal font. With "Mix fonts" off there is one slot (the normal font).
++ */
++@Composable
++internal fun rememberKineticFontSlots(settings: LyricsStyleSettings): List<FontFamily?> {
++    val context = LocalContext.current.applicationContext
++    val revision = KineticFontStore.revision.intValue
++    return remember(settings.kineticFontMix, settings.kineticFontCount, settings.kineticFonts, revision) {
++        if (!settings.kineticFontMix) {
++            listOf(null)
++        } else {
++            settings.kineticFonts
++                .split(',')
++                .filter { it.isNotBlank() }
++                .mapNotNull { KineticFontStore.family(context, it.trim()) }
++                .take(settings.kineticFontCount)
++                .ifEmpty { listOf(null) }
++        }
++    }
++}
+diff --git a/app/src/main/java/me/spica27/spicamusic/ui/widget/KineticLyrics.kt b/app/src/main/java/me/spica27/spicamusic/ui/widget/KineticLyrics.kt
+index 3c425b9..2f6b144 100644
+--- a/app/src/main/java/me/spica27/spicamusic/ui/widget/KineticLyrics.kt
++++ b/app/src/main/java/me/spica27/spicamusic/ui/widget/KineticLyrics.kt
+@@ -1,6 +1,10 @@
+ package me.spica27.spicamusic.ui.widget
+ 
++import android.content.Context
++import android.graphics.Bitmap
++import android.graphics.BitmapFactory
+ import android.graphics.RuntimeShader
++import android.net.Uri
+ import android.os.Build
+ import androidx.annotation.RequiresApi
+ import androidx.compose.animation.core.Animatable
+@@ -28,6 +32,7 @@ import androidx.compose.foundation.layout.wrapContentWidth
+ import androidx.compose.material3.MaterialTheme
+ import androidx.compose.material3.Text
+ import androidx.compose.runtime.Composable
++import androidx.compose.runtime.Immutable
+ import androidx.compose.runtime.LaunchedEffect
+ import androidx.compose.runtime.State
+ import androidx.compose.runtime.derivedStateOf
+@@ -48,36 +53,49 @@ import androidx.compose.ui.geometry.Offset
+ import androidx.compose.ui.graphics.BlurEffect
+ import androidx.compose.ui.graphics.Brush
+ import androidx.compose.ui.graphics.Color
++import androidx.compose.ui.graphics.CompositingStrategy
+ import androidx.compose.ui.graphics.Path
+ import androidx.compose.ui.graphics.PathMeasure
+ import androidx.compose.ui.graphics.Shadow
+ import androidx.compose.ui.graphics.ShaderBrush
+ import androidx.compose.ui.graphics.StrokeCap
++import androidx.compose.ui.graphics.TransformOrigin
++import androidx.compose.ui.graphics.toArgb
+ import androidx.compose.ui.graphics.drawscope.Stroke
+ import androidx.compose.ui.graphics.graphicsLayer
+ import androidx.compose.ui.layout.Layout
++import androidx.compose.ui.layout.layout
+ import androidx.compose.ui.layout.LayoutCoordinates
+ import androidx.compose.ui.layout.onGloballyPositioned
+ import androidx.compose.ui.layout.positionInRoot
++import androidx.compose.ui.platform.LocalContext
+ import androidx.compose.ui.platform.LocalDensity
+ import androidx.compose.ui.text.TextStyle
++import androidx.compose.ui.text.font.FontFamily
+ import androidx.compose.ui.text.font.FontWeight
+ import androidx.compose.ui.unit.Constraints
+ import androidx.compose.ui.unit.Dp
+ import androidx.compose.ui.unit.dp
+ import androidx.compose.ui.unit.em
+ import androidx.compose.ui.util.lerp
++import androidx.core.graphics.ColorUtils
++import androidx.lifecycle.compose.collectAsStateWithLifecycle
++import androidx.palette.graphics.Palette
++import kotlinx.coroutines.Dispatchers
+ import kotlinx.coroutines.delay
+ import kotlinx.coroutines.launch
++import kotlinx.coroutines.withContext
+ import me.spica27.spicamusic.common.entity.LyricItem
+ import me.spica27.spicamusic.core.preferences.KineticStyle
+ import me.spica27.spicamusic.core.preferences.LyricsStyleSettings
++import me.spica27.spicamusic.ui.player.LocalPlayerViewModel
+ import java.text.BreakIterator
+ import kotlin.math.ceil
+ import kotlin.math.max
+ import kotlin.math.min
+ import kotlin.math.roundToInt
+ import kotlin.math.sin
++import kotlin.math.sqrt
+ import kotlin.random.Random
+ import androidx.compose.ui.graphics.lerp as lerpColor
+ 
+@@ -216,38 +234,34 @@ private class KRng(
+     }
+ }
+ 
+-private fun KRng.pick(vararg weighted: Pair<KineticStyle, Float>): KineticStyle {
++private fun KRng.pickWeighted(weighted: List<Pair<KineticStyle, Float>>): KineticStyle {
+     var x = next() * weighted.sumOf { it.second.toDouble() }.toFloat()
+     for ((v, k) in weighted) {
+         x -= k
+         if (x <= 0f) return v
+     }
+-    return weighted[0].first
++    return weighted.first().first
+ }
+ 
+-/** Auto: picks the style for a line from its length, singing speed and chorus repeats. */
+-private fun chooseKind(
+-    line: KLine,
+-    seed: Int,
+-): KineticStyle {
+-    val r = KRng(seed)
++/** How likely each style is for a line, from its length, singing speed and chorus repeats. */
++private fun kindWeights(line: KLine): List<Pair<KineticStyle, Float>> {
+     val n = line.words.size
+     val wps = n / max(0.5f, (line.endMs - line.startMs) / 1000f)
+     val energetic = wps > 2.5f
+     val calm = wps < 1.4f
+     val chorus = line.repeats >= 2
+     return when {
+-        n <= 2 -> r.pick(KineticStyle.Zoom to 3f, KineticStyle.Letters to 2f, KineticStyle.Stack to 1f)
+-        n > 11 || wps > 3.8f -> r.pick(KineticStyle.Flow to 3f, KineticStyle.Slide to 2f)
++        n <= 2 -> listOf(KineticStyle.Zoom to 3f, KineticStyle.Letters to 2f, KineticStyle.Stack to 1f)
++        n > 11 || wps > 3.8f -> listOf(KineticStyle.Flow to 3f, KineticStyle.Slide to 2f)
+         chorus && n <= 7 ->
+             if (energetic) {
+-                r.pick(KineticStyle.Zoom to 2f, KineticStyle.Slide to 2f, KineticStyle.Letters to 1f)
++                listOf(KineticStyle.Zoom to 2f, KineticStyle.Slide to 2f, KineticStyle.Letters to 1f)
+             } else {
+-                r.pick(KineticStyle.Stack to 2f, KineticStyle.Letters to 1f, KineticStyle.Zoom to 1f)
++                listOf(KineticStyle.Stack to 2f, KineticStyle.Letters to 1f, KineticStyle.Zoom to 1f)
+             }
+ 
+         else ->
+-            r.pick(
++            listOf(
+                 KineticStyle.Stack to (if (calm) 3f else 2f),
+                 KineticStyle.Slide to (if (energetic) 3f else 2f),
+                 KineticStyle.Graph to (if (n <= 8) (if (calm) 2.5f else 1.5f) else 0f),
+@@ -259,6 +273,18 @@ private fun chooseKind(
+     }
+ }
+ 
++/** Picks the style of a line: Auto uses every style, otherwise only the chosen ones (still at random). */
++private fun chooseKind(
++    line: KLine,
++    seed: Int,
++    allowed: Set<KineticStyle>,
++): KineticStyle {
++    val r = KRng(seed)
++    val weights = kindWeights(line)
++    if (KineticStyle.Auto in allowed) return r.pickWeighted(weights.filter { it.second > 0f })
++    return r.pickWeighted(allowed.map { k -> k to ((weights.firstOrNull { it.first == k }?.second ?: 0f) + 0.35f) })
++}
++
+ private fun visualLength(s: String): Float {
+     var n = 0f
+     for (ch in s.uppercase()) {
+@@ -325,27 +351,40 @@ private fun groupRows(
+     return rows
+ }
+ 
+-private val TinyWords =
+-    setOf("a", "an", "the", "to", "of", "in", "on", "at", "by", "for", "and", "or", "but", "so", "is", "am", "are", "be", "i", "me", "my", "we", "it", "oh")
+-
+ private fun cleanWord(s: String): String = s.lowercase().filter { it.isLetter() || it == '\'' }
+ 
+-/** One to four real words of a line get the album accent colour (random, but stable for a line). */
+-private fun highlightSet(
++/** The colour and font of every word of a line. */
++private class KLook(
++    val colors: List<Color>,
++    val fonts: List<FontFamily?>,
++    val accent: Color,
++)
++
++/**
++ * A line uses two of the album colours (picked at random, stable for the line). Slot k of the font list belongs to
++ * colour k, so a colour always comes with its own font.
++ */
++private fun buildLook(
+     line: KLine,
+     seed: Int,
+-): Set<Int> {
+-    val r = KRng(seed xor 0x51ed27)
+-    var pool = line.words.indices.filter { cleanWord(line.words[it].text) !in TinyWords }.toMutableList()
+-    if (pool.isEmpty()) pool = line.words.indices.toMutableList()
+-    for (i in pool.size - 1 downTo 1) {
+-        val j = (r.next() * (i + 1)).toInt().coerceIn(0, i)
+-        val tmp = pool[i]
+-        pool[i] = pool[j]
+-        pool[j] = tmp
++    colors: List<Color>,
++    fonts: List<FontFamily?>,
++): KLook {
++    val r = KRng(seed xor 0x7a3b21)
++    val n = colors.size
++    val a = (r.next() * n).toInt().coerceIn(0, n - 1)
++    val b = (a + 1 + (r.next() * (n - 1)).toInt().coerceIn(0, max(0, n - 2))) % n
++    val slots = IntArray(line.words.size)
++    var current = if (r.next() < 0.5f) a else b
++    for (i in slots.indices) {
++        if (i > 0 && r.next() < 0.55f) current = if (current == a) b else a
++        slots[i] = current
++    }
++    if (slots.size >= 2 && slots.all { it == slots[0] }) {
++        val j = 1 + (r.next() * (slots.size - 1)).toInt().coerceIn(0, slots.size - 2)
++        slots[j] = if (slots[0] == a) b else a
+     }
+-    val count = (line.words.size * (0.18f + r.next() * 0.17f)).roundToInt().coerceIn(1, min(4, pool.size))
+-    return pool.take(count).toSet()
++    return KLook(slots.map { colors[it] }, slots.map { fonts[it % fonts.size] }, colors[a])
+ }
+ 
+ private fun splitLetters(word: String): List<String> {
+@@ -362,6 +401,121 @@ private fun splitLetters(word: String): List<String> {
+     return out.ifEmpty { listOf(word) }
+ }
+ 
++// ==================== album colours ====================
++
++@Immutable
++private class KPalette(
++    val text: List<Color>,
++    val pools: List<Color>,
++    val base: Color,
++)
++
++private fun colorDistance(
++    a: Color,
++    b: Color,
++): Float {
++    val dr = a.red - b.red
++    val dg = a.green - b.green
++    val db = a.blue - b.blue
++    return sqrt(dr * dr + dg * dg + db * db)
++}
++
++private fun hslOf(c: Color): FloatArray {
++    val hsl = FloatArray(3)
++    ColorUtils.colorToHSL(c.toArgb(), hsl)
++    return hsl
++}
++
++private fun fromHsl(
++    h: Float,
++    s: Float,
++    l: Float,
++): Color = Color(ColorUtils.HSLToColor(floatArrayOf(h.mod(360f), s.coerceIn(0f, 1f), l.coerceIn(0f, 1f))))
++
++/** Reads the main colours of the cover (vibrant ones first). Empty when there is no cover. */
++private suspend fun extractSwatches(
++    context: Context,
++    uri: Uri?,
++): List<Color> =
++    withContext(Dispatchers.IO) {
++        if (uri == null) return@withContext emptyList()
++        try {
++            val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
++            context.contentResolver.openInputStream(uri)?.use { BitmapFactory.decodeStream(it, null, bounds) }
++            var sample = 1
++            while (bounds.outWidth / (sample * 2) >= 128 && bounds.outHeight / (sample * 2) >= 128) sample *= 2
++            val options =
++                BitmapFactory.Options().apply {
++                    inSampleSize = sample
++                    inPreferredConfig = Bitmap.Config.ARGB_8888
++                }
++            val bitmap =
++                context.contentResolver.openInputStream(uri)?.use { BitmapFactory.decodeStream(it, null, options) }
++                    ?: return@withContext emptyList()
++            val palette = Palette.from(bitmap).maximumColorCount(24).generate()
++            bitmap.recycle()
++            listOfNotNull(
++                palette.vibrantSwatch,
++                palette.lightVibrantSwatch,
++                palette.darkVibrantSwatch,
++                palette.mutedSwatch,
++                palette.lightMutedSwatch,
++                palette.darkMutedSwatch,
++                palette.dominantSwatch,
++            ).map { Color(it.rgb) }
++        } catch (e: Exception) {
++            emptyList()
++        }
++    }
++
++/**
++ * Five text colours (light and vivid so they read on the dark glass), three colours for the background and a dark
++ * tint of the cover colour as the background base. [textStrength] makes the text colours paler or more vivid.
++ */
++private fun buildPalette(
++    source: List<Color>,
++    textStrength: Int,
++): KPalette {
++    val distinct = ArrayList<Color>()
++    for (c in source) {
++        val opaque = c.copy(alpha = 1f)
++        if (distinct.none { colorDistance(it, opaque) < 0.2f }) distinct += opaque
++    }
++    if (distinct.isEmpty()) distinct += Color(0xFF7C5CFF)
++    var turn = 0
++    while (distinct.size < 5) {
++        val h = hslOf(distinct[turn % distinct.size])
++        distinct += fromHsl(h[0] + 40f + 35f * turn, max(h[1], 0.6f), 0.5f)
++        turn++
++    }
++    val k = textStrength / 100f
++    val text =
++        distinct.take(5).map { c ->
++            val h = hslOf(c)
++            fromHsl(h[0], max(h[1], 0.5f) * k, h[2].coerceIn(0.62f, 0.8f))
++        }
++    val pools =
++        distinct.take(3).map { c ->
++            val h = hslOf(c)
++            fromHsl(h[0], max(h[1], 0.6f), 0.5f)
++        }
++    val h0 = hslOf(distinct[0])
++    return KPalette(text, pools, fromHsl(h0[0], 0.5f, 0.13f))
++}
++
++@Composable
++private fun rememberKineticPalette(
++    uri: Uri?,
++    textStrength: Int,
++): KPalette {
++    val context = LocalContext.current
++    val cs = MaterialTheme.colorScheme
++    val fallback = remember(cs.primary, cs.tertiary, cs.secondary) { listOf(cs.primary, cs.tertiary, cs.secondary) }
++    var swatches by remember(uri) { mutableStateOf<List<Color>>(emptyList()) }
++    LaunchedEffect(uri) { swatches = extractSwatches(context, uri) }
++    return remember(swatches, fallback, textStrength) { buildPalette(swatches.ifEmpty { fallback }, textStrength) }
++}
++
+ // ==================== entry point ====================
+ 
+ private class RippleBuffer {
+@@ -387,8 +541,6 @@ private class BoxInfo {
+     var h = 1f
+ }
+ 
+-private val NoRipples = FloatArray(32)
+-
+ @Composable
+ internal fun KineticLyricsUI(
+     modifier: Modifier,
+@@ -400,7 +552,10 @@ internal fun KineticLyricsUI(
+ ) {
+     val kLines = remember(lines) { buildKineticLines(lines) }
+     val salt = remember(kLines) { Random.nextInt() }
+-    val accents = kineticAccents()
++    val playerViewModel = LocalPlayerViewModel.current
++    val mediaItem by playerViewModel.currentMediaItem.collectAsStateWithLifecycle()
++    val palette = rememberKineticPalette(mediaItem?.mediaMetadata?.artworkUri, settings.kineticTextStrength)
++    val fonts = rememberKineticFontSlots(settings)
+     val clock = remember { mutableFloatStateOf(0f) }
+     val timeMs = remember { mutableLongStateOf(0L) }
+     val timeProvider by rememberUpdatedState(currentTimeProvider)
+@@ -437,13 +592,17 @@ internal fun KineticLyricsUI(
+                     info.h = max(1f, it.size.height.toFloat())
+                 },
+     ) {
+-        KineticBackground(
+-            clock = clock,
+-            ripples = ripples,
+-            accents = accents,
+-            ripplesOn = settings.kineticRipples,
+-            modifier = Modifier.fillMaxSize(),
+-        )
++        // Ripple effect off: no glass background, the normal player background shows through.
++        if (settings.kineticRipples) {
++            KineticBackground(
++                clock = clock,
++                ripples = ripples,
++                palette = palette,
++                strength = settings.kineticBgStrength,
++                quality = settings.kineticBgQuality,
++                modifier = Modifier.fillMaxSize(),
++            )
++        }
+         val index = lineIndex
+         if (index >= 0 && index < kLines.size) {
+             key(index) {
+@@ -452,7 +611,8 @@ internal fun KineticLyricsUI(
+                     salt = salt,
+                     timeMs = timeMs,
+                     settings = settings,
+-                    accents = accents,
++                    palette = palette,
++                    fonts = fonts,
+                     topInset = topInset,
+                     bottomInset = bottomInset,
+                     onReveal = { rootCenter ->
+@@ -470,27 +630,52 @@ internal fun KineticLyricsUI(
+     }
+ }
+ 
+-@Composable
+-private fun kineticAccents(): List<Color> {
+-    val cs = MaterialTheme.colorScheme
+-    return remember(cs.primary, cs.tertiary, cs.secondary) {
+-        listOf(cs.primary, cs.tertiary, cs.secondary).map { lerpColor(it, Color.White, 0.18f) }
+-    }
+-}
+-
+ private class KCtx(
+     val line: KLine,
+     val revealed: Int,
+     val seed: Int,
+-    val highlights: Set<Int>,
+-    val accent: Color,
++    val look: KLook,
+     val w: Float,
+     val h: Float,
++    val speed: Float,
++    val shadow: Boolean,
++    val glow: Boolean,
++    val blur: Boolean,
++    val flip: Boolean,
++    val letterDelay: Int,
+     val onReveal: (Offset) -> Unit,
+ ) {
+-    fun color(i: Int): Color = if (i in highlights) accent else Color.White
+-
+     fun shown(i: Int): Boolean = i < revealed
++
++    /** One word (or one letter of it) with its own colour and font. */
++    @Composable
++    fun Word(
++        i: Int,
++        fontPx: Float,
++        from: Pose,
++        stiffness: Float,
++        text: String = line.words[i].text,
++        modifier: Modifier = Modifier,
++        delayMs: Int = 0,
++        offscreen: Boolean = true,
++        reveal: Boolean = true,
++    ) {
++        KWordText(
++            text = text,
++            shown = shown(i),
++            from = from,
++            spec = springSpec(stiffness * speed * speed),
++            fontPx = fontPx,
++            color = look.colors[i],
++            fontFamily = look.fonts[i],
++            shadow = shadow,
++            glow = glow,
++            modifier = modifier,
++            delayMs = delayMs,
++            offscreen = offscreen,
++            onReveal = if (reveal) onReveal else null,
++        )
++    }
+ }
+ 
+ @Composable
+@@ -499,20 +684,25 @@ private fun KineticStage(
+     salt: Int,
+     timeMs: State<Long>,
+     settings: LyricsStyleSettings,
+-    accents: List<Color>,
++    palette: KPalette,
++    fonts: List<FontFamily?>,
+     topInset: Dp,
+     bottomInset: Dp,
+     onReveal: (Offset) -> Unit,
+ ) {
+     val seed = line.text.hashCode() xor salt
+     val kind =
+-        remember(line, settings.kineticStyle, seed) {
+-            if (settings.kineticStyle == KineticStyle.Auto) chooseKind(line, seed) else settings.kineticStyle
++        remember(line, settings.kineticStyles, seed) {
++            val styles = settings.kineticStyles
++            if (styles.size == 1 && styles.first() != KineticStyle.Auto) styles.first() else chooseKind(line, seed, styles)
++        }
++    val look =
++        remember(line, seed, palette, settings.kineticTextColors, fonts) {
++            buildLook(line, seed, palette.text.take(settings.kineticTextColors), fonts)
+         }
+-    val highlights = remember(line, seed) { highlightSet(line, seed) }
+     val revealed by remember(line) { derivedStateOf { line.words.count { it.startMs <= timeMs.value } } }
+-    val accent = accents[((seed ushr 3) and 0x7fffffff) % 3]
+     val density = LocalDensity.current
++    val speed = settings.kineticSpeed / 100f
+ 
+     BoxWithConstraints(
+         modifier =
+@@ -523,7 +713,22 @@ private fun KineticStage(
+     ) {
+         val w = with(density) { maxWidth.toPx() }
+         val h = with(density) { maxHeight.toPx() }
+-        val ctx = KCtx(line, revealed, seed, highlights, accent, w, h, onReveal)
++        val ctx =
++            KCtx(
++                line = line,
++                revealed = revealed,
++                seed = seed,
++                look = look,
++                w = w,
++                h = h,
++                speed = speed,
++                shadow = settings.kineticShadow,
++                glow = settings.kineticGlow,
++                blur = settings.kineticBlur,
++                flip = settings.kineticFlip3d,
++                letterDelay = (settings.kineticLetterDelay / speed).toInt(),
++                onReveal = onReveal,
++            )
+         val scale = settings.kineticSize / 100f
+         val shift = (settings.kineticPosition - 50) / 50f * h * 0.35f
+         Box(
+@@ -551,6 +756,7 @@ private fun KineticStage(
+ 
+ // ==================== one animated word ====================
+ 
++@Immutable
+ private data class Pose(
+     val x: Float = 0f,
+     val y: Float = 0f,
+@@ -563,9 +769,16 @@ private data class Pose(
+     val blurPx: Float = 0f,
+ )
+ 
+-private fun springSpec(stiffness: Float): AnimationSpec<Float> = spring(dampingRatio = 1f, stiffness = stiffness)
++private val specCache = HashMap<Float, AnimationSpec<Float>>()
++
++/** One spring per stiffness, so words do not get a new animation spec (and redraw) every time. */
++private fun springSpec(stiffness: Float): AnimationSpec<Float> =
++    specCache.getOrPut(stiffness) { spring<Float>(dampingRatio = 1f, stiffness = stiffness) }
+ 
+-/** A word that glides from the hidden pose [from] to rest when [shown] becomes true. */
++/**
++ * A word that glides from the hidden pose [from] to rest when [shown] becomes true. The word is drawn once into
++ * a texture ([offscreen]) and only that texture is moved, so the shadow and glow are not redrawn every frame.
++ */
+ @Composable
+ private fun KWordText(
+     text: String,
+@@ -574,19 +787,22 @@ private fun KWordText(
+     spec: AnimationSpec<Float>,
+     fontPx: Float,
+     color: Color,
++    fontFamily: FontFamily?,
++    shadow: Boolean,
+     glow: Boolean,
+     modifier: Modifier = Modifier,
+     delayMs: Int = 0,
++    offscreen: Boolean = true,
+     onReveal: ((Offset) -> Unit)? = null,
+ ) {
+     val density = LocalDensity.current
+     val progress = remember { Animatable(0f) }
+-    var coords by remember { mutableStateOf<LayoutCoordinates?>(null) }
++    val holder = remember { arrayOfNulls<LayoutCoordinates>(1) }
+     val reveal by rememberUpdatedState(onReveal)
+     LaunchedEffect(shown) {
+         if (shown) {
+             if (delayMs > 0) delay(delayMs.toLong())
+-            coords?.takeIf { it.isAttached }?.let { c ->
++            holder[0]?.takeIf { it.isAttached }?.let { c ->
+                 reveal?.invoke(c.positionInRoot() + Offset(c.size.width / 2f, c.size.height / 2f))
+             }
+             progress.animateTo(1f, spec)
+@@ -595,25 +811,28 @@ private fun KWordText(
+         }
+     }
+     val fontSp = with(density) { fontPx.toSp() }
+-    val shadow =
+-        if (glow) {
+-            Shadow(color.copy(alpha = 0.55f), Offset.Zero, fontPx * 0.6f)
+-        } else {
+-            Shadow(Color.Black.copy(alpha = 0.5f), Offset(0f, fontPx * 0.035f), fontPx * 0.22f)
++    val textShadow =
++        remember(color, fontPx, shadow, glow) {
++            when {
++                glow -> Shadow(color.copy(alpha = 0.55f), Offset.Zero, fontPx * 0.6f)
++                shadow -> Shadow(Color.Black.copy(alpha = 0.5f), Offset(0f, fontPx * 0.035f), fontPx * 0.22f)
++                else -> null
++            }
+         }
+     Text(
+         text = text.uppercase(),
+         color = color,
+         fontSize = fontSp,
++        fontFamily = fontFamily,
+         fontWeight = FontWeight.Black,
+         letterSpacing = (-0.02f).em,
+         lineHeight = fontSp * 1.05f,
+         softWrap = false,
+         maxLines = 1,
+-        style = TextStyle(shadow = shadow),
++        style = TextStyle(shadow = textShadow),
+         modifier =
+             modifier
+-                .onGloballyPositioned { coords = it }
++                .onGloballyPositioned { holder[0] = it }
+                 .graphicsLayer {
+                     val p = progress.value
+                     val h = 1f - p
+@@ -626,6 +845,7 @@ private fun KWordText(
+                     rotationZ = from.rotate * h
+                     rotationX = from.rotateX * h
+                     cameraDistance = 12f * this.density
++                    compositingStrategy = if (offscreen) CompositingStrategy.Offscreen else CompositingStrategy.Auto
+                     renderEffect =
+                         if (from.blurPx > 0f && h > 0.02f && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                             val r = from.blurPx * h
+@@ -660,9 +880,7 @@ private fun StackTemplate(c: KCtx) {
+             FlowRow(
+                 horizontalArrangement = Arrangement.spacedBy(gap, if (left) Alignment.Start else Alignment.End),
+             ) {
+-                row.forEach { i ->
+-                    KWordText(c.line.words[i].text, c.shown(i), from, springSpec(150f), fontPx, c.color(i), i in c.highlights, onReveal = c.onReveal)
+-                }
++                row.forEach { i -> c.Word(i, fontPx, from, 150f) }
+             }
+         }
+     }
+@@ -694,28 +912,30 @@ private fun SlideTemplate(c: KCtx) {
+                         .padding(start = px2dp(indent * c.w / 100f)),
+                 horizontalArrangement = Arrangement.spacedBy(gap),
+             ) {
+-                row.forEach { i ->
+-                    KWordText(c.line.words[i].text, c.shown(i), from, springSpec(120f), fontPx, c.color(i), i in c.highlights, onReveal = c.onReveal)
+-                }
++                row.forEach { i -> c.Word(i, fontPx, from, 120f) }
+             }
+         }
+     }
+ }
+ 
+-/** Words fly in huge and blurred, settling into centred rows. */
++/** Words fly in huge (and blurred when allowed), settling into centred rows. */
+ @OptIn(ExperimentalLayoutApi::class)
+ @Composable
+ private fun ZoomTemplate(c: KCtx) {
+     val rows = groupRows(c.line.words, ceil(c.line.words.size / 2f).toInt().coerceIn(1, 4))
+     val fontPx = fitRows(c, rows, 90f, 17f)
+     val gap = px2dp(fontPx * 0.25f)
+-    val from = Pose(scale = 2.6f, alpha = 0f, scaleY = 0.75f, blurPx = fontPx * 0.25f)
++    val from =
++        Pose(
++            scale = if (c.blur) 2.6f else 1.8f,
++            alpha = 0f,
++            scaleY = 0.75f,
++            blurPx = if (c.blur) fontPx * 0.25f else 0f,
++        )
+     Column(modifier = Modifier.fillMaxWidth(0.94f), horizontalAlignment = Alignment.CenterHorizontally) {
+         rows.forEach { row ->
+             FlowRow(horizontalArrangement = Arrangement.spacedBy(gap, Alignment.CenterHorizontally)) {
+-                row.forEach { i ->
+-                    KWordText(c.line.words[i].text, c.shown(i), from, springSpec(80f), fontPx, c.color(i), i in c.highlights, onReveal = c.onReveal)
+-                }
++                row.forEach { i -> c.Word(i, fontPx, from, 80f) }
+             }
+         }
+     }
+@@ -730,7 +950,12 @@ private fun LettersTemplate(c: KCtx) {
+     val rows = groupRows(c.line.words, ceil(c.line.words.size / 2f).toInt().coerceIn(1, 4))
+     val fontPx = fitRows(c, rows, 90f, 16f)
+     val gap = px2dp(fontPx * 0.25f)
+-    val from = Pose(rotateX = if (fromTop) 90f else -90f, y = if (fromTop) -0.4f else 0.4f, alpha = 0f)
++    val from =
++        Pose(
++            rotateX = if (c.flip) (if (fromTop) 90f else -90f) else 0f,
++            y = if (fromTop) -0.4f else 0.4f,
++            alpha = 0f,
++        )
+     Column(modifier = Modifier.fillMaxWidth(0.94f), horizontalAlignment = Alignment.CenterHorizontally) {
+         rows.forEach { row ->
+             FlowRow(horizontalArrangement = Arrangement.spacedBy(gap, Alignment.CenterHorizontally)) {
+@@ -738,16 +963,15 @@ private fun LettersTemplate(c: KCtx) {
+                     val letters = remember(c.line.words[i].text) { splitLetters(c.line.words[i].text) }
+                     Row {
+                         letters.forEachIndexed { j, ch ->
+-                            KWordText(
+-                                ch,
+-                                c.shown(i),
+-                                from,
+-                                springSpec(160f),
+-                                fontPx,
+-                                c.color(i),
+-                                i in c.highlights,
+-                                delayMs = j * 30,
+-                                onReveal = if (j == 0) c.onReveal else null,
++                            c.Word(
++                                i = i,
++                                fontPx = fontPx,
++                                from = from,
++                                stiffness = 160f,
++                                text = ch,
++                                delayMs = j * c.letterDelay,
++                                offscreen = false,
++                                reveal = j == 0,
+                             )
+                         }
+                     }
+@@ -780,18 +1004,14 @@ private fun ScatterTemplate(c: KCtx) {
+         horizontalArrangement = Arrangement.spacedBy(gap, Alignment.CenterHorizontally),
+         verticalArrangement = Arrangement.spacedBy(px2dp(base * 0.1f), Alignment.CenterVertically),
+     ) {
+-        c.line.words.forEachIndexed { i, w ->
++        c.line.words.indices.forEach { i ->
+             val (scale, offset, from) = layout[i]
+-            KWordText(
+-                w.text,
+-                c.shown(i),
+-                from,
+-                springSpec(150f),
+-                base * scale,
+-                c.color(i),
+-                i in c.highlights,
++            c.Word(
++                i = i,
++                fontPx = base * scale,
++                from = from,
++                stiffness = 150f,
+                 modifier = Modifier.offset(y = px2dp(base * offset)),
+-                onReveal = c.onReveal,
+             )
+         }
+     }
+@@ -807,6 +1027,7 @@ private fun FlowTemplate(c: KCtx) {
+     val gap = px2dp(fontPx * 0.26f)
+     val density = LocalDensity.current
+     val fontSp = with(density) { fontPx.toSp() }
++    val fade = (300 / c.speed).toInt()
+     FlowRow(
+         modifier = Modifier.fillMaxWidth(0.92f),
+         horizontalArrangement = Arrangement.spacedBy(gap, Alignment.CenterHorizontally),
+@@ -814,28 +1035,36 @@ private fun FlowTemplate(c: KCtx) {
+         c.line.words.forEachIndexed { i, w ->
+             val sung = c.shown(i)
+             val active = i == c.revealed - 1
+-            val a by animateFloatAsState(if (sung) 1f else 0.32f, tween(300), label = "flowAlpha")
+-            val s by animateFloatAsState(if (active) 1.03f else 1f, tween(300), label = "flowScale")
+-            val color = if (sung) c.color(i) else Color.White
+-            var coords by remember { mutableStateOf<LayoutCoordinates?>(null) }
++            val a by animateFloatAsState(if (sung) 1f else 0.32f, tween(fade), label = "flowAlpha")
++            val s by animateFloatAsState(if (active) 1.03f else 1f, tween(fade), label = "flowScale")
++            val holder = remember { arrayOfNulls<LayoutCoordinates>(1) }
+             LaunchedEffect(sung) {
+                 if (sung) {
+-                    coords?.takeIf { it.isAttached }?.let { cc ->
++                    holder[0]?.takeIf { it.isAttached }?.let { cc ->
+                         c.onReveal(cc.positionInRoot() + Offset(cc.size.width / 2f, cc.size.height / 2f))
+                     }
+                 }
+             }
+             Text(
+                 text = w.text.uppercase(),
+-                color = color,
++                color = c.look.colors[i],
+                 fontSize = fontSp,
++                fontFamily = c.look.fonts[i],
+                 fontWeight = FontWeight.ExtraBold,
+                 letterSpacing = (-0.02f).em,
+                 lineHeight = fontSp * 1.12f,
+-                style = TextStyle(shadow = Shadow(Color.Black.copy(alpha = 0.5f), Offset(0f, fontPx * 0.035f), fontPx * 0.22f)),
++                style =
++                    TextStyle(
++                        shadow =
++                            if (c.shadow) {
++                                Shadow(Color.Black.copy(alpha = 0.5f), Offset(0f, fontPx * 0.035f), fontPx * 0.22f)
++                            } else {
++                                null
++                            },
++                    ),
+                 modifier =
+                     Modifier
+-                        .onGloballyPositioned { coords = it }
++                        .onGloballyPositioned { holder[0] = it }
+                         .graphicsLayer {
+                             alpha = a
+                             scaleX = s
+@@ -961,27 +1190,31 @@ private fun GraphTemplate(c: KCtx) {
+     val nodes = remember(c.line, c.seed, c.w, c.h) { layoutGraph(words, c.seed, c.w, c.h) }
+     val segs = remember(nodes) { graphSegments(words, nodes) }
+     val progress = remember(segs) { segs.map { Animatable(0f) } }
++    val drawMs = (800 / c.speed).toInt()
+     LaunchedEffect(c.revealed, segs) {
+         segs.forEachIndexed { i, s ->
+-            launch { progress[i].animateTo(if (s.dest < c.revealed) 1f else 0f, tween(800)) }
++            launch { progress[i].animateTo(if (s.dest < c.revealed) 1f else 0f, tween(drawMs)) }
+         }
+     }
+     val strokeWidth = max(2f, nodes.firstOrNull { !it.leaf }?.font?.times(0.05f) ?: 2f)
+     val from = Pose(y = 0.5f, alpha = 0f, scale = 0.8f)
++    val lineColor = c.look.accent.copy(alpha = 0.9f)
+     Layout(
+         content = {
+-            words.forEachIndexed { i, t ->
+-                KWordText(t, c.shown(i), from, springSpec(150f), nodes[i].font, c.color(i), i in c.highlights, onReveal = c.onReveal)
+-            }
++            words.indices.forEach { i -> c.Word(i, nodes[i].font, from, 150f) }
+         },
+         modifier =
+             Modifier
+                 .size(px2dp(c.w), px2dp(c.h))
+                 .drawBehind {
++                    val path = Path()
++                    val part = Path()
++                    val measure = PathMeasure()
+                     segs.forEachIndexed { i, s ->
+                         val p = progress[i].value.coerceIn(0f, 1f)
+                         if (p <= 0.001f) return@forEachIndexed
+-                        val path = Path()
++                        path.reset()
++                        part.reset()
+                         path.moveTo(s.a.x, s.a.y)
+                         if (s.horizontal) {
+                             val mx = (s.a.x + s.b.x) / 2f
+@@ -990,11 +1223,9 @@ private fun GraphTemplate(c: KCtx) {
+                             val my = (s.a.y + s.b.y) / 2f
+                             path.cubicTo(s.a.x, my, s.b.x, my, s.b.x, s.b.y)
+                         }
+-                        val measure = PathMeasure()
+                         measure.setPath(path, false)
+-                        val part = Path()
+                         measure.getSegment(0f, measure.length * p, part, true)
+-                        drawPath(part, c.accent.copy(alpha = 0.9f), style = Stroke(width = strokeWidth, cap = StrokeCap.Round))
++                        drawPath(part, lineColor, style = Stroke(width = strokeWidth, cap = StrokeCap.Round))
+                     }
+                 },
+     ) { measurables, constraints ->
+@@ -1010,12 +1241,34 @@ private fun GraphTemplate(c: KCtx) {
+ 
+ // ==================== background ====================
+ 
++/** Draws the content at [quality] of the screen resolution and scales it up (much less work on high-resolution screens). */
++private fun Modifier.lowRes(quality: Float): Modifier =
++    if (quality >= 0.99f) {
++        this
++    } else {
++        layout { measurable, constraints ->
++            val q = quality.coerceIn(0.2f, 1f)
++            val w = max(2, (constraints.maxWidth * q).roundToInt())
++            val h = max(2, (constraints.maxHeight * q).roundToInt())
++            val placeable = measurable.measure(Constraints.fixed(w, h))
++            layout(constraints.maxWidth, constraints.maxHeight) {
++                placeable.placeWithLayer(0, 0) {
++                    scaleX = 1f / q
++                    scaleY = 1f / q
++                    transformOrigin = TransformOrigin(0f, 0f)
++                    compositingStrategy = CompositingStrategy.Offscreen
++                }
++            }
++        }
++    }
++
+ @Composable
+ private fun KineticBackground(
+     clock: State<Float>,
+     ripples: RippleBuffer,
+-    accents: List<Color>,
+-    ripplesOn: Boolean,
++    palette: KPalette,
++    strength: Int,
++    quality: Int,
+     modifier: Modifier,
+ ) {
+     val shader =
+@@ -1026,10 +1279,11 @@ private fun KineticBackground(
+                 null
+             }
+         }
++    val lowRes = modifier.lowRes(quality / 100f)
+     if (shader != null && Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+-        AgslBackground(shader, clock, ripples, accents, ripplesOn, modifier)
++        AgslBackground(shader, clock, ripples, palette, strength / 100f, lowRes)
+     } else {
+-        FallbackBackground(clock, ripples, accents, ripplesOn, modifier)
++        FallbackBackground(clock, ripples, palette, strength / 100f, lowRes)
+     }
+ }
+ 
+@@ -1039,19 +1293,18 @@ private fun AgslBackground(
+     shader: RuntimeShader,
+     clock: State<Float>,
+     ripples: RippleBuffer,
+-    accents: List<Color>,
+-    ripplesOn: Boolean,
++    palette: KPalette,
++    k: Float,
+     modifier: Modifier,
+ ) {
+     val brush = remember(shader) { ShaderBrush(shader) }
+     Canvas(modifier) {
+         shader.setFloatUniform("uRes", size.width, size.height)
+         shader.setFloatUniform("uTime", clock.value)
+-        shader.setFloatUniform("uC0", accents[0].red, accents[0].green, accents[0].blue)
+-        shader.setFloatUniform("uC1", accents[1].red, accents[1].green, accents[1].blue)
+-        shader.setFloatUniform("uC2", accents[2].red, accents[2].green, accents[2].blue)
+-        shader.setFloatUniform("uBase", KineticBase.red, KineticBase.green, KineticBase.blue)
+-        shader.setFloatUniform("uRip", if (ripplesOn) ripples.data else NoRipples)
++        palette.pools.forEachIndexed { i, c -> shader.setFloatUniform("uC$i", c.red * k, c.green * k, c.blue * k) }
++        val bk = 0.5f + 0.5f * k
++        shader.setFloatUniform("uBase", palette.base.red * bk, palette.base.green * bk, palette.base.blue * bk)
++        shader.setFloatUniform("uRip", ripples.data)
+         drawRect(brush)
+     }
+ }
+@@ -1061,13 +1314,13 @@ private fun AgslBackground(
+ private fun FallbackBackground(
+     clock: State<Float>,
+     ripples: RippleBuffer,
+-    accents: List<Color>,
+-    ripplesOn: Boolean,
++    palette: KPalette,
++    k: Float,
+     modifier: Modifier,
+ ) {
+     Canvas(modifier) {
+         val t = clock.value
+-        drawRect(KineticBase)
++        drawRect(palette.base)
+         val spots =
+             listOf(
+                 Offset(0.25f + 0.08f * sin(t * 0.17f), 0.3f + 0.06f * sin(t * 0.13f + 1f)),
+@@ -1078,22 +1331,20 @@ private fun FallbackBackground(
+             val center = Offset(s.x * size.width, s.y * size.height)
+             val radius = max(size.width, size.height) * 0.6f
+             drawCircle(
+-                brush = Brush.radialGradient(listOf(accents[i].copy(alpha = 0.4f), Color.Transparent), center, radius),
++                brush = Brush.radialGradient(listOf(palette.pools[i].copy(alpha = (0.4f * k).coerceIn(0f, 1f)), Color.Transparent), center, radius),
+                 radius = radius,
+                 center = center,
+             )
+         }
+-        if (ripplesOn) {
+-            for (i in 0 until 8) {
+-                val age = t - ripples.data[i * 4 + 2]
+-                if (ripples.data[i * 4 + 3] <= 0f || age < 0f || age > 3.5f) continue
+-                drawCircle(
+-                    color = Color.White.copy(alpha = 0.14f * (1f - age / 3.5f)),
+-                    radius = age * 0.32f * size.height,
+-                    center = Offset(ripples.data[i * 4] * size.width, ripples.data[i * 4 + 1] * size.height),
+-                    style = Stroke(width = 3f),
+-                )
+-            }
++        for (i in 0 until 8) {
++            val age = t - ripples.data[i * 4 + 2]
++            if (ripples.data[i * 4 + 3] <= 0f || age < 0f || age > 3.5f) continue
++            drawCircle(
++                color = Color.White.copy(alpha = 0.14f * (1f - age / 3.5f)),
++                radius = age * 0.32f * size.height,
++                center = Offset(ripples.data[i * 4] * size.width, ripples.data[i * 4 + 1] * size.height),
++                style = Stroke(width = 3f),
++            )
+         }
+     }
+ }
+diff --git a/app/src/main/java/me/spica27/spicamusic/ui/widget/LyricsSettingsComponents.kt b/app/src/main/java/me/spica27/spicamusic/ui/widget/LyricsSettingsComponents.kt
+index b0d806b..23f123d 100644
+--- a/app/src/main/java/me/spica27/spicamusic/ui/widget/LyricsSettingsComponents.kt
++++ b/app/src/main/java/me/spica27/spicamusic/ui/widget/LyricsSettingsComponents.kt
+@@ -141,6 +141,42 @@ internal fun <T> LyricsSettingsChips(
+     }
+ }
+ 
++/** Row of selectable chips where several can be on at the same time. */
++@OptIn(ExperimentalLayoutApi::class)
++@Composable
++internal fun <T> LyricsSettingsMultiChips(
++    label: String,
++    description: String,
++    options: List<T>,
++    isSelected: (T) -> Boolean,
++    optionLabel: @Composable (T) -> String,
++    optionFont: (T) -> FontFamily? = { null },
++    onToggle: (T) -> Unit,
++) {
++    Column(modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp)) {
++        LabelBlock(label = label, description = description)
++        FlowRow(
++            modifier = Modifier.padding(top = 8.dp),
++            horizontalArrangement = Arrangement.spacedBy(8.dp),
++        ) {
++            options.forEach { option ->
++                FilterChip(
++                    selected = isSelected(option),
++                    onClick = { onToggle(option) },
++                    label = {
++                        Text(
++                            text = optionLabel(option),
++                            style = TextStyle(fontFamily = optionFont(option)),
++                            maxLines = 1,
++                            overflow = TextOverflow.Ellipsis,
++                        )
++                    },
++                )
++            }
++        }
++    }
++}
++
+ /** Label + switch. Used by the sections that come with the next parts. */
+ @Composable
+ internal fun LyricsSettingsToggle(
+diff --git a/app/src/main/java/me/spica27/spicamusic/ui/widget/LyricsSettingsSheet.kt b/app/src/main/java/me/spica27/spicamusic/ui/widget/LyricsSettingsSheet.kt
+index 8e94745..93c7236 100644
+--- a/app/src/main/java/me/spica27/spicamusic/ui/widget/LyricsSettingsSheet.kt
++++ b/app/src/main/java/me/spica27/spicamusic/ui/widget/LyricsSettingsSheet.kt
+@@ -1,5 +1,18 @@
+ package me.spica27.spicamusic.ui.widget
+ 
++import android.widget.Toast
++import androidx.activity.compose.rememberLauncherForActivityResult
++import androidx.activity.result.contract.ActivityResultContracts
++import androidx.compose.material3.OutlinedButton
++import androidx.compose.material3.Text
++import androidx.compose.runtime.mutableStateListOf
++import androidx.compose.runtime.remember
++import androidx.compose.runtime.rememberCoroutineScope
++import androidx.compose.ui.platform.LocalContext
++import kotlinx.coroutines.launch
++import me.spica27.spicamusic.core.preferences.KineticPreset
++import me.spica27.spicamusic.core.preferences.kineticPresetOrNull
++import me.spica27.spicamusic.core.preferences.withKineticPreset
+ import androidx.compose.foundation.layout.Column
+ import androidx.compose.foundation.layout.fillMaxWidth
+ import androidx.compose.foundation.layout.navigationBarsPadding
+@@ -1016,6 +1029,18 @@ private fun EnhanceHeaderSection(
+     )
+ }
+ 
++private fun toggleKineticStyle(
++    current: Set<KineticStyle>,
++    style: KineticStyle,
++): Set<KineticStyle> =
++    if (style == KineticStyle.Auto) {
++        setOf(KineticStyle.Auto)
++    } else {
++        val base = current - KineticStyle.Auto
++        val next = if (style in base) base - style else base + style
++        next.ifEmpty { setOf(KineticStyle.Auto) }
++    }
++
+ @Composable
+ private fun KineticSection(
+     settings: LyricsStyleSettings,
+@@ -1031,11 +1056,11 @@ private fun KineticSection(
+     )
+     if (!settings.kineticEnabled) return
+ 
+-    LyricsSettingsChips(
++    LyricsSettingsMultiChips(
+         label = stringResource(R.string.lyr_set_kinetic_style),
+         description = stringResource(R.string.lyr_set_kinetic_style_desc),
+         options = KineticStyle.entries,
+-        selected = settings.kineticStyle,
++        isSelected = { it in settings.kineticStyles },
+         optionLabel = { style ->
+             stringResource(
+                 when (style) {
+@@ -1050,7 +1075,7 @@ private fun KineticSection(
+                 },
+             )
+         },
+-        onSelect = { style -> onUpdate { it.copy(kineticStyle = style) } },
++        onToggle = { style -> onUpdate { it.copy(kineticStyles = toggleKineticStyle(it.kineticStyles, style)) } },
+     )
+     LyricsSettingsSlider(
+         label = stringResource(R.string.lyr_set_kinetic_size),
+@@ -1080,10 +1105,201 @@ private fun KineticSection(
+         },
+         onValueChange = { v -> onUpdate { it.copy(kineticPosition = v) } },
+     )
++
++    // ---- Text animation ----
++    LyricsSettingsSection(stringResource(R.string.lyr_set_kinetic_section_text))
++    LyricsSettingsChips(
++        label = stringResource(R.string.lyr_set_kinetic_preset),
++        description = stringResource(R.string.lyr_set_kinetic_preset_desc),
++        options = KineticPreset.entries,
++        selected = settings.kineticPresetOrNull(),
++        optionLabel = { preset ->
++            when (preset) {
++                KineticPreset.Light -> stringResource(R.string.lyr_set_kinetic_preset_light)
++                KineticPreset.Balanced -> stringResource(R.string.lyr_set_kinetic_preset_balanced)
++                KineticPreset.Full -> stringResource(R.string.lyr_set_kinetic_preset_full)
++                null -> ""
++            }
++        },
++        onSelect = { preset -> if (preset != null) onUpdate { it.withKineticPreset(preset) } },
++    )
++    LyricsSettingsSlider(
++        label = stringResource(R.string.lyr_set_kinetic_speed),
++        description = stringResource(R.string.lyr_set_kinetic_speed_desc),
++        value = settings.kineticSpeed,
++        range = LyricsStyleSettings.KINETIC_SPEED_RANGE,
++        step = 10,
++        valueText = { "$it%" },
++        onValueChange = { v -> onUpdate { it.copy(kineticSpeed = v) } },
++    )
++    LyricsSettingsSlider(
++        label = stringResource(R.string.lyr_set_kinetic_letter_delay),
++        description = stringResource(R.string.lyr_set_kinetic_letter_delay_desc),
++        value = settings.kineticLetterDelay,
++        range = LyricsStyleSettings.KINETIC_LETTER_DELAY_RANGE,
++        step = 5,
++        valueText = { "$it ms" },
++        onValueChange = { v -> onUpdate { it.copy(kineticLetterDelay = v) } },
++    )
++    LyricsSettingsToggle(
++        label = stringResource(R.string.lyr_set_kinetic_shadow),
++        description = stringResource(R.string.lyr_set_kinetic_shadow_desc),
++        checked = settings.kineticShadow,
++        onCheckedChange = { v -> onUpdate { it.copy(kineticShadow = v) } },
++    )
++    LyricsSettingsToggle(
++        label = stringResource(R.string.lyr_set_kinetic_glow),
++        description = stringResource(R.string.lyr_set_kinetic_glow_desc),
++        checked = settings.kineticGlow,
++        onCheckedChange = { v -> onUpdate { it.copy(kineticGlow = v) } },
++    )
++    LyricsSettingsToggle(
++        label = stringResource(R.string.lyr_set_kinetic_blur),
++        description = stringResource(R.string.lyr_set_kinetic_blur_desc),
++        checked = settings.kineticBlur,
++        onCheckedChange = { v -> onUpdate { it.copy(kineticBlur = v) } },
++    )
++    LyricsSettingsToggle(
++        label = stringResource(R.string.lyr_set_kinetic_flip),
++        description = stringResource(R.string.lyr_set_kinetic_flip_desc),
++        checked = settings.kineticFlip3d,
++        onCheckedChange = { v -> onUpdate { it.copy(kineticFlip3d = v) } },
++    )
++
++    // ---- Colours ----
++    LyricsSettingsSlider(
++        label = stringResource(R.string.lyr_set_kinetic_text_colors),
++        description = stringResource(R.string.lyr_set_kinetic_text_colors_desc),
++        value = settings.kineticTextColors,
++        range = LyricsStyleSettings.KINETIC_TEXT_COLORS_RANGE,
++        step = 1,
++        valueText = { "$it" },
++        onValueChange = { v -> onUpdate { it.copy(kineticTextColors = v) } },
++    )
++    LyricsSettingsSlider(
++        label = stringResource(R.string.lyr_set_kinetic_text_strength),
++        description = stringResource(R.string.lyr_set_kinetic_text_strength_desc),
++        value = settings.kineticTextStrength,
++        range = LyricsStyleSettings.KINETIC_TEXT_STRENGTH_RANGE,
++        step = 10,
++        valueText = { "$it%" },
++        onValueChange = { v -> onUpdate { it.copy(kineticTextStrength = v) } },
++    )
++
++    // ---- Fonts ----
++    KineticFontsSection(settings = settings, onUpdate = onUpdate)
++
++    // ---- Background ----
++    LyricsSettingsSection(stringResource(R.string.lyr_set_kinetic_section_bg))
+     LyricsSettingsToggle(
+         label = stringResource(R.string.lyr_set_kinetic_ripples),
+         description = stringResource(R.string.lyr_set_kinetic_ripples_desc),
+         checked = settings.kineticRipples,
+         onCheckedChange = { v -> onUpdate { it.copy(kineticRipples = v) } },
+     )
++    if (settings.kineticRipples) {
++        LyricsSettingsSlider(
++            label = stringResource(R.string.lyr_set_kinetic_bg_quality),
++            description = stringResource(R.string.lyr_set_kinetic_bg_quality_desc),
++            value = settings.kineticBgQuality,
++            range = LyricsStyleSettings.KINETIC_BG_QUALITY_RANGE,
++            step = 10,
++            valueText = { "$it%" },
++            onValueChange = { v -> onUpdate { it.copy(kineticBgQuality = v) } },
++        )
++        LyricsSettingsSlider(
++            label = stringResource(R.string.lyr_set_kinetic_bg_strength),
++            description = stringResource(R.string.lyr_set_kinetic_bg_strength_desc),
++            value = settings.kineticBgStrength,
++            range = LyricsStyleSettings.KINETIC_BG_STRENGTH_RANGE,
++            step = 10,
++            valueText = { "$it%" },
++            onValueChange = { v -> onUpdate { it.copy(kineticBgStrength = v) } },
++        )
++    }
++}
++
++@Composable
++private fun KineticFontsSection(
++    settings: LyricsStyleSettings,
++    onUpdate: ((LyricsStyleSettings) -> LyricsStyleSettings) -> Unit,
++) {
++    val context = LocalContext.current
++    val scope = rememberCoroutineScope()
++    val busy = remember { mutableStateListOf<String>() }
++    val options = rememberKineticFontOptions()
++    val chosen = settings.kineticFonts.split(',').filter { it.isNotBlank() }
++
++    fun addFont(id: String) {
++        onUpdate { s -> if (id in s.kineticFonts.split(',')) s else s.copy(kineticFonts = (s.kineticFonts.split(',').filter { it.isNotBlank() } + id).joinToString(",")) }
++    }
++
++    val importLauncher =
++        rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
++            if (uri != null) {
++                scope.launch {
++                    val id = KineticFontStore.importFont(context, uri)
++                    if (id != null) {
++                        addFont(id)
++                        Toast.makeText(context, R.string.lyr_set_kinetic_font_import_ok, Toast.LENGTH_SHORT).show()
++                    } else {
++                        Toast.makeText(context, R.string.lyr_set_kinetic_font_import_fail, Toast.LENGTH_SHORT).show()
++                    }
++                }
++            }
++        }
++
++    LyricsSettingsSection(stringResource(R.string.lyr_set_kinetic_section_fonts))
++    LyricsSettingsToggle(
++        label = stringResource(R.string.lyr_set_kinetic_font_mix),
++        description = stringResource(R.string.lyr_set_kinetic_font_mix_desc),
++        checked = settings.kineticFontMix,
++        onCheckedChange = { v -> onUpdate { it.copy(kineticFontMix = v) } },
++    )
++    if (!settings.kineticFontMix) return
++
++    LyricsSettingsSlider(
++        label = stringResource(R.string.lyr_set_kinetic_font_count),
++        description = stringResource(R.string.lyr_set_kinetic_font_count_desc),
++        value = settings.kineticFontCount,
++        range = LyricsStyleSettings.KINETIC_FONT_COUNT_RANGE,
++        step = 1,
++        valueText = { "$it" },
++        onValueChange = { v -> onUpdate { it.copy(kineticFontCount = v) } },
++    )
++    LyricsSettingsMultiChips(
++        label = stringResource(R.string.lyr_set_kinetic_font_pick),
++        description = stringResource(R.string.lyr_set_kinetic_font_pick_desc),
++        options = options,
++        isSelected = { it.id in chosen },
++        optionLabel = { option ->
++            when {
++                option.id in busy -> option.label + " …"
++                !option.available -> option.label + " ↓"
++                else -> option.label
++            }
++        },
++        optionFont = { option -> if (option.available) KineticFontStore.family(context, option.id) else null },
++        onToggle = { option ->
++            if (option.id in chosen) {
++                onUpdate { s -> s.copy(kineticFonts = s.kineticFonts.split(',').filter { it.isNotBlank() && it != option.id }.joinToString(",")) }
++            } else if (option.available) {
++                addFont(option.id)
++            } else if (option.id !in busy) {
++                busy.add(option.id)
++                scope.launch {
++                    val ok = KineticFontStore.download(context, option)
++                    busy.remove(option.id)
++                    if (ok) {
++                        addFont(option.id)
++                    } else {
++                        Toast.makeText(context, R.string.lyr_set_kinetic_font_download_fail, Toast.LENGTH_LONG).show()
++                    }
++                }
++            }
++        },
++    )
++    OutlinedButton(onClick = { importLauncher.launch(arrayOf("*/*")) }) {
++        Text(stringResource(R.string.lyr_set_kinetic_font_import))
++    }
+ }
+diff --git a/app/src/main/res/values-zh-rTW/strings.xml b/app/src/main/res/values-zh-rTW/strings.xml
+index 0b48f1d..93dc93e 100644
+--- a/app/src/main/res/values-zh-rTW/strings.xml
++++ b/app/src/main/res/values-zh-rTW/strings.xml
+@@ -1043,7 +1043,7 @@
+   <string name="lyr_set_kinetic">動態效果</string>
+   <string name="lyr_set_kinetic_desc">文字動畫配流動玻璃背景</string>
+   <string name="lyr_set_kinetic_style">樣式</string>
+-  <string name="lyr_set_kinetic_style_desc">自動為每一行選擇樣式</string>
++  <string name="lyr_set_kinetic_style_desc">可多選。選多個時每行隨機選一種</string>
+   <string name="lyr_set_kinetic_auto">自動</string>
+   <string name="lyr_set_kinetic_stack">堆疊</string>
+   <string name="lyr_set_kinetic_slide">滑動</string>
+@@ -1060,5 +1060,43 @@
+   <string name="lyr_set_kinetic_pos_middle">中間</string>
+   <string name="lyr_set_kinetic_pos_bottom">底部</string>
+   <string name="lyr_set_kinetic_ripples">漣漪效果</string>
+-  <string name="lyr_set_kinetic_ripples_desc">唱到每個詞時背景泛起漣漪</string>
++  <string name="lyr_set_kinetic_ripples_desc">開：玻璃背景和漣漪；關：使用原本的播放器背景</string>
++  <string name="lyr_set_kinetic_section_text">文字動畫</string>
++  <string name="lyr_set_kinetic_preset">預設</string>
++  <string name="lyr_set_kinetic_preset_desc">輕量最流暢，適合較慢的手機</string>
++  <string name="lyr_set_kinetic_preset_light">輕量</string>
++  <string name="lyr_set_kinetic_preset_balanced">均衡</string>
++  <string name="lyr_set_kinetic_preset_full">完整</string>
++  <string name="lyr_set_kinetic_speed">動畫速度</string>
++  <string name="lyr_set_kinetic_speed_desc">文字移動更快或更慢</string>
++  <string name="lyr_set_kinetic_letter_delay">字母延遲</string>
++  <string name="lyr_set_kinetic_letter_delay_desc">字母樣式中字母之間的間隔</string>
++  <string name="lyr_set_kinetic_shadow">文字陰影</string>
++  <string name="lyr_set_kinetic_shadow_desc">每個詞下方的柔和陰影</string>
++  <string name="lyr_set_kinetic_glow">文字發光</string>
++  <string name="lyr_set_kinetic_glow_desc">每個詞周圍的柔和光暈（較耗效能）</string>
++  <string name="lyr_set_kinetic_blur">Zoom 模糊</string>
++  <string name="lyr_set_kinetic_blur_desc">Zoom 樣式中文字從模糊開始</string>
++  <string name="lyr_set_kinetic_flip">3D 字母翻轉</string>
++  <string name="lyr_set_kinetic_flip_desc">字母翻入（字母樣式）</string>
++  <string name="lyr_set_kinetic_text_colors">文字顏色數量</string>
++  <string name="lyr_set_kinetic_text_colors_desc">歌詞使用的專輯顏色數量，每行使用其中兩種</string>
++  <string name="lyr_set_kinetic_text_strength">文字顏色強度</string>
++  <string name="lyr_set_kinetic_text_strength_desc">文字顏色更淡或更鮮豔</string>
++  <string name="lyr_set_kinetic_section_fonts">字體</string>
++  <string name="lyr_set_kinetic_font_mix">混合字體</string>
++  <string name="lyr_set_kinetic_font_mix_desc">每種顏色對應一種字體，字體與顏色相配</string>
++  <string name="lyr_set_kinetic_font_count">混合字體數量</string>
++  <string name="lyr_set_kinetic_font_count_desc">使用下方選擇的前幾種字體</string>
++  <string name="lyr_set_kinetic_font_pick">選擇字體</string>
++  <string name="lyr_set_kinetic_font_pick_desc">帶箭頭的字體（如 Playfair Display）在首次選擇時下載</string>
++  <string name="lyr_set_kinetic_font_import">匯入字體（TTF 或 OTF）</string>
++  <string name="lyr_set_kinetic_font_import_ok">字體已匯入</string>
++  <string name="lyr_set_kinetic_font_import_fail">無法匯入此字體</string>
++  <string name="lyr_set_kinetic_font_download_fail">無法下載字體，請檢查網路</string>
++  <string name="lyr_set_kinetic_section_bg">背景</string>
++  <string name="lyr_set_kinetic_bg_quality">背景畫質</string>
++  <string name="lyr_set_kinetic_bg_quality_desc">越低在高解析度螢幕上越流暢</string>
++  <string name="lyr_set_kinetic_bg_strength">背景顏色強度</string>
++  <string name="lyr_set_kinetic_bg_strength_desc">背景中專輯顏色更弱或更強</string>
+ </resources>
+diff --git a/app/src/main/res/values-zh/strings.xml b/app/src/main/res/values-zh/strings.xml
+index 291832b..cbede3c 100644
+--- a/app/src/main/res/values-zh/strings.xml
++++ b/app/src/main/res/values-zh/strings.xml
+@@ -1044,7 +1044,7 @@
+   <string name="lyr_set_kinetic">动态效果</string>
+   <string name="lyr_set_kinetic_desc">文字动画配流动玻璃背景</string>
+   <string name="lyr_set_kinetic_style">样式</string>
+-  <string name="lyr_set_kinetic_style_desc">自动为每一行选择样式</string>
++  <string name="lyr_set_kinetic_style_desc">可多选。选多个时每行随机选一种</string>
+   <string name="lyr_set_kinetic_auto">自动</string>
+   <string name="lyr_set_kinetic_stack">堆叠</string>
+   <string name="lyr_set_kinetic_slide">滑动</string>
+@@ -1061,5 +1061,43 @@
+   <string name="lyr_set_kinetic_pos_middle">中间</string>
+   <string name="lyr_set_kinetic_pos_bottom">底部</string>
+   <string name="lyr_set_kinetic_ripples">涟漪效果</string>
+-  <string name="lyr_set_kinetic_ripples_desc">唱到每个词时背景泛起涟漪</string>
++  <string name="lyr_set_kinetic_ripples_desc">开：玻璃背景和涟漪；关：使用原来的播放器背景</string>
++  <string name="lyr_set_kinetic_section_text">文字动画</string>
++  <string name="lyr_set_kinetic_preset">预设</string>
++  <string name="lyr_set_kinetic_preset_desc">轻量最流畅，适合较慢的手机</string>
++  <string name="lyr_set_kinetic_preset_light">轻量</string>
++  <string name="lyr_set_kinetic_preset_balanced">均衡</string>
++  <string name="lyr_set_kinetic_preset_full">完整</string>
++  <string name="lyr_set_kinetic_speed">动画速度</string>
++  <string name="lyr_set_kinetic_speed_desc">文字移动更快或更慢</string>
++  <string name="lyr_set_kinetic_letter_delay">字母延迟</string>
++  <string name="lyr_set_kinetic_letter_delay_desc">字母样式中字母之间的间隔</string>
++  <string name="lyr_set_kinetic_shadow">文字阴影</string>
++  <string name="lyr_set_kinetic_shadow_desc">每个词下方的柔和阴影</string>
++  <string name="lyr_set_kinetic_glow">文字发光</string>
++  <string name="lyr_set_kinetic_glow_desc">每个词周围的柔和光晕（较耗性能）</string>
++  <string name="lyr_set_kinetic_blur">Zoom 模糊</string>
++  <string name="lyr_set_kinetic_blur_desc">Zoom 样式中文字从模糊开始</string>
++  <string name="lyr_set_kinetic_flip">3D 字母翻转</string>
++  <string name="lyr_set_kinetic_flip_desc">字母翻入（字母样式）</string>
++  <string name="lyr_set_kinetic_text_colors">文字颜色数量</string>
++  <string name="lyr_set_kinetic_text_colors_desc">歌词使用的专辑颜色数量，每行使用其中两种</string>
++  <string name="lyr_set_kinetic_text_strength">文字颜色强度</string>
++  <string name="lyr_set_kinetic_text_strength_desc">文字颜色更淡或更鲜艳</string>
++  <string name="lyr_set_kinetic_section_fonts">字体</string>
++  <string name="lyr_set_kinetic_font_mix">混合字体</string>
++  <string name="lyr_set_kinetic_font_mix_desc">每种颜色对应一种字体，字体与颜色相配</string>
++  <string name="lyr_set_kinetic_font_count">混合字体数量</string>
++  <string name="lyr_set_kinetic_font_count_desc">使用下方选择的前几种字体</string>
++  <string name="lyr_set_kinetic_font_pick">选择字体</string>
++  <string name="lyr_set_kinetic_font_pick_desc">带箭头的字体（如 Playfair Display）在首次选择时下载</string>
++  <string name="lyr_set_kinetic_font_import">导入字体（TTF 或 OTF）</string>
++  <string name="lyr_set_kinetic_font_import_ok">字体已导入</string>
++  <string name="lyr_set_kinetic_font_import_fail">无法导入此字体</string>
++  <string name="lyr_set_kinetic_font_download_fail">无法下载字体，请检查网络</string>
++  <string name="lyr_set_kinetic_section_bg">背景</string>
++  <string name="lyr_set_kinetic_bg_quality">背景画质</string>
++  <string name="lyr_set_kinetic_bg_quality_desc">越低在高分辨率屏幕上越流畅</string>
++  <string name="lyr_set_kinetic_bg_strength">背景颜色强度</string>
++  <string name="lyr_set_kinetic_bg_strength_desc">背景中专辑颜色更弱或更强</string>
+ </resources>
+diff --git a/app/src/main/res/values/strings.xml b/app/src/main/res/values/strings.xml
+index b6dd11f..277c90b 100644
+--- a/app/src/main/res/values/strings.xml
++++ b/app/src/main/res/values/strings.xml
+@@ -1044,7 +1044,7 @@
+   <string name="lyr_set_kinetic">Kinetic effect</string>
+   <string name="lyr_set_kinetic_desc">Animated words with a flowing glass background</string>
+   <string name="lyr_set_kinetic_style">Style</string>
+-  <string name="lyr_set_kinetic_style_desc">Auto picks a style for every line</string>
++  <string name="lyr_set_kinetic_style_desc">Pick one or more. With several, each line picks one at random</string>
+   <string name="lyr_set_kinetic_auto">Auto</string>
+   <string name="lyr_set_kinetic_stack">Stack</string>
+   <string name="lyr_set_kinetic_slide">Slide</string>
+@@ -1061,5 +1061,43 @@
+   <string name="lyr_set_kinetic_pos_middle">Middle</string>
+   <string name="lyr_set_kinetic_pos_bottom">Bottom</string>
+   <string name="lyr_set_kinetic_ripples">Ripple effect</string>
+-  <string name="lyr_set_kinetic_ripples_desc">Ripples spread through the background as words are sung</string>
++  <string name="lyr_set_kinetic_ripples_desc">On: glass background with ripples. Off: your normal player background</string>
++  <string name="lyr_set_kinetic_section_text">Text animation</string>
++  <string name="lyr_set_kinetic_preset">Preset</string>
++  <string name="lyr_set_kinetic_preset_desc">Light is the smoothest on slower phones</string>
++  <string name="lyr_set_kinetic_preset_light">Light</string>
++  <string name="lyr_set_kinetic_preset_balanced">Balanced</string>
++  <string name="lyr_set_kinetic_preset_full">Full</string>
++  <string name="lyr_set_kinetic_speed">Animation speed</string>
++  <string name="lyr_set_kinetic_speed_desc">Faster or slower word movement</string>
++  <string name="lyr_set_kinetic_letter_delay">Letter delay</string>
++  <string name="lyr_set_kinetic_letter_delay_desc">Gap between letters in the Letters style</string>
++  <string name="lyr_set_kinetic_shadow">Text shadow</string>
++  <string name="lyr_set_kinetic_shadow_desc">Soft shadow under every word</string>
++  <string name="lyr_set_kinetic_glow">Word glow</string>
++  <string name="lyr_set_kinetic_glow_desc">Soft glow around every word (heavier)</string>
++  <string name="lyr_set_kinetic_blur">Blur on Zoom</string>
++  <string name="lyr_set_kinetic_blur_desc">Words start blurred in the Zoom style</string>
++  <string name="lyr_set_kinetic_flip">3D letter flip</string>
++  <string name="lyr_set_kinetic_flip_desc">Letters flip in (Letters style)</string>
++  <string name="lyr_set_kinetic_text_colors">Text colours</string>
++  <string name="lyr_set_kinetic_text_colors_desc">How many album colours the words use. Each line uses two of them</string>
++  <string name="lyr_set_kinetic_text_strength">Text colour strength</string>
++  <string name="lyr_set_kinetic_text_strength_desc">Paler or more vivid text colours</string>
++  <string name="lyr_set_kinetic_section_fonts">Fonts</string>
++  <string name="lyr_set_kinetic_font_mix">Mix fonts</string>
++  <string name="lyr_set_kinetic_font_mix_desc">Each colour gets its own font, so font and colour match</string>
++  <string name="lyr_set_kinetic_font_count">Fonts in the mix</string>
++  <string name="lyr_set_kinetic_font_count_desc">Uses the first fonts you picked below</string>
++  <string name="lyr_set_kinetic_font_pick">Pick fonts</string>
++  <string name="lyr_set_kinetic_font_pick_desc">Fonts marked with an arrow (such as Playfair Display) are downloaded the first time you pick them</string>
++  <string name="lyr_set_kinetic_font_import">Import font (TTF or OTF)</string>
++  <string name="lyr_set_kinetic_font_import_ok">Font imported</string>
++  <string name="lyr_set_kinetic_font_import_fail">Could not import this font</string>
++  <string name="lyr_set_kinetic_font_download_fail">Could not download the font. Check your connection</string>
++  <string name="lyr_set_kinetic_section_bg">Background</string>
++  <string name="lyr_set_kinetic_bg_quality">Background quality</string>
++  <string name="lyr_set_kinetic_bg_quality_desc">Lower is smoother on high-resolution screens</string>
++  <string name="lyr_set_kinetic_bg_strength">Background colour strength</string>
++  <string name="lyr_set_kinetic_bg_strength_desc">Weaker or stronger album colours in the background</string>
+ </resources>
+diff --git a/core-preferences/src/main/java/me/spica27/spicamusic/core/preferences/LyricsStyleSettings.kt b/core-preferences/src/main/java/me/spica27/spicamusic/core/preferences/LyricsStyleSettings.kt
+index 97b880f..77e197f 100644
+--- a/core-preferences/src/main/java/me/spica27/spicamusic/core/preferences/LyricsStyleSettings.kt
++++ b/core-preferences/src/main/java/me/spica27/spicamusic/core/preferences/LyricsStyleSettings.kt
+@@ -34,6 +34,32 @@ enum class KineticStyle(
+     }
+ }
+ 
++/** Ready-made mixes of the kinetic text settings that cost performance. */
++enum class KineticPreset {
++    Light,
++    Balanced,
++    Full,
++}
++
++fun LyricsStyleSettings.withKineticPreset(preset: KineticPreset): LyricsStyleSettings =
++    when (preset) {
++        KineticPreset.Light -> copy(kineticShadow = false, kineticGlow = false, kineticBlur = false, kineticFlip3d = false, kineticLetterDelay = 15)
++        KineticPreset.Balanced -> copy(kineticShadow = true, kineticGlow = false, kineticBlur = false, kineticFlip3d = true, kineticLetterDelay = 30)
++        KineticPreset.Full -> copy(kineticShadow = true, kineticGlow = true, kineticBlur = true, kineticFlip3d = true, kineticLetterDelay = 30)
++    }
++
++/** The preset that matches the current kinetic text settings, or null when they were changed by hand. */
++fun LyricsStyleSettings.kineticPresetOrNull(): KineticPreset? = KineticPreset.entries.firstOrNull { matches(it) }
++
++private fun LyricsStyleSettings.matches(preset: KineticPreset): Boolean {
++    val p = withKineticPreset(preset)
++    return p.kineticShadow == kineticShadow &&
++        p.kineticGlow == kineticGlow &&
++        p.kineticBlur == kineticBlur &&
++        p.kineticFlip3d == kineticFlip3d &&
++        p.kineticLetterDelay == kineticLetterDelay
++}
++
+ enum class TransliterationPosition(
+     val value: String,
+ ) {
+@@ -219,13 +245,36 @@ data class LyricsStyleSettings(
+     val bgRevealFadeMs: Int = 800,
+     // ---- Kinetic lyrics (off = the normal lyrics view) ----
+     val kineticEnabled: Boolean = false,
+-    val kineticStyle: KineticStyle = KineticStyle.Auto,
++    /** One or more styles; with several (or Auto) every line picks one at random. */
++    val kineticStyles: Set<KineticStyle> = setOf(KineticStyle.Auto),
+     /** Size of the kinetic words in percent (100 = fitted to the screen). */
+     val kineticSize: Int = 100,
+     /** Vertical position of the kinetic words: 0 = top, 50 = middle, 100 = bottom. */
+     val kineticPosition: Int = 50,
+-    /** Ripples in the kinetic background as words are sung. */
++    /** On: glass background with ripples. Off: the normal player background. */
+     val kineticRipples: Boolean = true,
++    // ---- Kinetic text animation (these cost the most performance) ----
++    val kineticShadow: Boolean = true,
++    val kineticGlow: Boolean = false,
++    val kineticBlur: Boolean = false,
++    val kineticFlip3d: Boolean = true,
++    /** Animation speed in percent. */
++    val kineticSpeed: Int = 100,
++    /** Delay between letters in the Letters style, in ms. */
++    val kineticLetterDelay: Int = 30,
++    // ---- Kinetic colours (taken from the album cover) ----
++    /** How many album colours the words use (each line uses two of them). */
++    val kineticTextColors: Int = 4,
++    val kineticTextStrength: Int = 100,
++    val kineticBgStrength: Int = 100,
++    /** Background resolution in percent (lower = smoother on high-resolution screens). */
++    val kineticBgQuality: Int = 60,
++    // ---- Kinetic fonts ----
++    val kineticFontMix: Boolean = false,
++    /** How many of the chosen fonts are mixed (each colour gets its own font). */
++    val kineticFontCount: Int = 2,
++    /** Ids of the chosen fonts, comma separated, in order. */
++    val kineticFonts: String = "sans,serif,mono,cursive",
+ ) {
+     /** Returns a copy with every value forced into its allowed range. */
+     fun sanitized(): LyricsStyleSettings =
+@@ -282,6 +331,14 @@ data class LyricsStyleSettings(
+             bgRevealFadeMs = bgRevealFadeMs.coerceIn(BG_REVEAL_FADE_RANGE),
+             kineticSize = kineticSize.coerceIn(KINETIC_SIZE_RANGE),
+             kineticPosition = kineticPosition.coerceIn(KINETIC_POSITION_RANGE),
++            kineticSpeed = kineticSpeed.coerceIn(KINETIC_SPEED_RANGE),
++            kineticLetterDelay = kineticLetterDelay.coerceIn(KINETIC_LETTER_DELAY_RANGE),
++            kineticTextColors = kineticTextColors.coerceIn(KINETIC_TEXT_COLORS_RANGE),
++            kineticTextStrength = kineticTextStrength.coerceIn(KINETIC_TEXT_STRENGTH_RANGE),
++            kineticBgStrength = kineticBgStrength.coerceIn(KINETIC_BG_STRENGTH_RANGE),
++            kineticBgQuality = kineticBgQuality.coerceIn(KINETIC_BG_QUALITY_RANGE),
++            kineticFontCount = kineticFontCount.coerceIn(KINETIC_FONT_COUNT_RANGE),
++            kineticStyles = kineticStyles.ifEmpty { setOf(KineticStyle.Auto) },
+         )
+ 
+     companion object {
+@@ -336,6 +393,13 @@ data class LyricsStyleSettings(
+         val BG_REVEAL_FADE_RANGE = 200..2000
+         val KINETIC_SIZE_RANGE = 50..150
+         val KINETIC_POSITION_RANGE = 0..100
++        val KINETIC_SPEED_RANGE = 50..200
++        val KINETIC_LETTER_DELAY_RANGE = 0..80
++        val KINETIC_TEXT_COLORS_RANGE = 2..5
++        val KINETIC_TEXT_STRENGTH_RANGE = 20..200
++        val KINETIC_BG_STRENGTH_RANGE = 0..200
++        val KINETIC_BG_QUALITY_RANGE = 30..100
++        val KINETIC_FONT_COUNT_RANGE = 2..4
+         const val BG_REVEAL_STYLE_CLASSIC = 0
+         const val BG_REVEAL_STYLE_FLIP = 1
+     }
+diff --git a/core-preferences/src/main/java/me/spica27/spicamusic/core/preferences/PreferencesManager.kt b/core-preferences/src/main/java/me/spica27/spicamusic/core/preferences/PreferencesManager.kt
+index 21b7775..b60e5e0 100644
+--- a/core-preferences/src/main/java/me/spica27/spicamusic/core/preferences/PreferencesManager.kt
++++ b/core-preferences/src/main/java/me/spica27/spicamusic/core/preferences/PreferencesManager.kt
+@@ -145,6 +145,19 @@ class PreferencesManager(
+         val LYRIC_KINETIC_SIZE = intPreferencesKey("lyric_kinetic_size")
+         val LYRIC_KINETIC_POSITION = intPreferencesKey("lyric_kinetic_position")
+         val LYRIC_KINETIC_RIPPLES = booleanPreferencesKey("lyric_kinetic_ripples")
++        val LYRIC_KINETIC_SHADOW = booleanPreferencesKey("lyric_kinetic_shadow")
++        val LYRIC_KINETIC_GLOW = booleanPreferencesKey("lyric_kinetic_glow")
++        val LYRIC_KINETIC_BLUR = booleanPreferencesKey("lyric_kinetic_blur")
++        val LYRIC_KINETIC_FLIP3D = booleanPreferencesKey("lyric_kinetic_flip3d")
++        val LYRIC_KINETIC_SPEED = intPreferencesKey("lyric_kinetic_speed")
++        val LYRIC_KINETIC_LETTER_DELAY = intPreferencesKey("lyric_kinetic_letter_delay")
++        val LYRIC_KINETIC_TEXT_COLORS = intPreferencesKey("lyric_kinetic_text_colors")
++        val LYRIC_KINETIC_TEXT_STRENGTH = intPreferencesKey("lyric_kinetic_text_strength")
++        val LYRIC_KINETIC_BG_STRENGTH = intPreferencesKey("lyric_kinetic_bg_strength")
++        val LYRIC_KINETIC_BG_QUALITY = intPreferencesKey("lyric_kinetic_bg_quality")
++        val LYRIC_KINETIC_FONT_MIX = booleanPreferencesKey("lyric_kinetic_font_mix")
++        val LYRIC_KINETIC_FONT_COUNT = intPreferencesKey("lyric_kinetic_font_count")
++        val LYRIC_KINETIC_FONTS = stringPreferencesKey("lyric_kinetic_fonts")
+     }
+ 
+ 
+@@ -243,10 +256,23 @@ class PreferencesManager(
+                     dockSoftEdge = p[Keys.LYRIC_DOCK_SOFT_EDGE] ?: d.dockSoftEdge,
+                     dockEdgeFade = p[Keys.LYRIC_DOCK_EDGE_FADE] ?: d.dockEdgeFade,
+                     kineticEnabled = p[Keys.LYRIC_KINETIC_ENABLED] ?: d.kineticEnabled,
+-                    kineticStyle = p[Keys.LYRIC_KINETIC_STYLE]?.let(KineticStyle::fromString) ?: d.kineticStyle,
++                    kineticStyles = p[Keys.LYRIC_KINETIC_STYLE]?.let(::parseKineticStyles) ?: d.kineticStyles,
+                     kineticSize = p[Keys.LYRIC_KINETIC_SIZE] ?: d.kineticSize,
+                     kineticPosition = p[Keys.LYRIC_KINETIC_POSITION] ?: d.kineticPosition,
+                     kineticRipples = p[Keys.LYRIC_KINETIC_RIPPLES] ?: d.kineticRipples,
++                    kineticShadow = p[Keys.LYRIC_KINETIC_SHADOW] ?: d.kineticShadow,
++                    kineticGlow = p[Keys.LYRIC_KINETIC_GLOW] ?: d.kineticGlow,
++                    kineticBlur = p[Keys.LYRIC_KINETIC_BLUR] ?: d.kineticBlur,
++                    kineticFlip3d = p[Keys.LYRIC_KINETIC_FLIP3D] ?: d.kineticFlip3d,
++                    kineticSpeed = p[Keys.LYRIC_KINETIC_SPEED] ?: d.kineticSpeed,
++                    kineticLetterDelay = p[Keys.LYRIC_KINETIC_LETTER_DELAY] ?: d.kineticLetterDelay,
++                    kineticTextColors = p[Keys.LYRIC_KINETIC_TEXT_COLORS] ?: d.kineticTextColors,
++                    kineticTextStrength = p[Keys.LYRIC_KINETIC_TEXT_STRENGTH] ?: d.kineticTextStrength,
++                    kineticBgStrength = p[Keys.LYRIC_KINETIC_BG_STRENGTH] ?: d.kineticBgStrength,
++                    kineticBgQuality = p[Keys.LYRIC_KINETIC_BG_QUALITY] ?: d.kineticBgQuality,
++                    kineticFontMix = p[Keys.LYRIC_KINETIC_FONT_MIX] ?: d.kineticFontMix,
++                    kineticFontCount = p[Keys.LYRIC_KINETIC_FONT_COUNT] ?: d.kineticFontCount,
++                    kineticFonts = p[Keys.LYRIC_KINETIC_FONTS] ?: d.kineticFonts,
+                 ).sanitized()
+             }.distinctUntilChanged()
+ 
+@@ -345,10 +371,23 @@ class PreferencesManager(
+                     dockSoftEdge = p[Keys.LYRIC_DOCK_SOFT_EDGE] ?: d.dockSoftEdge,
+                     dockEdgeFade = p[Keys.LYRIC_DOCK_EDGE_FADE] ?: d.dockEdgeFade,
+                     kineticEnabled = p[Keys.LYRIC_KINETIC_ENABLED] ?: d.kineticEnabled,
+-                    kineticStyle = p[Keys.LYRIC_KINETIC_STYLE]?.let(KineticStyle::fromString) ?: d.kineticStyle,
++                    kineticStyles = p[Keys.LYRIC_KINETIC_STYLE]?.let(::parseKineticStyles) ?: d.kineticStyles,
+                     kineticSize = p[Keys.LYRIC_KINETIC_SIZE] ?: d.kineticSize,
+                     kineticPosition = p[Keys.LYRIC_KINETIC_POSITION] ?: d.kineticPosition,
+                     kineticRipples = p[Keys.LYRIC_KINETIC_RIPPLES] ?: d.kineticRipples,
++                    kineticShadow = p[Keys.LYRIC_KINETIC_SHADOW] ?: d.kineticShadow,
++                    kineticGlow = p[Keys.LYRIC_KINETIC_GLOW] ?: d.kineticGlow,
++                    kineticBlur = p[Keys.LYRIC_KINETIC_BLUR] ?: d.kineticBlur,
++                    kineticFlip3d = p[Keys.LYRIC_KINETIC_FLIP3D] ?: d.kineticFlip3d,
++                    kineticSpeed = p[Keys.LYRIC_KINETIC_SPEED] ?: d.kineticSpeed,
++                    kineticLetterDelay = p[Keys.LYRIC_KINETIC_LETTER_DELAY] ?: d.kineticLetterDelay,
++                    kineticTextColors = p[Keys.LYRIC_KINETIC_TEXT_COLORS] ?: d.kineticTextColors,
++                    kineticTextStrength = p[Keys.LYRIC_KINETIC_TEXT_STRENGTH] ?: d.kineticTextStrength,
++                    kineticBgStrength = p[Keys.LYRIC_KINETIC_BG_STRENGTH] ?: d.kineticBgStrength,
++                    kineticBgQuality = p[Keys.LYRIC_KINETIC_BG_QUALITY] ?: d.kineticBgQuality,
++                    kineticFontMix = p[Keys.LYRIC_KINETIC_FONT_MIX] ?: d.kineticFontMix,
++                    kineticFontCount = p[Keys.LYRIC_KINETIC_FONT_COUNT] ?: d.kineticFontCount,
++                    kineticFonts = p[Keys.LYRIC_KINETIC_FONTS] ?: d.kineticFonts,
+                 )
+             val n = transform(current).sanitized()
+             p[Keys.LYRIC_FONT_STYLE] = n.fontStyle
+@@ -438,10 +477,23 @@ class PreferencesManager(
+             p[Keys.LYRIC_DOCK_SOFT_EDGE] = n.dockSoftEdge
+             p[Keys.LYRIC_DOCK_EDGE_FADE] = n.dockEdgeFade
+             p[Keys.LYRIC_KINETIC_ENABLED] = n.kineticEnabled
+-            p[Keys.LYRIC_KINETIC_STYLE] = n.kineticStyle.value
++            p[Keys.LYRIC_KINETIC_STYLE] = n.kineticStyles.joinToString(",") { it.value }
+             p[Keys.LYRIC_KINETIC_SIZE] = n.kineticSize
+             p[Keys.LYRIC_KINETIC_POSITION] = n.kineticPosition
+             p[Keys.LYRIC_KINETIC_RIPPLES] = n.kineticRipples
++            p[Keys.LYRIC_KINETIC_SHADOW] = n.kineticShadow
++            p[Keys.LYRIC_KINETIC_GLOW] = n.kineticGlow
++            p[Keys.LYRIC_KINETIC_BLUR] = n.kineticBlur
++            p[Keys.LYRIC_KINETIC_FLIP3D] = n.kineticFlip3d
++            p[Keys.LYRIC_KINETIC_SPEED] = n.kineticSpeed
++            p[Keys.LYRIC_KINETIC_LETTER_DELAY] = n.kineticLetterDelay
++            p[Keys.LYRIC_KINETIC_TEXT_COLORS] = n.kineticTextColors
++            p[Keys.LYRIC_KINETIC_TEXT_STRENGTH] = n.kineticTextStrength
++            p[Keys.LYRIC_KINETIC_BG_STRENGTH] = n.kineticBgStrength
++            p[Keys.LYRIC_KINETIC_BG_QUALITY] = n.kineticBgQuality
++            p[Keys.LYRIC_KINETIC_FONT_MIX] = n.kineticFontMix
++            p[Keys.LYRIC_KINETIC_FONT_COUNT] = n.kineticFontCount
++            p[Keys.LYRIC_KINETIC_FONTS] = n.kineticFonts
+         }
+     }
+ 
+@@ -535,3 +587,11 @@ class PreferencesManager(
+         }
+     }
+ }
++
++/** "auto" or a comma separated list such as "stack,zoom" (the old single value still works). */
++private fun parseKineticStyles(raw: String): Set<KineticStyle> =
++    raw
++        .split(',')
++        .mapNotNull { v -> KineticStyle.entries.firstOrNull { it.value == v.trim() } }
++        .toSet()
++        .ifEmpty { setOf(KineticStyle.Auto) }
