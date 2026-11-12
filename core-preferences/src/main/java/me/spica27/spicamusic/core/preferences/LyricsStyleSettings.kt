@@ -34,6 +34,32 @@ enum class KineticStyle(
     }
 }
 
+/** Ready-made mixes of the kinetic text settings that cost performance. */
+enum class KineticPreset {
+    Light,
+    Balanced,
+    Full,
+}
+
+fun LyricsStyleSettings.withKineticPreset(preset: KineticPreset): LyricsStyleSettings =
+    when (preset) {
+        KineticPreset.Light -> copy(kineticShadow = false, kineticGlow = false, kineticBlur = false, kineticFlip3d = false, kineticLetterDelay = 15)
+        KineticPreset.Balanced -> copy(kineticShadow = true, kineticGlow = false, kineticBlur = false, kineticFlip3d = true, kineticLetterDelay = 30)
+        KineticPreset.Full -> copy(kineticShadow = true, kineticGlow = true, kineticBlur = true, kineticFlip3d = true, kineticLetterDelay = 30)
+    }
+
+/** The preset that matches the current kinetic text settings, or null when they were changed by hand. */
+fun LyricsStyleSettings.kineticPresetOrNull(): KineticPreset? = KineticPreset.entries.firstOrNull { matches(it) }
+
+private fun LyricsStyleSettings.matches(preset: KineticPreset): Boolean {
+    val p = withKineticPreset(preset)
+    return p.kineticShadow == kineticShadow &&
+        p.kineticGlow == kineticGlow &&
+        p.kineticBlur == kineticBlur &&
+        p.kineticFlip3d == kineticFlip3d &&
+        p.kineticLetterDelay == kineticLetterDelay
+}
+
 enum class TransliterationPosition(
     val value: String,
 ) {
@@ -219,13 +245,36 @@ data class LyricsStyleSettings(
     val bgRevealFadeMs: Int = 800,
     // ---- Kinetic lyrics (off = the normal lyrics view) ----
     val kineticEnabled: Boolean = false,
-    val kineticStyle: KineticStyle = KineticStyle.Auto,
+    /** One or more styles; with several (or Auto) every line picks one at random. */
+    val kineticStyles: Set<KineticStyle> = setOf(KineticStyle.Auto),
     /** Size of the kinetic words in percent (100 = fitted to the screen). */
     val kineticSize: Int = 100,
     /** Vertical position of the kinetic words: 0 = top, 50 = middle, 100 = bottom. */
     val kineticPosition: Int = 50,
-    /** Ripples in the kinetic background as words are sung. */
+    /** On: glass background with ripples. Off: the normal player background. */
     val kineticRipples: Boolean = true,
+    // ---- Kinetic text animation (these cost the most performance) ----
+    val kineticShadow: Boolean = true,
+    val kineticGlow: Boolean = false,
+    val kineticBlur: Boolean = false,
+    val kineticFlip3d: Boolean = true,
+    /** Animation speed in percent. */
+    val kineticSpeed: Int = 100,
+    /** Delay between letters in the Letters style, in ms. */
+    val kineticLetterDelay: Int = 30,
+    // ---- Kinetic colours (taken from the album cover) ----
+    /** How many album colours the words use (each line uses two of them). */
+    val kineticTextColors: Int = 4,
+    val kineticTextStrength: Int = 100,
+    val kineticBgStrength: Int = 100,
+    /** Background resolution in percent (lower = smoother on high-resolution screens). */
+    val kineticBgQuality: Int = 60,
+    // ---- Kinetic fonts ----
+    val kineticFontMix: Boolean = false,
+    /** How many of the chosen fonts are mixed (each colour gets its own font). */
+    val kineticFontCount: Int = 2,
+    /** Ids of the chosen fonts, comma separated, in order. */
+    val kineticFonts: String = "sans,serif,mono,cursive",
 ) {
     /** Returns a copy with every value forced into its allowed range. */
     fun sanitized(): LyricsStyleSettings =
@@ -282,6 +331,14 @@ data class LyricsStyleSettings(
             bgRevealFadeMs = bgRevealFadeMs.coerceIn(BG_REVEAL_FADE_RANGE),
             kineticSize = kineticSize.coerceIn(KINETIC_SIZE_RANGE),
             kineticPosition = kineticPosition.coerceIn(KINETIC_POSITION_RANGE),
+            kineticSpeed = kineticSpeed.coerceIn(KINETIC_SPEED_RANGE),
+            kineticLetterDelay = kineticLetterDelay.coerceIn(KINETIC_LETTER_DELAY_RANGE),
+            kineticTextColors = kineticTextColors.coerceIn(KINETIC_TEXT_COLORS_RANGE),
+            kineticTextStrength = kineticTextStrength.coerceIn(KINETIC_TEXT_STRENGTH_RANGE),
+            kineticBgStrength = kineticBgStrength.coerceIn(KINETIC_BG_STRENGTH_RANGE),
+            kineticBgQuality = kineticBgQuality.coerceIn(KINETIC_BG_QUALITY_RANGE),
+            kineticFontCount = kineticFontCount.coerceIn(KINETIC_FONT_COUNT_RANGE),
+            kineticStyles = kineticStyles.ifEmpty { setOf(KineticStyle.Auto) },
         )
 
     companion object {
@@ -336,6 +393,13 @@ data class LyricsStyleSettings(
         val BG_REVEAL_FADE_RANGE = 200..2000
         val KINETIC_SIZE_RANGE = 50..150
         val KINETIC_POSITION_RANGE = 0..100
+        val KINETIC_SPEED_RANGE = 50..200
+        val KINETIC_LETTER_DELAY_RANGE = 0..80
+        val KINETIC_TEXT_COLORS_RANGE = 2..5
+        val KINETIC_TEXT_STRENGTH_RANGE = 20..200
+        val KINETIC_BG_STRENGTH_RANGE = 0..200
+        val KINETIC_BG_QUALITY_RANGE = 30..100
+        val KINETIC_FONT_COUNT_RANGE = 2..4
         const val BG_REVEAL_STYLE_CLASSIC = 0
         const val BG_REVEAL_STYLE_FLIP = 1
     }

@@ -1,6 +1,10 @@
 package me.spica27.spicamusic.ui.widget
 
+import android.content.Context
+import android.graphics.Bitmap
+import android.graphics.BitmapFactory
 import android.graphics.RuntimeShader
+import android.net.Uri
 import android.os.Build
 import androidx.annotation.RequiresApi
 import androidx.compose.animation.core.Animatable
@@ -28,6 +32,7 @@ import androidx.compose.foundation.layout.wrapContentWidth
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.State
 import androidx.compose.runtime.derivedStateOf
@@ -48,36 +53,49 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.BlurEffect
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.CompositingStrategy
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.PathMeasure
 import androidx.compose.ui.graphics.Shadow
 import androidx.compose.ui.graphics.ShaderBrush
 import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.TransformOrigin
+import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.Layout
+import androidx.compose.ui.layout.layout
 import androidx.compose.ui.layout.LayoutCoordinates
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.positionInRoot
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.em
 import androidx.compose.ui.util.lerp
+import androidx.core.graphics.ColorUtils
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.palette.graphics.Palette
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import me.spica27.spicamusic.common.entity.LyricItem
 import me.spica27.spicamusic.core.preferences.KineticStyle
 import me.spica27.spicamusic.core.preferences.LyricsStyleSettings
+import me.spica27.spicamusic.ui.player.LocalPlayerViewModel
 import java.text.BreakIterator
 import kotlin.math.ceil
 import kotlin.math.max
 import kotlin.math.min
 import kotlin.math.roundToInt
 import kotlin.math.sin
+import kotlin.math.sqrt
 import kotlin.random.Random
 import androidx.compose.ui.graphics.lerp as lerpColor
 
@@ -216,38 +234,34 @@ private class KRng(
     }
 }
 
-private fun KRng.pick(vararg weighted: Pair<KineticStyle, Float>): KineticStyle {
+private fun KRng.pickWeighted(weighted: List<Pair<KineticStyle, Float>>): KineticStyle {
     var x = next() * weighted.sumOf { it.second.toDouble() }.toFloat()
     for ((v, k) in weighted) {
         x -= k
         if (x <= 0f) return v
     }
-    return weighted[0].first
+    return weighted.first().first
 }
 
-/** Auto: picks the style for a line from its length, singing speed and chorus repeats. */
-private fun chooseKind(
-    line: KLine,
-    seed: Int,
-): KineticStyle {
-    val r = KRng(seed)
+/** How likely each style is for a line, from its length, singing speed and chorus repeats. */
+private fun kindWeights(line: KLine): List<Pair<KineticStyle, Float>> {
     val n = line.words.size
     val wps = n / max(0.5f, (line.endMs - line.startMs) / 1000f)
     val energetic = wps > 2.5f
     val calm = wps < 1.4f
     val chorus = line.repeats >= 2
     return when {
-        n <= 2 -> r.pick(KineticStyle.Zoom to 3f, KineticStyle.Letters to 2f, KineticStyle.Stack to 1f)
-        n > 11 || wps > 3.8f -> r.pick(KineticStyle.Flow to 3f, KineticStyle.Slide to 2f)
+        n <= 2 -> listOf(KineticStyle.Zoom to 3f, KineticStyle.Letters to 2f, KineticStyle.Stack to 1f)
+        n > 11 || wps > 3.8f -> listOf(KineticStyle.Flow to 3f, KineticStyle.Slide to 2f)
         chorus && n <= 7 ->
             if (energetic) {
-                r.pick(KineticStyle.Zoom to 2f, KineticStyle.Slide to 2f, KineticStyle.Letters to 1f)
+                listOf(KineticStyle.Zoom to 2f, KineticStyle.Slide to 2f, KineticStyle.Letters to 1f)
             } else {
-                r.pick(KineticStyle.Stack to 2f, KineticStyle.Letters to 1f, KineticStyle.Zoom to 1f)
+                listOf(KineticStyle.Stack to 2f, KineticStyle.Letters to 1f, KineticStyle.Zoom to 1f)
             }
 
         else ->
-            r.pick(
+            listOf(
                 KineticStyle.Stack to (if (calm) 3f else 2f),
                 KineticStyle.Slide to (if (energetic) 3f else 2f),
                 KineticStyle.Graph to (if (n <= 8) (if (calm) 2.5f else 1.5f) else 0f),
@@ -257,6 +271,18 @@ private fun chooseKind(
                 KineticStyle.Flow to (if (calm) 2f else 0.5f),
             )
     }
+}
+
+/** Picks the style of a line: Auto uses every style, otherwise only the chosen ones (still at random). */
+private fun chooseKind(
+    line: KLine,
+    seed: Int,
+    allowed: Set<KineticStyle>,
+): KineticStyle {
+    val r = KRng(seed)
+    val weights = kindWeights(line)
+    if (KineticStyle.Auto in allowed) return r.pickWeighted(weights.filter { it.second > 0f })
+    return r.pickWeighted(allowed.map { k -> k to ((weights.firstOrNull { it.first == k }?.second ?: 0f) + 0.35f) })
 }
 
 private fun visualLength(s: String): Float {
@@ -325,27 +351,40 @@ private fun groupRows(
     return rows
 }
 
-private val TinyWords =
-    setOf("a", "an", "the", "to", "of", "in", "on", "at", "by", "for", "and", "or", "but", "so", "is", "am", "are", "be", "i", "me", "my", "we", "it", "oh")
-
 private fun cleanWord(s: String): String = s.lowercase().filter { it.isLetter() || it == '\'' }
 
-/** One to four real words of a line get the album accent colour (random, but stable for a line). */
-private fun highlightSet(
+/** The colour and font of every word of a line. */
+private class KLook(
+    val colors: List<Color>,
+    val fonts: List<FontFamily?>,
+    val accent: Color,
+)
+
+/**
+ * A line uses two of the album colours (picked at random, stable for the line). Slot k of the font list belongs to
+ * colour k, so a colour always comes with its own font.
+ */
+private fun buildLook(
     line: KLine,
     seed: Int,
-): Set<Int> {
-    val r = KRng(seed xor 0x51ed27)
-    var pool = line.words.indices.filter { cleanWord(line.words[it].text) !in TinyWords }.toMutableList()
-    if (pool.isEmpty()) pool = line.words.indices.toMutableList()
-    for (i in pool.size - 1 downTo 1) {
-        val j = (r.next() * (i + 1)).toInt().coerceIn(0, i)
-        val tmp = pool[i]
-        pool[i] = pool[j]
-        pool[j] = tmp
+    colors: List<Color>,
+    fonts: List<FontFamily?>,
+): KLook {
+    val r = KRng(seed xor 0x7a3b21)
+    val n = colors.size
+    val a = (r.next() * n).toInt().coerceIn(0, n - 1)
+    val b = (a + 1 + (r.next() * (n - 1)).toInt().coerceIn(0, max(0, n - 2))) % n
+    val slots = IntArray(line.words.size)
+    var current = if (r.next() < 0.5f) a else b
+    for (i in slots.indices) {
+        if (i > 0 && r.next() < 0.55f) current = if (current == a) b else a
+        slots[i] = current
     }
-    val count = (line.words.size * (0.18f + r.next() * 0.17f)).roundToInt().coerceIn(1, min(4, pool.size))
-    return pool.take(count).toSet()
+    if (slots.size >= 2 && slots.all { it == slots[0] }) {
+        val j = 1 + (r.next() * (slots.size - 1)).toInt().coerceIn(0, slots.size - 2)
+        slots[j] = if (slots[0] == a) b else a
+    }
+    return KLook(slots.map { colors[it] }, slots.map { fonts[it % fonts.size] }, colors[a])
 }
 
 private fun splitLetters(word: String): List<String> {
@@ -360,6 +399,121 @@ private fun splitLetters(word: String): List<String> {
         e = it.next()
     }
     return out.ifEmpty { listOf(word) }
+}
+
+// ==================== album colours ====================
+
+@Immutable
+private class KPalette(
+    val text: List<Color>,
+    val pools: List<Color>,
+    val base: Color,
+)
+
+private fun colorDistance(
+    a: Color,
+    b: Color,
+): Float {
+    val dr = a.red - b.red
+    val dg = a.green - b.green
+    val db = a.blue - b.blue
+    return sqrt(dr * dr + dg * dg + db * db)
+}
+
+private fun hslOf(c: Color): FloatArray {
+    val hsl = FloatArray(3)
+    ColorUtils.colorToHSL(c.toArgb(), hsl)
+    return hsl
+}
+
+private fun fromHsl(
+    h: Float,
+    s: Float,
+    l: Float,
+): Color = Color(ColorUtils.HSLToColor(floatArrayOf(h.mod(360f), s.coerceIn(0f, 1f), l.coerceIn(0f, 1f))))
+
+/** Reads the main colours of the cover (vibrant ones first). Empty when there is no cover. */
+private suspend fun extractSwatches(
+    context: Context,
+    uri: Uri?,
+): List<Color> =
+    withContext(Dispatchers.IO) {
+        if (uri == null) return@withContext emptyList()
+        try {
+            val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
+            context.contentResolver.openInputStream(uri)?.use { BitmapFactory.decodeStream(it, null, bounds) }
+            var sample = 1
+            while (bounds.outWidth / (sample * 2) >= 128 && bounds.outHeight / (sample * 2) >= 128) sample *= 2
+            val options =
+                BitmapFactory.Options().apply {
+                    inSampleSize = sample
+                    inPreferredConfig = Bitmap.Config.ARGB_8888
+                }
+            val bitmap =
+                context.contentResolver.openInputStream(uri)?.use { BitmapFactory.decodeStream(it, null, options) }
+                    ?: return@withContext emptyList()
+            val palette = Palette.from(bitmap).maximumColorCount(24).generate()
+            bitmap.recycle()
+            listOfNotNull(
+                palette.vibrantSwatch,
+                palette.lightVibrantSwatch,
+                palette.darkVibrantSwatch,
+                palette.mutedSwatch,
+                palette.lightMutedSwatch,
+                palette.darkMutedSwatch,
+                palette.dominantSwatch,
+            ).map { Color(it.rgb) }
+        } catch (e: Exception) {
+            emptyList()
+        }
+    }
+
+/**
+ * Five text colours (light and vivid so they read on the dark glass), three colours for the background and a dark
+ * tint of the cover colour as the background base. [textStrength] makes the text colours paler or more vivid.
+ */
+private fun buildPalette(
+    source: List<Color>,
+    textStrength: Int,
+): KPalette {
+    val distinct = ArrayList<Color>()
+    for (c in source) {
+        val opaque = c.copy(alpha = 1f)
+        if (distinct.none { colorDistance(it, opaque) < 0.2f }) distinct += opaque
+    }
+    if (distinct.isEmpty()) distinct += Color(0xFF7C5CFF)
+    var turn = 0
+    while (distinct.size < 5) {
+        val h = hslOf(distinct[turn % distinct.size])
+        distinct += fromHsl(h[0] + 40f + 35f * turn, max(h[1], 0.6f), 0.5f)
+        turn++
+    }
+    val k = textStrength / 100f
+    val text =
+        distinct.take(5).map { c ->
+            val h = hslOf(c)
+            fromHsl(h[0], max(h[1], 0.5f) * k, h[2].coerceIn(0.62f, 0.8f))
+        }
+    val pools =
+        distinct.take(3).map { c ->
+            val h = hslOf(c)
+            fromHsl(h[0], max(h[1], 0.6f), 0.5f)
+        }
+    val h0 = hslOf(distinct[0])
+    return KPalette(text, pools, fromHsl(h0[0], 0.5f, 0.13f))
+}
+
+@Composable
+private fun rememberKineticPalette(
+    uri: Uri?,
+    textStrength: Int,
+): KPalette {
+    val context = LocalContext.current
+    val cs = MaterialTheme.colorScheme
+    val fallback = remember(cs.primary, cs.tertiary, cs.secondary) { listOf(cs.primary, cs.tertiary, cs.secondary) }
+    var swatches by remember(uri) { mutableStateOf<List<Color>>(emptyList()) }
+    LaunchedEffect(uri) { swatches = extractSwatches(context, uri) }
+    return remember(swatches, fallback, textStrength) { buildPalette(swatches.ifEmpty { fallback }, textStrength) }
 }
 
 // ==================== entry point ====================
@@ -387,8 +541,6 @@ private class BoxInfo {
     var h = 1f
 }
 
-private val NoRipples = FloatArray(32)
-
 @Composable
 internal fun KineticLyricsUI(
     modifier: Modifier,
@@ -400,7 +552,10 @@ internal fun KineticLyricsUI(
 ) {
     val kLines = remember(lines) { buildKineticLines(lines) }
     val salt = remember(kLines) { Random.nextInt() }
-    val accents = kineticAccents()
+    val playerViewModel = LocalPlayerViewModel.current
+    val mediaItem by playerViewModel.currentMediaItem.collectAsStateWithLifecycle()
+    val palette = rememberKineticPalette(mediaItem?.mediaMetadata?.artworkUri, settings.kineticTextStrength)
+    val fonts = rememberKineticFontSlots(settings)
     val clock = remember { mutableFloatStateOf(0f) }
     val timeMs = remember { mutableLongStateOf(0L) }
     val timeProvider by rememberUpdatedState(currentTimeProvider)
@@ -437,13 +592,17 @@ internal fun KineticLyricsUI(
                     info.h = max(1f, it.size.height.toFloat())
                 },
     ) {
-        KineticBackground(
-            clock = clock,
-            ripples = ripples,
-            accents = accents,
-            ripplesOn = settings.kineticRipples,
-            modifier = Modifier.fillMaxSize(),
-        )
+        // Ripple effect off: no glass background, the normal player background shows through.
+        if (settings.kineticRipples) {
+            KineticBackground(
+                clock = clock,
+                ripples = ripples,
+                palette = palette,
+                strength = settings.kineticBgStrength,
+                quality = settings.kineticBgQuality,
+                modifier = Modifier.fillMaxSize(),
+            )
+        }
         val index = lineIndex
         if (index >= 0 && index < kLines.size) {
             key(index) {
@@ -452,7 +611,8 @@ internal fun KineticLyricsUI(
                     salt = salt,
                     timeMs = timeMs,
                     settings = settings,
-                    accents = accents,
+                    palette = palette,
+                    fonts = fonts,
                     topInset = topInset,
                     bottomInset = bottomInset,
                     onReveal = { rootCenter ->
@@ -470,27 +630,52 @@ internal fun KineticLyricsUI(
     }
 }
 
-@Composable
-private fun kineticAccents(): List<Color> {
-    val cs = MaterialTheme.colorScheme
-    return remember(cs.primary, cs.tertiary, cs.secondary) {
-        listOf(cs.primary, cs.tertiary, cs.secondary).map { lerpColor(it, Color.White, 0.18f) }
-    }
-}
-
 private class KCtx(
     val line: KLine,
     val revealed: Int,
     val seed: Int,
-    val highlights: Set<Int>,
-    val accent: Color,
+    val look: KLook,
     val w: Float,
     val h: Float,
+    val speed: Float,
+    val shadow: Boolean,
+    val glow: Boolean,
+    val blur: Boolean,
+    val flip: Boolean,
+    val letterDelay: Int,
     val onReveal: (Offset) -> Unit,
 ) {
-    fun color(i: Int): Color = if (i in highlights) accent else Color.White
-
     fun shown(i: Int): Boolean = i < revealed
+
+    /** One word (or one letter of it) with its own colour and font. */
+    @Composable
+    fun Word(
+        i: Int,
+        fontPx: Float,
+        from: Pose,
+        stiffness: Float,
+        text: String = line.words[i].text,
+        modifier: Modifier = Modifier,
+        delayMs: Int = 0,
+        offscreen: Boolean = true,
+        reveal: Boolean = true,
+    ) {
+        KWordText(
+            text = text,
+            shown = shown(i),
+            from = from,
+            spec = springSpec(stiffness * speed * speed),
+            fontPx = fontPx,
+            color = look.colors[i],
+            fontFamily = look.fonts[i],
+            shadow = shadow,
+            glow = glow,
+            modifier = modifier,
+            delayMs = delayMs,
+            offscreen = offscreen,
+            onReveal = if (reveal) onReveal else null,
+        )
+    }
 }
 
 @Composable
@@ -499,20 +684,25 @@ private fun KineticStage(
     salt: Int,
     timeMs: State<Long>,
     settings: LyricsStyleSettings,
-    accents: List<Color>,
+    palette: KPalette,
+    fonts: List<FontFamily?>,
     topInset: Dp,
     bottomInset: Dp,
     onReveal: (Offset) -> Unit,
 ) {
     val seed = line.text.hashCode() xor salt
     val kind =
-        remember(line, settings.kineticStyle, seed) {
-            if (settings.kineticStyle == KineticStyle.Auto) chooseKind(line, seed) else settings.kineticStyle
+        remember(line, settings.kineticStyles, seed) {
+            val styles = settings.kineticStyles
+            if (styles.size == 1 && styles.first() != KineticStyle.Auto) styles.first() else chooseKind(line, seed, styles)
         }
-    val highlights = remember(line, seed) { highlightSet(line, seed) }
+    val look =
+        remember(line, seed, palette, settings.kineticTextColors, fonts) {
+            buildLook(line, seed, palette.text.take(settings.kineticTextColors), fonts)
+        }
     val revealed by remember(line) { derivedStateOf { line.words.count { it.startMs <= timeMs.value } } }
-    val accent = accents[((seed ushr 3) and 0x7fffffff) % 3]
     val density = LocalDensity.current
+    val speed = settings.kineticSpeed / 100f
 
     BoxWithConstraints(
         modifier =
@@ -523,7 +713,22 @@ private fun KineticStage(
     ) {
         val w = with(density) { maxWidth.toPx() }
         val h = with(density) { maxHeight.toPx() }
-        val ctx = KCtx(line, revealed, seed, highlights, accent, w, h, onReveal)
+        val ctx =
+            KCtx(
+                line = line,
+                revealed = revealed,
+                seed = seed,
+                look = look,
+                w = w,
+                h = h,
+                speed = speed,
+                shadow = settings.kineticShadow,
+                glow = settings.kineticGlow,
+                blur = settings.kineticBlur,
+                flip = settings.kineticFlip3d,
+                letterDelay = (settings.kineticLetterDelay / speed).toInt(),
+                onReveal = onReveal,
+            )
         val scale = settings.kineticSize / 100f
         val shift = (settings.kineticPosition - 50) / 50f * h * 0.35f
         Box(
@@ -551,6 +756,7 @@ private fun KineticStage(
 
 // ==================== one animated word ====================
 
+@Immutable
 private data class Pose(
     val x: Float = 0f,
     val y: Float = 0f,
@@ -563,9 +769,16 @@ private data class Pose(
     val blurPx: Float = 0f,
 )
 
-private fun springSpec(stiffness: Float): AnimationSpec<Float> = spring(dampingRatio = 1f, stiffness = stiffness)
+private val specCache = HashMap<Float, AnimationSpec<Float>>()
 
-/** A word that glides from the hidden pose [from] to rest when [shown] becomes true. */
+/** One spring per stiffness, so words do not get a new animation spec (and redraw) every time. */
+private fun springSpec(stiffness: Float): AnimationSpec<Float> =
+    specCache.getOrPut(stiffness) { spring<Float>(dampingRatio = 1f, stiffness = stiffness) }
+
+/**
+ * A word that glides from the hidden pose [from] to rest when [shown] becomes true. The word is drawn once into
+ * a texture ([offscreen]) and only that texture is moved, so the shadow and glow are not redrawn every frame.
+ */
 @Composable
 private fun KWordText(
     text: String,
@@ -574,19 +787,22 @@ private fun KWordText(
     spec: AnimationSpec<Float>,
     fontPx: Float,
     color: Color,
+    fontFamily: FontFamily?,
+    shadow: Boolean,
     glow: Boolean,
     modifier: Modifier = Modifier,
     delayMs: Int = 0,
+    offscreen: Boolean = true,
     onReveal: ((Offset) -> Unit)? = null,
 ) {
     val density = LocalDensity.current
     val progress = remember { Animatable(0f) }
-    var coords by remember { mutableStateOf<LayoutCoordinates?>(null) }
+    val holder = remember { arrayOfNulls<LayoutCoordinates>(1) }
     val reveal by rememberUpdatedState(onReveal)
     LaunchedEffect(shown) {
         if (shown) {
             if (delayMs > 0) delay(delayMs.toLong())
-            coords?.takeIf { it.isAttached }?.let { c ->
+            holder[0]?.takeIf { it.isAttached }?.let { c ->
                 reveal?.invoke(c.positionInRoot() + Offset(c.size.width / 2f, c.size.height / 2f))
             }
             progress.animateTo(1f, spec)
@@ -595,25 +811,28 @@ private fun KWordText(
         }
     }
     val fontSp = with(density) { fontPx.toSp() }
-    val shadow =
-        if (glow) {
-            Shadow(color.copy(alpha = 0.55f), Offset.Zero, fontPx * 0.6f)
-        } else {
-            Shadow(Color.Black.copy(alpha = 0.5f), Offset(0f, fontPx * 0.035f), fontPx * 0.22f)
+    val textShadow =
+        remember(color, fontPx, shadow, glow) {
+            when {
+                glow -> Shadow(color.copy(alpha = 0.55f), Offset.Zero, fontPx * 0.6f)
+                shadow -> Shadow(Color.Black.copy(alpha = 0.5f), Offset(0f, fontPx * 0.035f), fontPx * 0.22f)
+                else -> null
+            }
         }
     Text(
         text = text.uppercase(),
         color = color,
         fontSize = fontSp,
+        fontFamily = fontFamily,
         fontWeight = FontWeight.Black,
         letterSpacing = (-0.02f).em,
         lineHeight = fontSp * 1.05f,
         softWrap = false,
         maxLines = 1,
-        style = TextStyle(shadow = shadow),
+        style = TextStyle(shadow = textShadow),
         modifier =
             modifier
-                .onGloballyPositioned { coords = it }
+                .onGloballyPositioned { holder[0] = it }
                 .graphicsLayer {
                     val p = progress.value
                     val h = 1f - p
@@ -626,6 +845,7 @@ private fun KWordText(
                     rotationZ = from.rotate * h
                     rotationX = from.rotateX * h
                     cameraDistance = 12f * this.density
+                    compositingStrategy = if (offscreen) CompositingStrategy.Offscreen else CompositingStrategy.Auto
                     renderEffect =
                         if (from.blurPx > 0f && h > 0.02f && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
                             val r = from.blurPx * h
@@ -660,9 +880,7 @@ private fun StackTemplate(c: KCtx) {
             FlowRow(
                 horizontalArrangement = Arrangement.spacedBy(gap, if (left) Alignment.Start else Alignment.End),
             ) {
-                row.forEach { i ->
-                    KWordText(c.line.words[i].text, c.shown(i), from, springSpec(150f), fontPx, c.color(i), i in c.highlights, onReveal = c.onReveal)
-                }
+                row.forEach { i -> c.Word(i, fontPx, from, 150f) }
             }
         }
     }
@@ -694,28 +912,30 @@ private fun SlideTemplate(c: KCtx) {
                         .padding(start = px2dp(indent * c.w / 100f)),
                 horizontalArrangement = Arrangement.spacedBy(gap),
             ) {
-                row.forEach { i ->
-                    KWordText(c.line.words[i].text, c.shown(i), from, springSpec(120f), fontPx, c.color(i), i in c.highlights, onReveal = c.onReveal)
-                }
+                row.forEach { i -> c.Word(i, fontPx, from, 120f) }
             }
         }
     }
 }
 
-/** Words fly in huge and blurred, settling into centred rows. */
+/** Words fly in huge (and blurred when allowed), settling into centred rows. */
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun ZoomTemplate(c: KCtx) {
     val rows = groupRows(c.line.words, ceil(c.line.words.size / 2f).toInt().coerceIn(1, 4))
     val fontPx = fitRows(c, rows, 90f, 17f)
     val gap = px2dp(fontPx * 0.25f)
-    val from = Pose(scale = 2.6f, alpha = 0f, scaleY = 0.75f, blurPx = fontPx * 0.25f)
+    val from =
+        Pose(
+            scale = if (c.blur) 2.6f else 1.8f,
+            alpha = 0f,
+            scaleY = 0.75f,
+            blurPx = if (c.blur) fontPx * 0.25f else 0f,
+        )
     Column(modifier = Modifier.fillMaxWidth(0.94f), horizontalAlignment = Alignment.CenterHorizontally) {
         rows.forEach { row ->
             FlowRow(horizontalArrangement = Arrangement.spacedBy(gap, Alignment.CenterHorizontally)) {
-                row.forEach { i ->
-                    KWordText(c.line.words[i].text, c.shown(i), from, springSpec(80f), fontPx, c.color(i), i in c.highlights, onReveal = c.onReveal)
-                }
+                row.forEach { i -> c.Word(i, fontPx, from, 80f) }
             }
         }
     }
@@ -730,7 +950,12 @@ private fun LettersTemplate(c: KCtx) {
     val rows = groupRows(c.line.words, ceil(c.line.words.size / 2f).toInt().coerceIn(1, 4))
     val fontPx = fitRows(c, rows, 90f, 16f)
     val gap = px2dp(fontPx * 0.25f)
-    val from = Pose(rotateX = if (fromTop) 90f else -90f, y = if (fromTop) -0.4f else 0.4f, alpha = 0f)
+    val from =
+        Pose(
+            rotateX = if (c.flip) (if (fromTop) 90f else -90f) else 0f,
+            y = if (fromTop) -0.4f else 0.4f,
+            alpha = 0f,
+        )
     Column(modifier = Modifier.fillMaxWidth(0.94f), horizontalAlignment = Alignment.CenterHorizontally) {
         rows.forEach { row ->
             FlowRow(horizontalArrangement = Arrangement.spacedBy(gap, Alignment.CenterHorizontally)) {
@@ -738,16 +963,15 @@ private fun LettersTemplate(c: KCtx) {
                     val letters = remember(c.line.words[i].text) { splitLetters(c.line.words[i].text) }
                     Row {
                         letters.forEachIndexed { j, ch ->
-                            KWordText(
-                                ch,
-                                c.shown(i),
-                                from,
-                                springSpec(160f),
-                                fontPx,
-                                c.color(i),
-                                i in c.highlights,
-                                delayMs = j * 30,
-                                onReveal = if (j == 0) c.onReveal else null,
+                            c.Word(
+                                i = i,
+                                fontPx = fontPx,
+                                from = from,
+                                stiffness = 160f,
+                                text = ch,
+                                delayMs = j * c.letterDelay,
+                                offscreen = false,
+                                reveal = j == 0,
                             )
                         }
                     }
@@ -780,18 +1004,14 @@ private fun ScatterTemplate(c: KCtx) {
         horizontalArrangement = Arrangement.spacedBy(gap, Alignment.CenterHorizontally),
         verticalArrangement = Arrangement.spacedBy(px2dp(base * 0.1f), Alignment.CenterVertically),
     ) {
-        c.line.words.forEachIndexed { i, w ->
+        c.line.words.indices.forEach { i ->
             val (scale, offset, from) = layout[i]
-            KWordText(
-                w.text,
-                c.shown(i),
-                from,
-                springSpec(150f),
-                base * scale,
-                c.color(i),
-                i in c.highlights,
+            c.Word(
+                i = i,
+                fontPx = base * scale,
+                from = from,
+                stiffness = 150f,
                 modifier = Modifier.offset(y = px2dp(base * offset)),
-                onReveal = c.onReveal,
             )
         }
     }
@@ -807,6 +1027,7 @@ private fun FlowTemplate(c: KCtx) {
     val gap = px2dp(fontPx * 0.26f)
     val density = LocalDensity.current
     val fontSp = with(density) { fontPx.toSp() }
+    val fade = (300 / c.speed).toInt()
     FlowRow(
         modifier = Modifier.fillMaxWidth(0.92f),
         horizontalArrangement = Arrangement.spacedBy(gap, Alignment.CenterHorizontally),
@@ -814,28 +1035,36 @@ private fun FlowTemplate(c: KCtx) {
         c.line.words.forEachIndexed { i, w ->
             val sung = c.shown(i)
             val active = i == c.revealed - 1
-            val a by animateFloatAsState(if (sung) 1f else 0.32f, tween(300), label = "flowAlpha")
-            val s by animateFloatAsState(if (active) 1.03f else 1f, tween(300), label = "flowScale")
-            val color = if (sung) c.color(i) else Color.White
-            var coords by remember { mutableStateOf<LayoutCoordinates?>(null) }
+            val a by animateFloatAsState(if (sung) 1f else 0.32f, tween(fade), label = "flowAlpha")
+            val s by animateFloatAsState(if (active) 1.03f else 1f, tween(fade), label = "flowScale")
+            val holder = remember { arrayOfNulls<LayoutCoordinates>(1) }
             LaunchedEffect(sung) {
                 if (sung) {
-                    coords?.takeIf { it.isAttached }?.let { cc ->
+                    holder[0]?.takeIf { it.isAttached }?.let { cc ->
                         c.onReveal(cc.positionInRoot() + Offset(cc.size.width / 2f, cc.size.height / 2f))
                     }
                 }
             }
             Text(
                 text = w.text.uppercase(),
-                color = color,
+                color = c.look.colors[i],
                 fontSize = fontSp,
+                fontFamily = c.look.fonts[i],
                 fontWeight = FontWeight.ExtraBold,
                 letterSpacing = (-0.02f).em,
                 lineHeight = fontSp * 1.12f,
-                style = TextStyle(shadow = Shadow(Color.Black.copy(alpha = 0.5f), Offset(0f, fontPx * 0.035f), fontPx * 0.22f)),
+                style =
+                    TextStyle(
+                        shadow =
+                            if (c.shadow) {
+                                Shadow(Color.Black.copy(alpha = 0.5f), Offset(0f, fontPx * 0.035f), fontPx * 0.22f)
+                            } else {
+                                null
+                            },
+                    ),
                 modifier =
                     Modifier
-                        .onGloballyPositioned { coords = it }
+                        .onGloballyPositioned { holder[0] = it }
                         .graphicsLayer {
                             alpha = a
                             scaleX = s
@@ -961,27 +1190,31 @@ private fun GraphTemplate(c: KCtx) {
     val nodes = remember(c.line, c.seed, c.w, c.h) { layoutGraph(words, c.seed, c.w, c.h) }
     val segs = remember(nodes) { graphSegments(words, nodes) }
     val progress = remember(segs) { segs.map { Animatable(0f) } }
+    val drawMs = (800 / c.speed).toInt()
     LaunchedEffect(c.revealed, segs) {
         segs.forEachIndexed { i, s ->
-            launch { progress[i].animateTo(if (s.dest < c.revealed) 1f else 0f, tween(800)) }
+            launch { progress[i].animateTo(if (s.dest < c.revealed) 1f else 0f, tween(drawMs)) }
         }
     }
     val strokeWidth = max(2f, nodes.firstOrNull { !it.leaf }?.font?.times(0.05f) ?: 2f)
     val from = Pose(y = 0.5f, alpha = 0f, scale = 0.8f)
+    val lineColor = c.look.accent.copy(alpha = 0.9f)
     Layout(
         content = {
-            words.forEachIndexed { i, t ->
-                KWordText(t, c.shown(i), from, springSpec(150f), nodes[i].font, c.color(i), i in c.highlights, onReveal = c.onReveal)
-            }
+            words.indices.forEach { i -> c.Word(i, nodes[i].font, from, 150f) }
         },
         modifier =
             Modifier
                 .size(px2dp(c.w), px2dp(c.h))
                 .drawBehind {
+                    val path = Path()
+                    val part = Path()
+                    val measure = PathMeasure()
                     segs.forEachIndexed { i, s ->
                         val p = progress[i].value.coerceIn(0f, 1f)
                         if (p <= 0.001f) return@forEachIndexed
-                        val path = Path()
+                        path.reset()
+                        part.reset()
                         path.moveTo(s.a.x, s.a.y)
                         if (s.horizontal) {
                             val mx = (s.a.x + s.b.x) / 2f
@@ -990,11 +1223,9 @@ private fun GraphTemplate(c: KCtx) {
                             val my = (s.a.y + s.b.y) / 2f
                             path.cubicTo(s.a.x, my, s.b.x, my, s.b.x, s.b.y)
                         }
-                        val measure = PathMeasure()
                         measure.setPath(path, false)
-                        val part = Path()
                         measure.getSegment(0f, measure.length * p, part, true)
-                        drawPath(part, c.accent.copy(alpha = 0.9f), style = Stroke(width = strokeWidth, cap = StrokeCap.Round))
+                        drawPath(part, lineColor, style = Stroke(width = strokeWidth, cap = StrokeCap.Round))
                     }
                 },
     ) { measurables, constraints ->
@@ -1010,12 +1241,34 @@ private fun GraphTemplate(c: KCtx) {
 
 // ==================== background ====================
 
+/** Draws the content at [quality] of the screen resolution and scales it up (much less work on high-resolution screens). */
+private fun Modifier.lowRes(quality: Float): Modifier =
+    if (quality >= 0.99f) {
+        this
+    } else {
+        layout { measurable, constraints ->
+            val q = quality.coerceIn(0.2f, 1f)
+            val w = max(2, (constraints.maxWidth * q).roundToInt())
+            val h = max(2, (constraints.maxHeight * q).roundToInt())
+            val placeable = measurable.measure(Constraints.fixed(w, h))
+            layout(constraints.maxWidth, constraints.maxHeight) {
+                placeable.placeWithLayer(0, 0) {
+                    scaleX = 1f / q
+                    scaleY = 1f / q
+                    transformOrigin = TransformOrigin(0f, 0f)
+                    compositingStrategy = CompositingStrategy.Offscreen
+                }
+            }
+        }
+    }
+
 @Composable
 private fun KineticBackground(
     clock: State<Float>,
     ripples: RippleBuffer,
-    accents: List<Color>,
-    ripplesOn: Boolean,
+    palette: KPalette,
+    strength: Int,
+    quality: Int,
     modifier: Modifier,
 ) {
     val shader =
@@ -1026,10 +1279,11 @@ private fun KineticBackground(
                 null
             }
         }
+    val lowRes = modifier.lowRes(quality / 100f)
     if (shader != null && Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-        AgslBackground(shader, clock, ripples, accents, ripplesOn, modifier)
+        AgslBackground(shader, clock, ripples, palette, strength / 100f, lowRes)
     } else {
-        FallbackBackground(clock, ripples, accents, ripplesOn, modifier)
+        FallbackBackground(clock, ripples, palette, strength / 100f, lowRes)
     }
 }
 
@@ -1039,19 +1293,18 @@ private fun AgslBackground(
     shader: RuntimeShader,
     clock: State<Float>,
     ripples: RippleBuffer,
-    accents: List<Color>,
-    ripplesOn: Boolean,
+    palette: KPalette,
+    k: Float,
     modifier: Modifier,
 ) {
     val brush = remember(shader) { ShaderBrush(shader) }
     Canvas(modifier) {
         shader.setFloatUniform("uRes", size.width, size.height)
         shader.setFloatUniform("uTime", clock.value)
-        shader.setFloatUniform("uC0", accents[0].red, accents[0].green, accents[0].blue)
-        shader.setFloatUniform("uC1", accents[1].red, accents[1].green, accents[1].blue)
-        shader.setFloatUniform("uC2", accents[2].red, accents[2].green, accents[2].blue)
-        shader.setFloatUniform("uBase", KineticBase.red, KineticBase.green, KineticBase.blue)
-        shader.setFloatUniform("uRip", if (ripplesOn) ripples.data else NoRipples)
+        palette.pools.forEachIndexed { i, c -> shader.setFloatUniform("uC$i", c.red * k, c.green * k, c.blue * k) }
+        val bk = 0.5f + 0.5f * k
+        shader.setFloatUniform("uBase", palette.base.red * bk, palette.base.green * bk, palette.base.blue * bk)
+        shader.setFloatUniform("uRip", ripples.data)
         drawRect(brush)
     }
 }
@@ -1061,13 +1314,13 @@ private fun AgslBackground(
 private fun FallbackBackground(
     clock: State<Float>,
     ripples: RippleBuffer,
-    accents: List<Color>,
-    ripplesOn: Boolean,
+    palette: KPalette,
+    k: Float,
     modifier: Modifier,
 ) {
     Canvas(modifier) {
         val t = clock.value
-        drawRect(KineticBase)
+        drawRect(palette.base)
         val spots =
             listOf(
                 Offset(0.25f + 0.08f * sin(t * 0.17f), 0.3f + 0.06f * sin(t * 0.13f + 1f)),
@@ -1078,22 +1331,20 @@ private fun FallbackBackground(
             val center = Offset(s.x * size.width, s.y * size.height)
             val radius = max(size.width, size.height) * 0.6f
             drawCircle(
-                brush = Brush.radialGradient(listOf(accents[i].copy(alpha = 0.4f), Color.Transparent), center, radius),
+                brush = Brush.radialGradient(listOf(palette.pools[i].copy(alpha = (0.4f * k).coerceIn(0f, 1f)), Color.Transparent), center, radius),
                 radius = radius,
                 center = center,
             )
         }
-        if (ripplesOn) {
-            for (i in 0 until 8) {
-                val age = t - ripples.data[i * 4 + 2]
-                if (ripples.data[i * 4 + 3] <= 0f || age < 0f || age > 3.5f) continue
-                drawCircle(
-                    color = Color.White.copy(alpha = 0.14f * (1f - age / 3.5f)),
-                    radius = age * 0.32f * size.height,
-                    center = Offset(ripples.data[i * 4] * size.width, ripples.data[i * 4 + 1] * size.height),
-                    style = Stroke(width = 3f),
-                )
-            }
+        for (i in 0 until 8) {
+            val age = t - ripples.data[i * 4 + 2]
+            if (ripples.data[i * 4 + 3] <= 0f || age < 0f || age > 3.5f) continue
+            drawCircle(
+                color = Color.White.copy(alpha = 0.14f * (1f - age / 3.5f)),
+                radius = age * 0.32f * size.height,
+                center = Offset(ripples.data[i * 4] * size.width, ripples.data[i * 4 + 1] * size.height),
+                style = Stroke(width = 3f),
+            )
         }
     }
 }

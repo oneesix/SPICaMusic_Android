@@ -145,6 +145,19 @@ class PreferencesManager(
         val LYRIC_KINETIC_SIZE = intPreferencesKey("lyric_kinetic_size")
         val LYRIC_KINETIC_POSITION = intPreferencesKey("lyric_kinetic_position")
         val LYRIC_KINETIC_RIPPLES = booleanPreferencesKey("lyric_kinetic_ripples")
+        val LYRIC_KINETIC_SHADOW = booleanPreferencesKey("lyric_kinetic_shadow")
+        val LYRIC_KINETIC_GLOW = booleanPreferencesKey("lyric_kinetic_glow")
+        val LYRIC_KINETIC_BLUR = booleanPreferencesKey("lyric_kinetic_blur")
+        val LYRIC_KINETIC_FLIP3D = booleanPreferencesKey("lyric_kinetic_flip3d")
+        val LYRIC_KINETIC_SPEED = intPreferencesKey("lyric_kinetic_speed")
+        val LYRIC_KINETIC_LETTER_DELAY = intPreferencesKey("lyric_kinetic_letter_delay")
+        val LYRIC_KINETIC_TEXT_COLORS = intPreferencesKey("lyric_kinetic_text_colors")
+        val LYRIC_KINETIC_TEXT_STRENGTH = intPreferencesKey("lyric_kinetic_text_strength")
+        val LYRIC_KINETIC_BG_STRENGTH = intPreferencesKey("lyric_kinetic_bg_strength")
+        val LYRIC_KINETIC_BG_QUALITY = intPreferencesKey("lyric_kinetic_bg_quality")
+        val LYRIC_KINETIC_FONT_MIX = booleanPreferencesKey("lyric_kinetic_font_mix")
+        val LYRIC_KINETIC_FONT_COUNT = intPreferencesKey("lyric_kinetic_font_count")
+        val LYRIC_KINETIC_FONTS = stringPreferencesKey("lyric_kinetic_fonts")
     }
 
 
@@ -243,10 +256,23 @@ class PreferencesManager(
                     dockSoftEdge = p[Keys.LYRIC_DOCK_SOFT_EDGE] ?: d.dockSoftEdge,
                     dockEdgeFade = p[Keys.LYRIC_DOCK_EDGE_FADE] ?: d.dockEdgeFade,
                     kineticEnabled = p[Keys.LYRIC_KINETIC_ENABLED] ?: d.kineticEnabled,
-                    kineticStyle = p[Keys.LYRIC_KINETIC_STYLE]?.let(KineticStyle::fromString) ?: d.kineticStyle,
+                    kineticStyles = p[Keys.LYRIC_KINETIC_STYLE]?.let(::parseKineticStyles) ?: d.kineticStyles,
                     kineticSize = p[Keys.LYRIC_KINETIC_SIZE] ?: d.kineticSize,
                     kineticPosition = p[Keys.LYRIC_KINETIC_POSITION] ?: d.kineticPosition,
                     kineticRipples = p[Keys.LYRIC_KINETIC_RIPPLES] ?: d.kineticRipples,
+                    kineticShadow = p[Keys.LYRIC_KINETIC_SHADOW] ?: d.kineticShadow,
+                    kineticGlow = p[Keys.LYRIC_KINETIC_GLOW] ?: d.kineticGlow,
+                    kineticBlur = p[Keys.LYRIC_KINETIC_BLUR] ?: d.kineticBlur,
+                    kineticFlip3d = p[Keys.LYRIC_KINETIC_FLIP3D] ?: d.kineticFlip3d,
+                    kineticSpeed = p[Keys.LYRIC_KINETIC_SPEED] ?: d.kineticSpeed,
+                    kineticLetterDelay = p[Keys.LYRIC_KINETIC_LETTER_DELAY] ?: d.kineticLetterDelay,
+                    kineticTextColors = p[Keys.LYRIC_KINETIC_TEXT_COLORS] ?: d.kineticTextColors,
+                    kineticTextStrength = p[Keys.LYRIC_KINETIC_TEXT_STRENGTH] ?: d.kineticTextStrength,
+                    kineticBgStrength = p[Keys.LYRIC_KINETIC_BG_STRENGTH] ?: d.kineticBgStrength,
+                    kineticBgQuality = p[Keys.LYRIC_KINETIC_BG_QUALITY] ?: d.kineticBgQuality,
+                    kineticFontMix = p[Keys.LYRIC_KINETIC_FONT_MIX] ?: d.kineticFontMix,
+                    kineticFontCount = p[Keys.LYRIC_KINETIC_FONT_COUNT] ?: d.kineticFontCount,
+                    kineticFonts = p[Keys.LYRIC_KINETIC_FONTS] ?: d.kineticFonts,
                 ).sanitized()
             }.distinctUntilChanged()
 
@@ -345,10 +371,23 @@ class PreferencesManager(
                     dockSoftEdge = p[Keys.LYRIC_DOCK_SOFT_EDGE] ?: d.dockSoftEdge,
                     dockEdgeFade = p[Keys.LYRIC_DOCK_EDGE_FADE] ?: d.dockEdgeFade,
                     kineticEnabled = p[Keys.LYRIC_KINETIC_ENABLED] ?: d.kineticEnabled,
-                    kineticStyle = p[Keys.LYRIC_KINETIC_STYLE]?.let(KineticStyle::fromString) ?: d.kineticStyle,
+                    kineticStyles = p[Keys.LYRIC_KINETIC_STYLE]?.let(::parseKineticStyles) ?: d.kineticStyles,
                     kineticSize = p[Keys.LYRIC_KINETIC_SIZE] ?: d.kineticSize,
                     kineticPosition = p[Keys.LYRIC_KINETIC_POSITION] ?: d.kineticPosition,
                     kineticRipples = p[Keys.LYRIC_KINETIC_RIPPLES] ?: d.kineticRipples,
+                    kineticShadow = p[Keys.LYRIC_KINETIC_SHADOW] ?: d.kineticShadow,
+                    kineticGlow = p[Keys.LYRIC_KINETIC_GLOW] ?: d.kineticGlow,
+                    kineticBlur = p[Keys.LYRIC_KINETIC_BLUR] ?: d.kineticBlur,
+                    kineticFlip3d = p[Keys.LYRIC_KINETIC_FLIP3D] ?: d.kineticFlip3d,
+                    kineticSpeed = p[Keys.LYRIC_KINETIC_SPEED] ?: d.kineticSpeed,
+                    kineticLetterDelay = p[Keys.LYRIC_KINETIC_LETTER_DELAY] ?: d.kineticLetterDelay,
+                    kineticTextColors = p[Keys.LYRIC_KINETIC_TEXT_COLORS] ?: d.kineticTextColors,
+                    kineticTextStrength = p[Keys.LYRIC_KINETIC_TEXT_STRENGTH] ?: d.kineticTextStrength,
+                    kineticBgStrength = p[Keys.LYRIC_KINETIC_BG_STRENGTH] ?: d.kineticBgStrength,
+                    kineticBgQuality = p[Keys.LYRIC_KINETIC_BG_QUALITY] ?: d.kineticBgQuality,
+                    kineticFontMix = p[Keys.LYRIC_KINETIC_FONT_MIX] ?: d.kineticFontMix,
+                    kineticFontCount = p[Keys.LYRIC_KINETIC_FONT_COUNT] ?: d.kineticFontCount,
+                    kineticFonts = p[Keys.LYRIC_KINETIC_FONTS] ?: d.kineticFonts,
                 )
             val n = transform(current).sanitized()
             p[Keys.LYRIC_FONT_STYLE] = n.fontStyle
@@ -438,10 +477,23 @@ class PreferencesManager(
             p[Keys.LYRIC_DOCK_SOFT_EDGE] = n.dockSoftEdge
             p[Keys.LYRIC_DOCK_EDGE_FADE] = n.dockEdgeFade
             p[Keys.LYRIC_KINETIC_ENABLED] = n.kineticEnabled
-            p[Keys.LYRIC_KINETIC_STYLE] = n.kineticStyle.value
+            p[Keys.LYRIC_KINETIC_STYLE] = n.kineticStyles.joinToString(",") { it.value }
             p[Keys.LYRIC_KINETIC_SIZE] = n.kineticSize
             p[Keys.LYRIC_KINETIC_POSITION] = n.kineticPosition
             p[Keys.LYRIC_KINETIC_RIPPLES] = n.kineticRipples
+            p[Keys.LYRIC_KINETIC_SHADOW] = n.kineticShadow
+            p[Keys.LYRIC_KINETIC_GLOW] = n.kineticGlow
+            p[Keys.LYRIC_KINETIC_BLUR] = n.kineticBlur
+            p[Keys.LYRIC_KINETIC_FLIP3D] = n.kineticFlip3d
+            p[Keys.LYRIC_KINETIC_SPEED] = n.kineticSpeed
+            p[Keys.LYRIC_KINETIC_LETTER_DELAY] = n.kineticLetterDelay
+            p[Keys.LYRIC_KINETIC_TEXT_COLORS] = n.kineticTextColors
+            p[Keys.LYRIC_KINETIC_TEXT_STRENGTH] = n.kineticTextStrength
+            p[Keys.LYRIC_KINETIC_BG_STRENGTH] = n.kineticBgStrength
+            p[Keys.LYRIC_KINETIC_BG_QUALITY] = n.kineticBgQuality
+            p[Keys.LYRIC_KINETIC_FONT_MIX] = n.kineticFontMix
+            p[Keys.LYRIC_KINETIC_FONT_COUNT] = n.kineticFontCount
+            p[Keys.LYRIC_KINETIC_FONTS] = n.kineticFonts
         }
     }
 
@@ -535,3 +587,11 @@ class PreferencesManager(
         }
     }
 }
+
+/** "auto" or a comma separated list such as "stack,zoom" (the old single value still works). */
+private fun parseKineticStyles(raw: String): Set<KineticStyle> =
+    raw
+        .split(',')
+        .mapNotNull { v -> KineticStyle.entries.firstOrNull { it.value == v.trim() } }
+        .toSet()
+        .ifEmpty { setOf(KineticStyle.Auto) }

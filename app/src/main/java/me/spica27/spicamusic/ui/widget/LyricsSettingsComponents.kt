@@ -141,6 +141,42 @@ internal fun <T> LyricsSettingsChips(
     }
 }
 
+/** Row of selectable chips where several can be on at the same time. */
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+internal fun <T> LyricsSettingsMultiChips(
+    label: String,
+    description: String,
+    options: List<T>,
+    isSelected: (T) -> Boolean,
+    optionLabel: @Composable (T) -> String,
+    optionFont: (T) -> FontFamily? = { null },
+    onToggle: (T) -> Unit,
+) {
+    Column(modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp)) {
+        LabelBlock(label = label, description = description)
+        FlowRow(
+            modifier = Modifier.padding(top = 8.dp),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            options.forEach { option ->
+                FilterChip(
+                    selected = isSelected(option),
+                    onClick = { onToggle(option) },
+                    label = {
+                        Text(
+                            text = optionLabel(option),
+                            style = TextStyle(fontFamily = optionFont(option)),
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                        )
+                    },
+                )
+            }
+        }
+    }
+}
+
 /** Label + switch. Used by the sections that come with the next parts. */
 @Composable
 internal fun LyricsSettingsToggle(

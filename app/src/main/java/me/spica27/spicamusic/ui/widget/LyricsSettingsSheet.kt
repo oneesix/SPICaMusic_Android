@@ -1,5 +1,18 @@
 package me.spica27.spicamusic.ui.widget
 
+import android.widget.Toast
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.Text
+import androidx.compose.runtime.mutableStateListOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.ui.platform.LocalContext
+import kotlinx.coroutines.launch
+import me.spica27.spicamusic.core.preferences.KineticPreset
+import me.spica27.spicamusic.core.preferences.kineticPresetOrNull
+import me.spica27.spicamusic.core.preferences.withKineticPreset
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.navigationBarsPadding
@@ -1016,6 +1029,18 @@ private fun EnhanceHeaderSection(
     )
 }
 
+private fun toggleKineticStyle(
+    current: Set<KineticStyle>,
+    style: KineticStyle,
+): Set<KineticStyle> =
+    if (style == KineticStyle.Auto) {
+        setOf(KineticStyle.Auto)
+    } else {
+        val base = current - KineticStyle.Auto
+        val next = if (style in base) base - style else base + style
+        next.ifEmpty { setOf(KineticStyle.Auto) }
+    }
+
 @Composable
 private fun KineticSection(
     settings: LyricsStyleSettings,
@@ -1031,11 +1056,11 @@ private fun KineticSection(
     )
     if (!settings.kineticEnabled) return
 
-    LyricsSettingsChips(
+    LyricsSettingsMultiChips(
         label = stringResource(R.string.lyr_set_kinetic_style),
         description = stringResource(R.string.lyr_set_kinetic_style_desc),
         options = KineticStyle.entries,
-        selected = settings.kineticStyle,
+        isSelected = { it in settings.kineticStyles },
         optionLabel = { style ->
             stringResource(
                 when (style) {
@@ -1050,7 +1075,7 @@ private fun KineticSection(
                 },
             )
         },
-        onSelect = { style -> onUpdate { it.copy(kineticStyle = style) } },
+        onToggle = { style -> onUpdate { it.copy(kineticStyles = toggleKineticStyle(it.kineticStyles, style)) } },
     )
     LyricsSettingsSlider(
         label = stringResource(R.string.lyr_set_kinetic_size),
@@ -1080,10 +1105,201 @@ private fun KineticSection(
         },
         onValueChange = { v -> onUpdate { it.copy(kineticPosition = v) } },
     )
+
+    // ---- Text animation ----
+    LyricsSettingsSection(stringResource(R.string.lyr_set_kinetic_section_text))
+    LyricsSettingsChips(
+        label = stringResource(R.string.lyr_set_kinetic_preset),
+        description = stringResource(R.string.lyr_set_kinetic_preset_desc),
+        options = KineticPreset.entries,
+        selected = settings.kineticPresetOrNull(),
+        optionLabel = { preset ->
+            when (preset) {
+                KineticPreset.Light -> stringResource(R.string.lyr_set_kinetic_preset_light)
+                KineticPreset.Balanced -> stringResource(R.string.lyr_set_kinetic_preset_balanced)
+                KineticPreset.Full -> stringResource(R.string.lyr_set_kinetic_preset_full)
+                null -> ""
+            }
+        },
+        onSelect = { preset -> if (preset != null) onUpdate { it.withKineticPreset(preset) } },
+    )
+    LyricsSettingsSlider(
+        label = stringResource(R.string.lyr_set_kinetic_speed),
+        description = stringResource(R.string.lyr_set_kinetic_speed_desc),
+        value = settings.kineticSpeed,
+        range = LyricsStyleSettings.KINETIC_SPEED_RANGE,
+        step = 10,
+        valueText = { "$it%" },
+        onValueChange = { v -> onUpdate { it.copy(kineticSpeed = v) } },
+    )
+    LyricsSettingsSlider(
+        label = stringResource(R.string.lyr_set_kinetic_letter_delay),
+        description = stringResource(R.string.lyr_set_kinetic_letter_delay_desc),
+        value = settings.kineticLetterDelay,
+        range = LyricsStyleSettings.KINETIC_LETTER_DELAY_RANGE,
+        step = 5,
+        valueText = { "$it ms" },
+        onValueChange = { v -> onUpdate { it.copy(kineticLetterDelay = v) } },
+    )
+    LyricsSettingsToggle(
+        label = stringResource(R.string.lyr_set_kinetic_shadow),
+        description = stringResource(R.string.lyr_set_kinetic_shadow_desc),
+        checked = settings.kineticShadow,
+        onCheckedChange = { v -> onUpdate { it.copy(kineticShadow = v) } },
+    )
+    LyricsSettingsToggle(
+        label = stringResource(R.string.lyr_set_kinetic_glow),
+        description = stringResource(R.string.lyr_set_kinetic_glow_desc),
+        checked = settings.kineticGlow,
+        onCheckedChange = { v -> onUpdate { it.copy(kineticGlow = v) } },
+    )
+    LyricsSettingsToggle(
+        label = stringResource(R.string.lyr_set_kinetic_blur),
+        description = stringResource(R.string.lyr_set_kinetic_blur_desc),
+        checked = settings.kineticBlur,
+        onCheckedChange = { v -> onUpdate { it.copy(kineticBlur = v) } },
+    )
+    LyricsSettingsToggle(
+        label = stringResource(R.string.lyr_set_kinetic_flip),
+        description = stringResource(R.string.lyr_set_kinetic_flip_desc),
+        checked = settings.kineticFlip3d,
+        onCheckedChange = { v -> onUpdate { it.copy(kineticFlip3d = v) } },
+    )
+
+    // ---- Colours ----
+    LyricsSettingsSlider(
+        label = stringResource(R.string.lyr_set_kinetic_text_colors),
+        description = stringResource(R.string.lyr_set_kinetic_text_colors_desc),
+        value = settings.kineticTextColors,
+        range = LyricsStyleSettings.KINETIC_TEXT_COLORS_RANGE,
+        step = 1,
+        valueText = { "$it" },
+        onValueChange = { v -> onUpdate { it.copy(kineticTextColors = v) } },
+    )
+    LyricsSettingsSlider(
+        label = stringResource(R.string.lyr_set_kinetic_text_strength),
+        description = stringResource(R.string.lyr_set_kinetic_text_strength_desc),
+        value = settings.kineticTextStrength,
+        range = LyricsStyleSettings.KINETIC_TEXT_STRENGTH_RANGE,
+        step = 10,
+        valueText = { "$it%" },
+        onValueChange = { v -> onUpdate { it.copy(kineticTextStrength = v) } },
+    )
+
+    // ---- Fonts ----
+    KineticFontsSection(settings = settings, onUpdate = onUpdate)
+
+    // ---- Background ----
+    LyricsSettingsSection(stringResource(R.string.lyr_set_kinetic_section_bg))
     LyricsSettingsToggle(
         label = stringResource(R.string.lyr_set_kinetic_ripples),
         description = stringResource(R.string.lyr_set_kinetic_ripples_desc),
         checked = settings.kineticRipples,
         onCheckedChange = { v -> onUpdate { it.copy(kineticRipples = v) } },
     )
+    if (settings.kineticRipples) {
+        LyricsSettingsSlider(
+            label = stringResource(R.string.lyr_set_kinetic_bg_quality),
+            description = stringResource(R.string.lyr_set_kinetic_bg_quality_desc),
+            value = settings.kineticBgQuality,
+            range = LyricsStyleSettings.KINETIC_BG_QUALITY_RANGE,
+            step = 10,
+            valueText = { "$it%" },
+            onValueChange = { v -> onUpdate { it.copy(kineticBgQuality = v) } },
+        )
+        LyricsSettingsSlider(
+            label = stringResource(R.string.lyr_set_kinetic_bg_strength),
+            description = stringResource(R.string.lyr_set_kinetic_bg_strength_desc),
+            value = settings.kineticBgStrength,
+            range = LyricsStyleSettings.KINETIC_BG_STRENGTH_RANGE,
+            step = 10,
+            valueText = { "$it%" },
+            onValueChange = { v -> onUpdate { it.copy(kineticBgStrength = v) } },
+        )
+    }
+}
+
+@Composable
+private fun KineticFontsSection(
+    settings: LyricsStyleSettings,
+    onUpdate: ((LyricsStyleSettings) -> LyricsStyleSettings) -> Unit,
+) {
+    val context = LocalContext.current
+    val scope = rememberCoroutineScope()
+    val busy = remember { mutableStateListOf<String>() }
+    val options = rememberKineticFontOptions()
+    val chosen = settings.kineticFonts.split(',').filter { it.isNotBlank() }
+
+    fun addFont(id: String) {
+        onUpdate { s -> if (id in s.kineticFonts.split(',')) s else s.copy(kineticFonts = (s.kineticFonts.split(',').filter { it.isNotBlank() } + id).joinToString(",")) }
+    }
+
+    val importLauncher =
+        rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
+            if (uri != null) {
+                scope.launch {
+                    val id = KineticFontStore.importFont(context, uri)
+                    if (id != null) {
+                        addFont(id)
+                        Toast.makeText(context, R.string.lyr_set_kinetic_font_import_ok, Toast.LENGTH_SHORT).show()
+                    } else {
+                        Toast.makeText(context, R.string.lyr_set_kinetic_font_import_fail, Toast.LENGTH_SHORT).show()
+                    }
+                }
+            }
+        }
+
+    LyricsSettingsSection(stringResource(R.string.lyr_set_kinetic_section_fonts))
+    LyricsSettingsToggle(
+        label = stringResource(R.string.lyr_set_kinetic_font_mix),
+        description = stringResource(R.string.lyr_set_kinetic_font_mix_desc),
+        checked = settings.kineticFontMix,
+        onCheckedChange = { v -> onUpdate { it.copy(kineticFontMix = v) } },
+    )
+    if (!settings.kineticFontMix) return
+
+    LyricsSettingsSlider(
+        label = stringResource(R.string.lyr_set_kinetic_font_count),
+        description = stringResource(R.string.lyr_set_kinetic_font_count_desc),
+        value = settings.kineticFontCount,
+        range = LyricsStyleSettings.KINETIC_FONT_COUNT_RANGE,
+        step = 1,
+        valueText = { "$it" },
+        onValueChange = { v -> onUpdate { it.copy(kineticFontCount = v) } },
+    )
+    LyricsSettingsMultiChips(
+        label = stringResource(R.string.lyr_set_kinetic_font_pick),
+        description = stringResource(R.string.lyr_set_kinetic_font_pick_desc),
+        options = options,
+        isSelected = { it.id in chosen },
+        optionLabel = { option ->
+            when {
+                option.id in busy -> option.label + " …"
+                !option.available -> option.label + " ↓"
+                else -> option.label
+            }
+        },
+        optionFont = { option -> if (option.available) KineticFontStore.family(context, option.id) else null },
+        onToggle = { option ->
+            if (option.id in chosen) {
+                onUpdate { s -> s.copy(kineticFonts = s.kineticFonts.split(',').filter { it.isNotBlank() && it != option.id }.joinToString(",")) }
+            } else if (option.available) {
+                addFont(option.id)
+            } else if (option.id !in busy) {
+                busy.add(option.id)
+                scope.launch {
+                    val ok = KineticFontStore.download(context, option)
+                    busy.remove(option.id)
+                    if (ok) {
+                        addFont(option.id)
+                    } else {
+                        Toast.makeText(context, R.string.lyr_set_kinetic_font_download_fail, Toast.LENGTH_LONG).show()
+                    }
+                }
+            }
+        },
+    )
+    OutlinedButton(onClick = { importLauncher.launch(arrayOf("*/*")) }) {
+        Text(stringResource(R.string.lyr_set_kinetic_font_import))
+    }
 }
