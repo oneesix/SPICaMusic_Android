@@ -319,7 +319,23 @@ private fun fitPx(
 ): Float {
     val vw = min(maxPct, widthPct / max(0.5f, longest))
     val vh = heightPct / max(1, rowCount) / 1.05f
-    return min(vw * c.w / 100f, vh * c.h / 100f)
+    val base = min(vw * c.w / 100f, vh * c.h / 100f)
+    val s = c.sizeScale
+    if (s <= 1f) return base * s
+    // Bigger than 100%: the words get a bigger font and wrap into more rows inside the stage. The size is limited
+    // so the longest word still fits the width and all rows still fit the height (never below the 100% size).
+    val words = c.line.words
+    val wordEm = words.maxOf { visualLength(it.text) }
+    val totalEm = words.sumOf { (visualLength(it.text) + 0.3f).toDouble() }.toFloat()
+    var px = min(base * s, max(base, c.w * 0.92f / max(0.5f, wordEm)))
+    val lineW = widthPct / 100f * c.w
+    val maxH = heightPct / 100f * c.h
+    while (px > base) {
+        val rowsNeeded = max(rowCount, ceil(totalEm * px * 1.15f / lineW).toInt())
+        if (rowsNeeded * px * 1.3f <= maxH) break
+        px *= 0.96f
+    }
+    return max(base, px)
 }
 
 private fun fitRows(
@@ -642,6 +658,8 @@ internal fun KineticLyricsUI(
             12.dp
         }
     val bottomInset = if (displayMode == LyricsDisplayMode.Fullscreen) 132.dp else 12.dp
+    // Same left and right edge as the lyrics top bar, so the words never touch the window edge.
+    val sidePad = if (displayMode == LyricsDisplayMode.Fullscreen) rememberLyricsEdgePadding() else 8.dp
 
     Box(
         modifier =
@@ -688,6 +706,7 @@ internal fun KineticLyricsUI(
                     fonts = fonts,
                     topInset = topInset,
                     bottomInset = bottomInset,
+                    sidePad = sidePad,
                     onReveal = { rootCenter ->
                         if (settings.kineticRipples) {
                             ripples.add(
@@ -710,6 +729,8 @@ private class KCtx(
     val look: KLook,
     val w: Float,
     val h: Float,
+    /** Size of the words (1 = 100%). Applied to the font size inside the padded stage, so nothing is cut off. */
+    val sizeScale: Float,
     val speed: Float,
     val shadow: Boolean,
     val glow: Boolean,
@@ -771,6 +792,7 @@ private fun KineticStage(
     fonts: List<FontFamily?>,
     topInset: Dp,
     bottomInset: Dp,
+    sidePad: Dp,
     onReveal: (Offset) -> Unit,
 ) {
     val seed = line.text.hashCode() xor salt
@@ -786,12 +808,13 @@ private fun KineticStage(
     val revealed by remember(line) { derivedStateOf { line.words.count { it.startMs <= timeMs.value } } }
     val density = LocalDensity.current
     val speed = settings.kineticSpeed / 100f
+    val sizePct = (if (kind == KineticStyle.Auto) null else settings.kineticStyleSizes[kind]) ?: settings.kineticSize
 
     BoxWithConstraints(
         modifier =
             Modifier
                 .fillMaxSize()
-                .padding(top = topInset, bottom = bottomInset),
+                .padding(start = sidePad, end = sidePad, top = topInset, bottom = bottomInset),
         contentAlignment = Alignment.Center,
     ) {
         val w = with(density) { maxWidth.toPx() }
@@ -804,6 +827,7 @@ private fun KineticStage(
                 look = look,
                 w = w,
                 h = h,
+                sizeScale = sizePct / 100f,
                 speed = speed,
                 shadow = settings.kineticShadow,
                 glow = settings.kineticGlow,
@@ -814,13 +838,10 @@ private fun KineticStage(
                 letterDelay = (settings.kineticLetterDelay / speed).toInt(),
                 onReveal = onReveal,
             )
-        val scale = settings.kineticSize / 100f
         val shift = (settings.kineticPosition - 50) / 50f * h * 0.35f
         Box(
             modifier =
                 Modifier.graphicsLayer {
-                    scaleX = scale
-                    scaleY = scale
                     translationY = shift
                 },
             contentAlignment = Alignment.Center,
@@ -1201,8 +1222,9 @@ private fun layoutGraph(
     seed: Int,
     w: Float,
     h: Float,
+    scale: Float = 1f,
 ): List<GNode> {
-    val tf = min(h * 0.1f, w * 0.115f)
+    val tf = min(h * 0.1f, w * 0.115f) * scale
     val lf = tf * 0.42f
     val rowW = w * 0.84f
     var leaf = words.mapIndexed { i, t -> i < words.size - 1 && cleanWord(t) in SmallWords }
@@ -1257,6 +1279,30 @@ private fun layoutGraph(
     return words.indices.map { GNode(xs[it], ys[it], if (leaf[it]) lf else tf, leaf[it], parent[it], rowOf[it]) }
 }
 
+/** The graph at the chosen size, made smaller step by step until every word is inside the stage. */
+private fun layoutGraphFit(
+    words: List<String>,
+    seed: Int,
+    w: Float,
+    h: Float,
+    scale: Float,
+): List<GNode> {
+    var s = scale
+    var nodes = layoutGraph(words, seed, w, h, s)
+    while (s > 1f) {
+        val outside =
+            nodes.indices.any { i ->
+                val n = nodes[i]
+                val half = visualLength(words[i]) * n.font / 2f
+                n.x - half < 0f || n.x + half > w || n.y - n.font * 0.6f < 0f || n.y + n.font * 0.6f > h
+            }
+        if (!outside) break
+        s = max(1f, s - 0.05f)
+        nodes = layoutGraph(words, seed, w, h, s)
+    }
+    return nodes
+}
+
 private fun graphSegments(
     words: List<String>,
     nodes: List<GNode>,
@@ -1284,7 +1330,7 @@ private fun graphSegments(
 @Composable
 private fun GraphTemplate(c: KCtx) {
     val words = remember(c.line) { c.line.words.map { it.text } }
-    val nodes = remember(c.line, c.seed, c.w, c.h) { layoutGraph(words, c.seed, c.w, c.h) }
+    val nodes = remember(c.line, c.seed, c.w, c.h, c.sizeScale) { layoutGraphFit(words, c.seed, c.w, c.h, c.sizeScale) }
     val segs = remember(nodes) { graphSegments(words, nodes) }
     val progress = remember(segs) { segs.map { Animatable(0f) } }
     val drawMs = (800 / c.speed).toInt()

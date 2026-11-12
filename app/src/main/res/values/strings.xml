@@ -1117,4 +1117,8 @@
   <string name="lyr_set_kinetic_glow_random">Random words</string>
   <string name="lyr_set_kinetic_glow_intensity">Glow intensity</string>
   <string name="lyr_set_kinetic_glow_intensity_desc">Weaker or stronger glow</string>
+  <string name="lyr_set_kinetic_size_all">Size (all styles)</string>
+  <string name="lyr_set_kinetic_size_all_desc">Sets the same size for every style below</string>
+  <string name="lyr_set_kinetic_size_style">Size: %1$s</string>
+  <string name="lyr_set_kinetic_size_style_desc">Size of this style only</string>
 </resources>

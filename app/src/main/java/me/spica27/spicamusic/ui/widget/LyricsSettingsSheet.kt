@@ -5,6 +5,7 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
+import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -1133,15 +1134,42 @@ private fun KineticSection(
         },
         onToggle = { style -> onUpdate { it.copy(kineticStyles = toggleKineticStyle(it.kineticStyles, style)) } },
     )
+    // One size for every style (setting it clears the per-style sizes), then one slider for each style.
     LyricsSettingsSlider(
-        label = stringResource(R.string.lyr_set_kinetic_size),
-        description = stringResource(R.string.lyr_set_kinetic_size_desc),
+        label = stringResource(R.string.lyr_set_kinetic_size_all),
+        description = stringResource(R.string.lyr_set_kinetic_size_all_desc),
         value = settings.kineticSize,
         range = LyricsStyleSettings.KINETIC_SIZE_RANGE,
         step = 5,
         valueText = { "$it%" },
-        onValueChange = { v -> onUpdate { it.copy(kineticSize = v) } },
+        onValueChange = { v -> onUpdate { it.copy(kineticSize = v, kineticStyleSizes = emptyMap()) } },
     )
+    KineticStyle.entries.filter { it != KineticStyle.Auto }.forEach { style ->
+        val styleName =
+            stringResource(
+                when (style) {
+                    KineticStyle.Auto -> R.string.lyr_set_kinetic_auto
+                    KineticStyle.Stack -> R.string.lyr_set_kinetic_stack
+                    KineticStyle.Slide -> R.string.lyr_set_kinetic_slide
+                    KineticStyle.Zoom -> R.string.lyr_set_kinetic_zoom
+                    KineticStyle.Letters -> R.string.lyr_set_kinetic_letters
+                    KineticStyle.Scatter -> R.string.lyr_set_kinetic_scatter
+                    KineticStyle.Graph -> R.string.lyr_set_kinetic_graph
+                    KineticStyle.Flow -> R.string.lyr_set_kinetic_flow
+                },
+            )
+        key(style) {
+            LyricsSettingsSlider(
+                label = stringResource(R.string.lyr_set_kinetic_size_style, styleName),
+                description = stringResource(R.string.lyr_set_kinetic_size_style_desc),
+                value = settings.kineticStyleSizes[style] ?: settings.kineticSize,
+                range = LyricsStyleSettings.KINETIC_SIZE_RANGE,
+                step = 5,
+                valueText = { "$it%" },
+                onValueChange = { v -> onUpdate { it.copy(kineticStyleSizes = it.kineticStyleSizes + (style to v)) } },
+            )
+        }
+    }
     val top = stringResource(R.string.lyr_set_kinetic_pos_top)
     val middle = stringResource(R.string.lyr_set_kinetic_pos_middle)
     val bottom = stringResource(R.string.lyr_set_kinetic_pos_bottom)

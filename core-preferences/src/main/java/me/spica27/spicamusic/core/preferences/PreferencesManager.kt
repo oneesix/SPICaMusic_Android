@@ -143,6 +143,7 @@ class PreferencesManager(
         val LYRIC_KINETIC_ENABLED = booleanPreferencesKey("lyric_kinetic_enabled")
         val LYRIC_KINETIC_STYLE = stringPreferencesKey("lyric_kinetic_style")
         val LYRIC_KINETIC_SIZE = intPreferencesKey("lyric_kinetic_size")
+        val LYRIC_KINETIC_STYLE_SIZES = stringPreferencesKey("lyric_kinetic_style_sizes")
         val LYRIC_KINETIC_POSITION = intPreferencesKey("lyric_kinetic_position")
         val LYRIC_KINETIC_RIPPLES = booleanPreferencesKey("lyric_kinetic_ripples")
         val LYRIC_KINETIC_SHADOW = booleanPreferencesKey("lyric_kinetic_shadow")
@@ -263,6 +264,7 @@ class PreferencesManager(
                     kineticEnabled = p[Keys.LYRIC_KINETIC_ENABLED] ?: d.kineticEnabled,
                     kineticStyles = p[Keys.LYRIC_KINETIC_STYLE]?.let(::parseKineticStyles) ?: d.kineticStyles,
                     kineticSize = p[Keys.LYRIC_KINETIC_SIZE] ?: d.kineticSize,
+                    kineticStyleSizes = p[Keys.LYRIC_KINETIC_STYLE_SIZES]?.let(::parseKineticStyleSizes) ?: d.kineticStyleSizes,
                     kineticPosition = p[Keys.LYRIC_KINETIC_POSITION] ?: d.kineticPosition,
                     kineticRipples = p[Keys.LYRIC_KINETIC_RIPPLES] ?: d.kineticRipples,
                     kineticShadow = p[Keys.LYRIC_KINETIC_SHADOW] ?: d.kineticShadow,
@@ -383,6 +385,7 @@ class PreferencesManager(
                     kineticEnabled = p[Keys.LYRIC_KINETIC_ENABLED] ?: d.kineticEnabled,
                     kineticStyles = p[Keys.LYRIC_KINETIC_STYLE]?.let(::parseKineticStyles) ?: d.kineticStyles,
                     kineticSize = p[Keys.LYRIC_KINETIC_SIZE] ?: d.kineticSize,
+                    kineticStyleSizes = p[Keys.LYRIC_KINETIC_STYLE_SIZES]?.let(::parseKineticStyleSizes) ?: d.kineticStyleSizes,
                     kineticPosition = p[Keys.LYRIC_KINETIC_POSITION] ?: d.kineticPosition,
                     kineticRipples = p[Keys.LYRIC_KINETIC_RIPPLES] ?: d.kineticRipples,
                     kineticShadow = p[Keys.LYRIC_KINETIC_SHADOW] ?: d.kineticShadow,
@@ -494,6 +497,7 @@ class PreferencesManager(
             p[Keys.LYRIC_KINETIC_ENABLED] = n.kineticEnabled
             p[Keys.LYRIC_KINETIC_STYLE] = n.kineticStyles.joinToString(",") { it.value }
             p[Keys.LYRIC_KINETIC_SIZE] = n.kineticSize
+            p[Keys.LYRIC_KINETIC_STYLE_SIZES] = n.kineticStyleSizes.entries.joinToString(",") { "${it.key.value}=${it.value}" }
             p[Keys.LYRIC_KINETIC_POSITION] = n.kineticPosition
             p[Keys.LYRIC_KINETIC_RIPPLES] = n.kineticRipples
             p[Keys.LYRIC_KINETIC_SHADOW] = n.kineticShadow
@@ -615,3 +619,14 @@ private fun parseKineticStyles(raw: String): Set<KineticStyle> =
         .mapNotNull { v -> KineticStyle.entries.firstOrNull { it.value == v.trim() } }
         .toSet()
         .ifEmpty { setOf(KineticStyle.Auto) }
+
+/** Such as "stack=120,zoom=90". Unknown styles and bad numbers are skipped. */
+private fun parseKineticStyleSizes(raw: String): Map<KineticStyle, Int> =
+    raw
+        .split(',')
+        .mapNotNull { part ->
+            val kv = part.split('=')
+            val style = KineticStyle.entries.firstOrNull { it.value == kv.getOrNull(0)?.trim() }
+            val size = kv.getOrNull(1)?.trim()?.toIntOrNull()
+            if (style == null || size == null) null else style to size
+        }.toMap()

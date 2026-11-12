@@ -249,6 +249,8 @@ data class LyricsStyleSettings(
     val kineticStyles: Set<KineticStyle> = setOf(KineticStyle.Auto),
     /** Size of the kinetic words in percent (100 = fitted to the screen). */
     val kineticSize: Int = 100,
+    /** Size per style in percent. A style without an entry uses [kineticSize]. */
+    val kineticStyleSizes: Map<KineticStyle, Int> = emptyMap(),
     /** Vertical position of the kinetic words: 0 = top, 50 = middle, 100 = bottom. */
     val kineticPosition: Int = 50,
     /** On: glass background with ripples. Off: the normal player background. */
@@ -340,6 +342,7 @@ data class LyricsStyleSettings(
             bgRevealFlipPivot = bgRevealFlipPivot.coerceIn(BG_REVEAL_FLIP_PIVOT_RANGE),
             bgRevealFadeMs = bgRevealFadeMs.coerceIn(BG_REVEAL_FADE_RANGE),
             kineticSize = kineticSize.coerceIn(KINETIC_SIZE_RANGE),
+            kineticStyleSizes = kineticStyleSizes.mapValues { it.value.coerceIn(KINETIC_SIZE_RANGE) },
             kineticPosition = kineticPosition.coerceIn(KINETIC_POSITION_RANGE),
             kineticSpeed = kineticSpeed.coerceIn(KINETIC_SPEED_RANGE),
             kineticLetterDelay = kineticLetterDelay.coerceIn(KINETIC_LETTER_DELAY_RANGE),

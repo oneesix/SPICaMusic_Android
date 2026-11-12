@@ -1117,4 +1117,8 @@
   <string name="lyr_set_kinetic_glow_random">随机词</string>
   <string name="lyr_set_kinetic_glow_intensity">发光强度</string>
   <string name="lyr_set_kinetic_glow_intensity_desc">更弱或更强的发光</string>
+  <string name="lyr_set_kinetic_size_all">大小（所有样式）</string>
+  <string name="lyr_set_kinetic_size_all_desc">为下面每个样式设置相同大小</string>
+  <string name="lyr_set_kinetic_size_style">大小：%1$s</string>
+  <string name="lyr_set_kinetic_size_style_desc">只改变此样式的大小</string>
 </resources>
