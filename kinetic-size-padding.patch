@@ -1,0 +1,320 @@
+diff --git a/app/src/main/java/me/spica27/spicamusic/ui/widget/KineticLyrics.kt b/app/src/main/java/me/spica27/spicamusic/ui/widget/KineticLyrics.kt
+index aae409b..64bc961 100644
+--- a/app/src/main/java/me/spica27/spicamusic/ui/widget/KineticLyrics.kt
++++ b/app/src/main/java/me/spica27/spicamusic/ui/widget/KineticLyrics.kt
+@@ -319,7 +319,23 @@ private fun fitPx(
+ ): Float {
+     val vw = min(maxPct, widthPct / max(0.5f, longest))
+     val vh = heightPct / max(1, rowCount) / 1.05f
+-    return min(vw * c.w / 100f, vh * c.h / 100f)
++    val base = min(vw * c.w / 100f, vh * c.h / 100f)
++    val s = c.sizeScale
++    if (s <= 1f) return base * s
++    // Bigger than 100%: the words get a bigger font and wrap into more rows inside the stage. The size is limited
++    // so the longest word still fits the width and all rows still fit the height (never below the 100% size).
++    val words = c.line.words
++    val wordEm = words.maxOf { visualLength(it.text) }
++    val totalEm = words.sumOf { (visualLength(it.text) + 0.3f).toDouble() }.toFloat()
++    var px = min(base * s, max(base, c.w * 0.92f / max(0.5f, wordEm)))
++    val lineW = widthPct / 100f * c.w
++    val maxH = heightPct / 100f * c.h
++    while (px > base) {
++        val rowsNeeded = max(rowCount, ceil(totalEm * px * 1.15f / lineW).toInt())
++        if (rowsNeeded * px * 1.3f <= maxH) break
++        px *= 0.96f
++    }
++    return max(base, px)
+ }
+ 
+ private fun fitRows(
+@@ -642,6 +658,8 @@ internal fun KineticLyricsUI(
+             12.dp
+         }
+     val bottomInset = if (displayMode == LyricsDisplayMode.Fullscreen) 132.dp else 12.dp
++    // Same left and right edge as the lyrics top bar, so the words never touch the window edge.
++    val sidePad = if (displayMode == LyricsDisplayMode.Fullscreen) rememberLyricsEdgePadding() else 8.dp
+ 
+     Box(
+         modifier =
+@@ -688,6 +706,7 @@ internal fun KineticLyricsUI(
+                     fonts = fonts,
+                     topInset = topInset,
+                     bottomInset = bottomInset,
++                    sidePad = sidePad,
+                     onReveal = { rootCenter ->
+                         if (settings.kineticRipples) {
+                             ripples.add(
+@@ -710,6 +729,8 @@ private class KCtx(
+     val look: KLook,
+     val w: Float,
+     val h: Float,
++    /** Size of the words (1 = 100%). Applied to the font size inside the padded stage, so nothing is cut off. */
++    val sizeScale: Float,
+     val speed: Float,
+     val shadow: Boolean,
+     val glow: Boolean,
+@@ -771,6 +792,7 @@ private fun KineticStage(
+     fonts: List<FontFamily?>,
+     topInset: Dp,
+     bottomInset: Dp,
++    sidePad: Dp,
+     onReveal: (Offset) -> Unit,
+ ) {
+     val seed = line.text.hashCode() xor salt
+@@ -786,12 +808,13 @@ private fun KineticStage(
+     val revealed by remember(line) { derivedStateOf { line.words.count { it.startMs <= timeMs.value } } }
+     val density = LocalDensity.current
+     val speed = settings.kineticSpeed / 100f
++    val sizePct = (if (kind == KineticStyle.Auto) null else settings.kineticStyleSizes[kind]) ?: settings.kineticSize
+ 
+     BoxWithConstraints(
+         modifier =
+             Modifier
+                 .fillMaxSize()
+-                .padding(top = topInset, bottom = bottomInset),
++                .padding(start = sidePad, end = sidePad, top = topInset, bottom = bottomInset),
+         contentAlignment = Alignment.Center,
+     ) {
+         val w = with(density) { maxWidth.toPx() }
+@@ -804,6 +827,7 @@ private fun KineticStage(
+                 look = look,
+                 w = w,
+                 h = h,
++                sizeScale = sizePct / 100f,
+                 speed = speed,
+                 shadow = settings.kineticShadow,
+                 glow = settings.kineticGlow,
+@@ -814,13 +838,10 @@ private fun KineticStage(
+                 letterDelay = (settings.kineticLetterDelay / speed).toInt(),
+                 onReveal = onReveal,
+             )
+-        val scale = settings.kineticSize / 100f
+         val shift = (settings.kineticPosition - 50) / 50f * h * 0.35f
+         Box(
+             modifier =
+                 Modifier.graphicsLayer {
+-                    scaleX = scale
+-                    scaleY = scale
+                     translationY = shift
+                 },
+             contentAlignment = Alignment.Center,
+@@ -1201,8 +1222,9 @@ private fun layoutGraph(
+     seed: Int,
+     w: Float,
+     h: Float,
++    scale: Float = 1f,
+ ): List<GNode> {
+-    val tf = min(h * 0.1f, w * 0.115f)
++    val tf = min(h * 0.1f, w * 0.115f) * scale
+     val lf = tf * 0.42f
+     val rowW = w * 0.84f
+     var leaf = words.mapIndexed { i, t -> i < words.size - 1 && cleanWord(t) in SmallWords }
+@@ -1257,6 +1279,30 @@ private fun layoutGraph(
+     return words.indices.map { GNode(xs[it], ys[it], if (leaf[it]) lf else tf, leaf[it], parent[it], rowOf[it]) }
+ }
+ 
++/** The graph at the chosen size, made smaller step by step until every word is inside the stage. */
++private fun layoutGraphFit(
++    words: List<String>,
++    seed: Int,
++    w: Float,
++    h: Float,
++    scale: Float,
++): List<GNode> {
++    var s = scale
++    var nodes = layoutGraph(words, seed, w, h, s)
++    while (s > 1f) {
++        val outside =
++            nodes.indices.any { i ->
++                val n = nodes[i]
++                val half = visualLength(words[i]) * n.font / 2f
++                n.x - half < 0f || n.x + half > w || n.y - n.font * 0.6f < 0f || n.y + n.font * 0.6f > h
++            }
++        if (!outside) break
++        s = max(1f, s - 0.05f)
++        nodes = layoutGraph(words, seed, w, h, s)
++    }
++    return nodes
++}
++
+ private fun graphSegments(
+     words: List<String>,
+     nodes: List<GNode>,
+@@ -1284,7 +1330,7 @@ private fun graphSegments(
+ @Composable
+ private fun GraphTemplate(c: KCtx) {
+     val words = remember(c.line) { c.line.words.map { it.text } }
+-    val nodes = remember(c.line, c.seed, c.w, c.h) { layoutGraph(words, c.seed, c.w, c.h) }
++    val nodes = remember(c.line, c.seed, c.w, c.h, c.sizeScale) { layoutGraphFit(words, c.seed, c.w, c.h, c.sizeScale) }
+     val segs = remember(nodes) { graphSegments(words, nodes) }
+     val progress = remember(segs) { segs.map { Animatable(0f) } }
+     val drawMs = (800 / c.speed).toInt()
+diff --git a/app/src/main/java/me/spica27/spicamusic/ui/widget/LyricsSettingsSheet.kt b/app/src/main/java/me/spica27/spicamusic/ui/widget/LyricsSettingsSheet.kt
+index 514df37..efd0ef9 100644
+--- a/app/src/main/java/me/spica27/spicamusic/ui/widget/LyricsSettingsSheet.kt
++++ b/app/src/main/java/me/spica27/spicamusic/ui/widget/LyricsSettingsSheet.kt
+@@ -5,6 +5,7 @@ import androidx.activity.compose.rememberLauncherForActivityResult
+ import androidx.activity.result.contract.ActivityResultContracts
+ import androidx.compose.material3.OutlinedButton
+ import androidx.compose.material3.Text
++import androidx.compose.runtime.key
+ import androidx.compose.runtime.mutableStateListOf
+ import androidx.compose.runtime.remember
+ import androidx.compose.runtime.rememberCoroutineScope
+@@ -1133,15 +1134,42 @@ private fun KineticSection(
+         },
+         onToggle = { style -> onUpdate { it.copy(kineticStyles = toggleKineticStyle(it.kineticStyles, style)) } },
+     )
++    // One size for every style (setting it clears the per-style sizes), then one slider for each style.
+     LyricsSettingsSlider(
+-        label = stringResource(R.string.lyr_set_kinetic_size),
+-        description = stringResource(R.string.lyr_set_kinetic_size_desc),
++        label = stringResource(R.string.lyr_set_kinetic_size_all),
++        description = stringResource(R.string.lyr_set_kinetic_size_all_desc),
+         value = settings.kineticSize,
+         range = LyricsStyleSettings.KINETIC_SIZE_RANGE,
+         step = 5,
+         valueText = { "$it%" },
+-        onValueChange = { v -> onUpdate { it.copy(kineticSize = v) } },
++        onValueChange = { v -> onUpdate { it.copy(kineticSize = v, kineticStyleSizes = emptyMap()) } },
+     )
++    KineticStyle.entries.filter { it != KineticStyle.Auto }.forEach { style ->
++        val styleName =
++            stringResource(
++                when (style) {
++                    KineticStyle.Auto -> R.string.lyr_set_kinetic_auto
++                    KineticStyle.Stack -> R.string.lyr_set_kinetic_stack
++                    KineticStyle.Slide -> R.string.lyr_set_kinetic_slide
++                    KineticStyle.Zoom -> R.string.lyr_set_kinetic_zoom
++                    KineticStyle.Letters -> R.string.lyr_set_kinetic_letters
++                    KineticStyle.Scatter -> R.string.lyr_set_kinetic_scatter
++                    KineticStyle.Graph -> R.string.lyr_set_kinetic_graph
++                    KineticStyle.Flow -> R.string.lyr_set_kinetic_flow
++                },
++            )
++        key(style) {
++            LyricsSettingsSlider(
++                label = stringResource(R.string.lyr_set_kinetic_size_style, styleName),
++                description = stringResource(R.string.lyr_set_kinetic_size_style_desc),
++                value = settings.kineticStyleSizes[style] ?: settings.kineticSize,
++                range = LyricsStyleSettings.KINETIC_SIZE_RANGE,
++                step = 5,
++                valueText = { "$it%" },
++                onValueChange = { v -> onUpdate { it.copy(kineticStyleSizes = it.kineticStyleSizes + (style to v)) } },
++            )
++        }
++    }
+     val top = stringResource(R.string.lyr_set_kinetic_pos_top)
+     val middle = stringResource(R.string.lyr_set_kinetic_pos_middle)
+     val bottom = stringResource(R.string.lyr_set_kinetic_pos_bottom)
+diff --git a/app/src/main/res/values-zh-rTW/strings.xml b/app/src/main/res/values-zh-rTW/strings.xml
+index 0f09f06..15b25e2 100644
+--- a/app/src/main/res/values-zh-rTW/strings.xml
++++ b/app/src/main/res/values-zh-rTW/strings.xml
+@@ -1116,4 +1116,8 @@
+   <string name="lyr_set_kinetic_glow_random">隨機詞</string>
+   <string name="lyr_set_kinetic_glow_intensity">發光強度</string>
+   <string name="lyr_set_kinetic_glow_intensity_desc">更弱或更強的發光</string>
++  <string name="lyr_set_kinetic_size_all">大小（所有樣式）</string>
++  <string name="lyr_set_kinetic_size_all_desc">為下面每個樣式設定相同大小</string>
++  <string name="lyr_set_kinetic_size_style">大小：%1$s</string>
++  <string name="lyr_set_kinetic_size_style_desc">只改變此樣式的大小</string>
+ </resources>
+diff --git a/app/src/main/res/values-zh/strings.xml b/app/src/main/res/values-zh/strings.xml
+index 8cd100c..8be3c8d 100644
+--- a/app/src/main/res/values-zh/strings.xml
++++ b/app/src/main/res/values-zh/strings.xml
+@@ -1117,4 +1117,8 @@
+   <string name="lyr_set_kinetic_glow_random">随机词</string>
+   <string name="lyr_set_kinetic_glow_intensity">发光强度</string>
+   <string name="lyr_set_kinetic_glow_intensity_desc">更弱或更强的发光</string>
++  <string name="lyr_set_kinetic_size_all">大小（所有样式）</string>
++  <string name="lyr_set_kinetic_size_all_desc">为下面每个样式设置相同大小</string>
++  <string name="lyr_set_kinetic_size_style">大小：%1$s</string>
++  <string name="lyr_set_kinetic_size_style_desc">只改变此样式的大小</string>
+ </resources>
+diff --git a/app/src/main/res/values/strings.xml b/app/src/main/res/values/strings.xml
+index 0d51597..19b03c4 100644
+--- a/app/src/main/res/values/strings.xml
++++ b/app/src/main/res/values/strings.xml
+@@ -1117,4 +1117,8 @@
+   <string name="lyr_set_kinetic_glow_random">Random words</string>
+   <string name="lyr_set_kinetic_glow_intensity">Glow intensity</string>
+   <string name="lyr_set_kinetic_glow_intensity_desc">Weaker or stronger glow</string>
++  <string name="lyr_set_kinetic_size_all">Size (all styles)</string>
++  <string name="lyr_set_kinetic_size_all_desc">Sets the same size for every style below</string>
++  <string name="lyr_set_kinetic_size_style">Size: %1$s</string>
++  <string name="lyr_set_kinetic_size_style_desc">Size of this style only</string>
+ </resources>
+diff --git a/core-preferences/src/main/java/me/spica27/spicamusic/core/preferences/LyricsStyleSettings.kt b/core-preferences/src/main/java/me/spica27/spicamusic/core/preferences/LyricsStyleSettings.kt
+index 66d12e1..3a91f69 100644
+--- a/core-preferences/src/main/java/me/spica27/spicamusic/core/preferences/LyricsStyleSettings.kt
++++ b/core-preferences/src/main/java/me/spica27/spicamusic/core/preferences/LyricsStyleSettings.kt
+@@ -249,6 +249,8 @@ data class LyricsStyleSettings(
+     val kineticStyles: Set<KineticStyle> = setOf(KineticStyle.Auto),
+     /** Size of the kinetic words in percent (100 = fitted to the screen). */
+     val kineticSize: Int = 100,
++    /** Size per style in percent. A style without an entry uses [kineticSize]. */
++    val kineticStyleSizes: Map<KineticStyle, Int> = emptyMap(),
+     /** Vertical position of the kinetic words: 0 = top, 50 = middle, 100 = bottom. */
+     val kineticPosition: Int = 50,
+     /** On: glass background with ripples. Off: the normal player background. */
+@@ -340,6 +342,7 @@ data class LyricsStyleSettings(
+             bgRevealFlipPivot = bgRevealFlipPivot.coerceIn(BG_REVEAL_FLIP_PIVOT_RANGE),
+             bgRevealFadeMs = bgRevealFadeMs.coerceIn(BG_REVEAL_FADE_RANGE),
+             kineticSize = kineticSize.coerceIn(KINETIC_SIZE_RANGE),
++            kineticStyleSizes = kineticStyleSizes.mapValues { it.value.coerceIn(KINETIC_SIZE_RANGE) },
+             kineticPosition = kineticPosition.coerceIn(KINETIC_POSITION_RANGE),
+             kineticSpeed = kineticSpeed.coerceIn(KINETIC_SPEED_RANGE),
+             kineticLetterDelay = kineticLetterDelay.coerceIn(KINETIC_LETTER_DELAY_RANGE),
+diff --git a/core-preferences/src/main/java/me/spica27/spicamusic/core/preferences/PreferencesManager.kt b/core-preferences/src/main/java/me/spica27/spicamusic/core/preferences/PreferencesManager.kt
+index 28fd458..c4427fa 100644
+--- a/core-preferences/src/main/java/me/spica27/spicamusic/core/preferences/PreferencesManager.kt
++++ b/core-preferences/src/main/java/me/spica27/spicamusic/core/preferences/PreferencesManager.kt
+@@ -143,6 +143,7 @@ class PreferencesManager(
+         val LYRIC_KINETIC_ENABLED = booleanPreferencesKey("lyric_kinetic_enabled")
+         val LYRIC_KINETIC_STYLE = stringPreferencesKey("lyric_kinetic_style")
+         val LYRIC_KINETIC_SIZE = intPreferencesKey("lyric_kinetic_size")
++        val LYRIC_KINETIC_STYLE_SIZES = stringPreferencesKey("lyric_kinetic_style_sizes")
+         val LYRIC_KINETIC_POSITION = intPreferencesKey("lyric_kinetic_position")
+         val LYRIC_KINETIC_RIPPLES = booleanPreferencesKey("lyric_kinetic_ripples")
+         val LYRIC_KINETIC_SHADOW = booleanPreferencesKey("lyric_kinetic_shadow")
+@@ -263,6 +264,7 @@ class PreferencesManager(
+                     kineticEnabled = p[Keys.LYRIC_KINETIC_ENABLED] ?: d.kineticEnabled,
+                     kineticStyles = p[Keys.LYRIC_KINETIC_STYLE]?.let(::parseKineticStyles) ?: d.kineticStyles,
+                     kineticSize = p[Keys.LYRIC_KINETIC_SIZE] ?: d.kineticSize,
++                    kineticStyleSizes = p[Keys.LYRIC_KINETIC_STYLE_SIZES]?.let(::parseKineticStyleSizes) ?: d.kineticStyleSizes,
+                     kineticPosition = p[Keys.LYRIC_KINETIC_POSITION] ?: d.kineticPosition,
+                     kineticRipples = p[Keys.LYRIC_KINETIC_RIPPLES] ?: d.kineticRipples,
+                     kineticShadow = p[Keys.LYRIC_KINETIC_SHADOW] ?: d.kineticShadow,
+@@ -383,6 +385,7 @@ class PreferencesManager(
+                     kineticEnabled = p[Keys.LYRIC_KINETIC_ENABLED] ?: d.kineticEnabled,
+                     kineticStyles = p[Keys.LYRIC_KINETIC_STYLE]?.let(::parseKineticStyles) ?: d.kineticStyles,
+                     kineticSize = p[Keys.LYRIC_KINETIC_SIZE] ?: d.kineticSize,
++                    kineticStyleSizes = p[Keys.LYRIC_KINETIC_STYLE_SIZES]?.let(::parseKineticStyleSizes) ?: d.kineticStyleSizes,
+                     kineticPosition = p[Keys.LYRIC_KINETIC_POSITION] ?: d.kineticPosition,
+                     kineticRipples = p[Keys.LYRIC_KINETIC_RIPPLES] ?: d.kineticRipples,
+                     kineticShadow = p[Keys.LYRIC_KINETIC_SHADOW] ?: d.kineticShadow,
+@@ -494,6 +497,7 @@ class PreferencesManager(
+             p[Keys.LYRIC_KINETIC_ENABLED] = n.kineticEnabled
+             p[Keys.LYRIC_KINETIC_STYLE] = n.kineticStyles.joinToString(",") { it.value }
+             p[Keys.LYRIC_KINETIC_SIZE] = n.kineticSize
++            p[Keys.LYRIC_KINETIC_STYLE_SIZES] = n.kineticStyleSizes.entries.joinToString(",") { "${it.key.value}=${it.value}" }
+             p[Keys.LYRIC_KINETIC_POSITION] = n.kineticPosition
+             p[Keys.LYRIC_KINETIC_RIPPLES] = n.kineticRipples
+             p[Keys.LYRIC_KINETIC_SHADOW] = n.kineticShadow
+@@ -615,3 +619,14 @@ private fun parseKineticStyles(raw: String): Set<KineticStyle> =
+         .mapNotNull { v -> KineticStyle.entries.firstOrNull { it.value == v.trim() } }
+         .toSet()
+         .ifEmpty { setOf(KineticStyle.Auto) }
++
++/** Such as "stack=120,zoom=90". Unknown styles and bad numbers are skipped. */
++private fun parseKineticStyleSizes(raw: String): Map<KineticStyle, Int> =
++    raw
++        .split(',')
++        .mapNotNull { part ->
++            val kv = part.split('=')
++            val style = KineticStyle.entries.firstOrNull { it.value == kv.getOrNull(0)?.trim() }
++            val size = kv.getOrNull(1)?.trim()?.toIntOrNull()
++            if (style == null || size == null) null else style to size
++        }.toMap()
