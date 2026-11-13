@@ -149,6 +149,12 @@ class PreferencesManager(
         val LYRIC_KINETIC_SIZE = intPreferencesKey("lyric_kinetic_size")
         val LYRIC_KINETIC_STYLE_SIZES = stringPreferencesKey("lyric_kinetic_style_sizes")
         val LYRIC_KINETIC_POSITION = intPreferencesKey("lyric_kinetic_position")
+        val LYRIC_KINETIC_TL_SIZE = intPreferencesKey("lyric_kinetic_tl_size")
+        val LYRIC_KINETIC_TL_POSITION = intPreferencesKey("lyric_kinetic_tl_position")
+        val LYRIC_KINETIC_BGV_ENABLED = booleanPreferencesKey("lyric_kinetic_bgv_enabled")
+        val LYRIC_KINETIC_BGV_STYLES = stringPreferencesKey("lyric_kinetic_bgv_styles")
+        val LYRIC_KINETIC_BGV_SIZE = intPreferencesKey("lyric_kinetic_bgv_size")
+        val LYRIC_KINETIC_BGV_POSITION = intPreferencesKey("lyric_kinetic_bgv_position")
         val LYRIC_KINETIC_RIPPLES = booleanPreferencesKey("lyric_kinetic_ripples")
         val LYRIC_KINETIC_SHADOW = booleanPreferencesKey("lyric_kinetic_shadow")
         val LYRIC_KINETIC_GLOW = booleanPreferencesKey("lyric_kinetic_glow")
@@ -274,6 +280,12 @@ class PreferencesManager(
                     kineticSize = p[Keys.LYRIC_KINETIC_SIZE] ?: d.kineticSize,
                     kineticStyleSizes = p[Keys.LYRIC_KINETIC_STYLE_SIZES]?.let(::parseKineticStyleSizes) ?: d.kineticStyleSizes,
                     kineticPosition = p[Keys.LYRIC_KINETIC_POSITION] ?: d.kineticPosition,
+                    kineticTranslationSize = p[Keys.LYRIC_KINETIC_TL_SIZE] ?: d.kineticTranslationSize,
+                    kineticTranslationPosition = p[Keys.LYRIC_KINETIC_TL_POSITION] ?: d.kineticTranslationPosition,
+                    kineticBgVocalEnabled = p[Keys.LYRIC_KINETIC_BGV_ENABLED] ?: d.kineticBgVocalEnabled,
+                    kineticBgVocalStyles = p[Keys.LYRIC_KINETIC_BGV_STYLES]?.let(::parseKineticStyles) ?: d.kineticBgVocalStyles,
+                    kineticBgVocalSize = p[Keys.LYRIC_KINETIC_BGV_SIZE] ?: d.kineticBgVocalSize,
+                    kineticBgVocalPosition = p[Keys.LYRIC_KINETIC_BGV_POSITION] ?: d.kineticBgVocalPosition,
                     kineticRipples = p[Keys.LYRIC_KINETIC_RIPPLES] ?: d.kineticRipples,
                     kineticShadow = p[Keys.LYRIC_KINETIC_SHADOW] ?: d.kineticShadow,
                     kineticGlow = p[Keys.LYRIC_KINETIC_GLOW] ?: d.kineticGlow,
@@ -399,6 +411,12 @@ class PreferencesManager(
                     kineticSize = p[Keys.LYRIC_KINETIC_SIZE] ?: d.kineticSize,
                     kineticStyleSizes = p[Keys.LYRIC_KINETIC_STYLE_SIZES]?.let(::parseKineticStyleSizes) ?: d.kineticStyleSizes,
                     kineticPosition = p[Keys.LYRIC_KINETIC_POSITION] ?: d.kineticPosition,
+                    kineticTranslationSize = p[Keys.LYRIC_KINETIC_TL_SIZE] ?: d.kineticTranslationSize,
+                    kineticTranslationPosition = p[Keys.LYRIC_KINETIC_TL_POSITION] ?: d.kineticTranslationPosition,
+                    kineticBgVocalEnabled = p[Keys.LYRIC_KINETIC_BGV_ENABLED] ?: d.kineticBgVocalEnabled,
+                    kineticBgVocalStyles = p[Keys.LYRIC_KINETIC_BGV_STYLES]?.let(::parseKineticStyles) ?: d.kineticBgVocalStyles,
+                    kineticBgVocalSize = p[Keys.LYRIC_KINETIC_BGV_SIZE] ?: d.kineticBgVocalSize,
+                    kineticBgVocalPosition = p[Keys.LYRIC_KINETIC_BGV_POSITION] ?: d.kineticBgVocalPosition,
                     kineticRipples = p[Keys.LYRIC_KINETIC_RIPPLES] ?: d.kineticRipples,
                     kineticShadow = p[Keys.LYRIC_KINETIC_SHADOW] ?: d.kineticShadow,
                     kineticGlow = p[Keys.LYRIC_KINETIC_GLOW] ?: d.kineticGlow,
@@ -515,6 +533,12 @@ class PreferencesManager(
             p[Keys.LYRIC_KINETIC_SIZE] = n.kineticSize
             p[Keys.LYRIC_KINETIC_STYLE_SIZES] = n.kineticStyleSizes.entries.joinToString(",") { "${it.key.value}=${it.value}" }
             p[Keys.LYRIC_KINETIC_POSITION] = n.kineticPosition
+            p[Keys.LYRIC_KINETIC_TL_SIZE] = n.kineticTranslationSize
+            p[Keys.LYRIC_KINETIC_TL_POSITION] = n.kineticTranslationPosition
+            p[Keys.LYRIC_KINETIC_BGV_ENABLED] = n.kineticBgVocalEnabled
+            p[Keys.LYRIC_KINETIC_BGV_STYLES] = n.kineticBgVocalStyles.joinToString(",") { it.value }
+            p[Keys.LYRIC_KINETIC_BGV_SIZE] = n.kineticBgVocalSize
+            p[Keys.LYRIC_KINETIC_BGV_POSITION] = n.kineticBgVocalPosition
             p[Keys.LYRIC_KINETIC_RIPPLES] = n.kineticRipples
             p[Keys.LYRIC_KINETIC_SHADOW] = n.kineticShadow
             p[Keys.LYRIC_KINETIC_GLOW] = n.kineticGlow

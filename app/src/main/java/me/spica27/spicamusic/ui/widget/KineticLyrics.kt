@@ -14,6 +14,7 @@ import androidx.compose.animation.core.AnimationSpec
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.Canvas
@@ -26,6 +27,7 @@ import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.asPaddingValues
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.offset
@@ -50,6 +52,7 @@ import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Alignment
+import androidx.compose.ui.BiasAlignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.draw.drawBehind
@@ -74,13 +77,18 @@ import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.positionInRoot
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.em
+import androidx.compose.ui.unit.sp
 import androidx.compose.ui.util.lerp
 import androidx.core.graphics.ColorUtils
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -123,24 +131,45 @@ private data class KLine(
     val startMs: Long,
     val endMs: Long,
     val repeats: Int,
+    /** Translation shown as a subtitle (null = none, or the translation button is off). */
+    val translation: String? = null,
 )
 
 private val KineticBase = Color(0xFF0B0A14)
 
-private fun buildKineticLines(items: List<LyricItem>): List<KLine> {
+private fun buildKineticLines(
+    items: List<LyricItem>,
+    options: LyricsDisplayOptions = LyricsDisplayOptions(),
+): List<KLine> {
     val out = ArrayList<KLine>()
     items.forEachIndexed { index, item ->
         when (item) {
             is LyricItem.WordsLyric -> {
-                val words = mergeTimedWords(item.words)
-                if (words.isNotEmpty()) {
+                val original = mergeTimedWords(item.words)
+                if (original.isNotEmpty()) {
+                    val endMs = max(item.endTime, original.last().startMs + 300L)
+                    // Transliteration button on: the romanized words replace the original words.
+                    val words =
+                        romanizedWords(
+                            original,
+                            item.words,
+                            item.transliterations.pickVariant(options.preferredTransliterationLanguage, false),
+                            item.phonetic,
+                            item.startTime,
+                            endMs,
+                        ) ?: original
                     out +=
                         KLine(
                             text = words.joinToString(" ") { it.text },
                             words = words,
                             startMs = item.startTime,
-                            endMs = max(item.endTime, words.last().startMs + 300L),
+                            endMs = endMs,
                             repeats = 1,
+                            translation =
+                                item.translationVariants
+                                    .ifEmpty { item.translation }
+                                    .pickVariant(options.preferredTranslationLanguage, false)
+                                    ?.subtitleText(),
                         )
                 }
             }
@@ -153,19 +182,167 @@ private fun buildKineticLines(items: List<LyricItem>): List<KLine> {
                     val weights = tokens.map { it.length + 2 }
                     val sum = weights.sum().toFloat()
                     var acc = 0f
-                    val words =
+                    val original =
                         tokens.mapIndexed { i, t ->
                             val w = KWord(t, item.time + (duration * acc / sum).toLong())
                             acc += weights[i]
                             w
                         }
-                    out += KLine(tokens.joinToString(" "), words, item.time, item.time + duration, 1)
+                    val romanText =
+                        item.transliterations
+                            .pickVariant(options.preferredTransliterationLanguage, false)
+                            ?.content
+                            ?.takeIf { it.isNotBlank() }
+                            ?: item.phonetic
+                    val words = staticRomanized(original, item.time, item.time + duration, romanText) ?: original
+                    val translationText =
+                        item.translationVariants
+                            .ifEmpty {
+                                item.translation
+                                    ?.takeIf { it.isNotBlank() }
+                                    ?.let { listOf(LyricItem.WordsLyric.Translation(content = it)) }
+                                    .orEmpty()
+                            }.pickVariant(options.preferredTranslationLanguage, false)
+                            ?.subtitleText()
+                    out +=
+                        KLine(
+                            words.joinToString(" ") { it.text },
+                            words,
+                            item.time,
+                            item.time + duration,
+                            1,
+                            translationText,
+                        )
                 }
             }
         }
     }
     val counts = out.groupingBy { it.text.lowercase() }.eachCount()
     return out.map { it.copy(repeats = counts[it.text.lowercase()] ?: 1) }
+}
+
+// ==================== transliteration, translation, background vocal ====================
+
+private fun List<LyricItem.WordsLyric.Translation>.pickVariant(
+    preferred: String?,
+    includeBackground: Boolean,
+): LyricItem.WordsLyric.Translation? {
+    val usable =
+        filter { (includeBackground || !it.isBackground) && (it.content.isNotBlank() || it.words.isNotEmpty()) }
+    if (usable.isEmpty()) return null
+    if (!preferred.isNullOrBlank()) {
+        val base = preferred.substringBefore('-')
+        usable.firstOrNull { it.lang.equals(preferred, true) || it.lang.startsWith(base, true) }?.let { return it }
+    }
+    return usable.first()
+}
+
+private fun LyricItem.WordsLyric.Translation.subtitleText(): String? =
+    content
+        .ifBlank { words.joinToString("") { it.content } }
+        .replace(Regex("\\s+"), " ")
+        .trim()
+        .takeIf { it.isNotEmpty() }
+
+private fun sameWords(
+    a: List<KWord>,
+    b: List<KWord>,
+): Boolean = a.joinToString(" ") { it.text }.equals(b.joinToString(" ") { it.text }, ignoreCase = true)
+
+/** Romanized words for a line, or null when the line has no usable transliteration. */
+private fun romanizedWords(
+    original: List<KWord>,
+    raw: List<LyricItem.WordsLyric.WordWithTiming>,
+    transliteration: LyricItem.WordsLyric.Translation?,
+    linePhonetic: String?,
+    startMs: Long,
+    endMs: Long,
+): List<KWord>? {
+    // 1. Every timed word has its own romanization.
+    val real = raw.filter { it.content.isNotBlank() }
+    if (real.isNotEmpty() && real.all { !it.phonetic.isNullOrBlank() }) {
+        val swapped =
+            raw.map { w ->
+                val ph = w.phonetic
+                if (w.content.isBlank() || ph.isNullOrBlank()) {
+                    w
+                } else {
+                    w.copy(content = w.content.takeWhile(Char::isWhitespace) + ph.trim() + w.content.takeLastWhile(Char::isWhitespace))
+                }
+            }
+        val merged = mergeTimedWords(swapped)
+        if (merged.isNotEmpty() && !sameWords(merged, original)) return merged
+    }
+    // 2. A romanization with its own word timing.
+    val timed = transliteration?.words.orEmpty().filter { it.content.isNotBlank() }
+    if (timed.isNotEmpty()) {
+        val merged = mergeTimedWords(timed)
+        if (merged.isNotEmpty() && !sameWords(merged, original)) return merged
+    }
+    // 3. A plain romanized line: spread over the original words.
+    val text = transliteration?.content?.takeIf { it.isNotBlank() } ?: linePhonetic
+    return staticRomanized(original, startMs, endMs, text)
+}
+
+private fun staticRomanized(
+    base: List<KWord>,
+    startMs: Long,
+    endMs: Long,
+    text: String?,
+): List<KWord>? {
+    val tokens = text?.trim()?.split(Regex("\\s+"))?.filter { it.isNotEmpty() }.orEmpty()
+    if (tokens.isEmpty() || base.isEmpty()) return null
+    val words =
+        if (tokens.size == base.size) {
+            tokens.mapIndexed { i, t -> KWord(t, base[i].startMs) }
+        } else {
+            val span = max(endMs - startMs, 600L)
+            val weights = tokens.map { it.length + 2 }
+            val sum = weights.sum().toFloat()
+            var acc = 0f
+            tokens.mapIndexed { i, t ->
+                val w = KWord(t, startMs + (span * acc / sum).toLong())
+                acc += weights[i]
+                w
+            }
+        }
+    return words.takeUnless { sameWords(it, base) }
+}
+
+/** Every background vocal of the song as its own kinetic line, sorted by start time. */
+private fun buildBgVocals(
+    items: List<LyricItem>,
+    options: LyricsDisplayOptions,
+): List<KLine> {
+    val out = ArrayList<KLine>()
+    items.forEach { item ->
+        if (item !is LyricItem.WordsLyric) return@forEach
+        item.accompaniment.forEach { acc ->
+            val original = mergeTimedWords(acc.words)
+            if (original.isEmpty()) return@forEach
+            val endMs = max(acc.endTime, original.last().startMs + 300L)
+            val words =
+                romanizedWords(
+                    original,
+                    acc.words,
+                    acc.transliterations.pickVariant(options.preferredTransliterationLanguage, true),
+                    acc.phonetic,
+                    acc.startTime,
+                    endMs,
+                ) ?: original
+            out += KLine(words.joinToString(" ") { it.text }, words, acc.startTime, endMs, 1)
+        }
+    }
+    return out.sortedBy { it.startMs }
+}
+
+/** Splits a translation into pieces for the colour mix: words, or short chunks when there are no spaces. */
+private fun subtitlePieces(text: String): List<String> {
+    val tokens = text.split(' ').filter { it.isNotEmpty() }
+    if (tokens.size > 1) return tokens.mapIndexed { i, t -> if (i < tokens.lastIndex) "$t " else t }
+    val letters = splitLetters(text)
+    if (letters.size <= 6) return listOf(text)
+    return letters.chunked(4).map { it.joinToString("") }
 }
 
 /** Joins the pieces of one word (sym + phony); lines without spaces (CJK) keep one piece per word. */
@@ -623,8 +800,10 @@ internal fun KineticLyricsUI(
     seekPreviewTimeProvider: () -> Long?,
     settings: LyricsStyleSettings,
     displayMode: LyricsDisplayMode,
+    displayOptions: LyricsDisplayOptions = LyricsDisplayOptions(),
 ) {
-    val kLines = remember(lines) { buildKineticLines(lines) }
+    val kLines = remember(lines, displayOptions) { buildKineticLines(lines, displayOptions) }
+    val bgLines = remember(lines, displayOptions) { buildBgVocals(lines, displayOptions) }
     val salt = remember(kLines) { Random.nextInt() }
     val playerViewModel = LocalPlayerViewModel.current
     val mediaItem by playerViewModel.currentMediaItem.collectAsStateWithLifecycle()
@@ -651,6 +830,16 @@ internal fun KineticLyricsUI(
     val ripples = remember { RippleBuffer() }
     val info = remember { BoxInfo() }
     val lineIndex by remember(kLines) { derivedStateOf { lastStartedIndex(kLines, timeMs.longValue) } }
+    val bgIndex by remember(bgLines, settings.kineticBgVocalEnabled) {
+        derivedStateOf {
+            if (!settings.kineticBgVocalEnabled) {
+                -1
+            } else {
+                val i = lastStartedIndex(bgLines, timeMs.longValue)
+                if (i >= 0 && timeMs.longValue <= bgLines[i].endMs + 500L) i else -1
+            }
+        }
+    }
     val topInset =
         if (displayMode == LyricsDisplayMode.Fullscreen) {
             WindowInsets.statusBars.asPaddingValues().calculateTopPadding() + 76.dp
@@ -719,6 +908,117 @@ internal fun KineticLyricsUI(
                 )
             }
         }
+        // Background vocal: its own styles, size and position (Kinetic settings).
+        AnimatedContent(
+            targetState = bgIndex,
+            modifier = Modifier.fillMaxSize(),
+            transitionSpec = { (fadeIn(tween(180)) togetherWith fadeOut(tween(220))).using(null) },
+            label = "kineticBgVocal",
+        ) { index ->
+            if (index >= 0 && index < bgLines.size) {
+                Box(
+                    modifier =
+                        Modifier
+                            .fillMaxSize()
+                            .padding(start = sidePad, end = sidePad, top = topInset, bottom = bottomInset),
+                ) {
+                    Box(
+                        modifier =
+                            Modifier
+                                .align(BiasAlignment(0f, (settings.kineticBgVocalPosition - 50) / 50f))
+                                .fillMaxWidth()
+                                .fillMaxHeight(0.26f),
+                    ) {
+                        KineticStage(
+                            line = bgLines[index],
+                            salt = salt xor 0x3c6ef372,
+                            timeMs = timeMs,
+                            settings = settings,
+                            palette = palette,
+                            fonts = fonts,
+                            topInset = 0.dp,
+                            bottomInset = 0.dp,
+                            sidePad = 0.dp,
+                            onReveal = {},
+                            styles = settings.kineticBgVocalStyles,
+                            position = 50,
+                            sizeOverridePct = settings.kineticBgVocalSize,
+                        )
+                    }
+                }
+            }
+        }
+        // Translation: a plain subtitle in the lyric colour and font mix.
+        AnimatedContent(
+            targetState = lineIndex,
+            modifier = Modifier.fillMaxSize(),
+            transitionSpec = { (EnterTransition.None togetherWith fadeOut(tween(160))).using(null) },
+            label = "kineticSubtitle",
+        ) { index ->
+            val shown = kLines.getOrNull(index)
+            if (shown?.translation != null) {
+                KineticSubtitle(
+                    line = shown,
+                    salt = salt,
+                    settings = settings,
+                    palette = palette,
+                    fonts = fonts,
+                    topInset = topInset,
+                    bottomInset = bottomInset,
+                    sidePad = sidePad,
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun KineticSubtitle(
+    line: KLine,
+    salt: Int,
+    settings: LyricsStyleSettings,
+    palette: KPalette,
+    fonts: List<FontFamily?>,
+    topInset: Dp,
+    bottomInset: Dp,
+    sidePad: Dp,
+) {
+    val text = line.translation ?: return
+    // Same inputs as KineticStage, so the subtitle gets the same colours and fonts as the lyric line.
+    val seed = line.text.hashCode() xor salt
+    val look =
+        remember(line, seed, palette, settings.kineticTextColors, fonts) {
+            buildLook(line, seed, palette.text.take(settings.kineticTextColors), fonts)
+        }
+    val annotated =
+        remember(text, look) {
+            val pieces = subtitlePieces(text)
+            buildAnnotatedString {
+                pieces.forEachIndexed { j, piece ->
+                    val slot = (j * look.colors.size / pieces.size).coerceIn(0, look.colors.size - 1)
+                    withStyle(SpanStyle(color = look.colors[slot], fontFamily = look.fonts[slot])) { append(piece) }
+                }
+            }
+        }
+    val scale = settings.kineticTranslationSize / 100f
+    Box(
+        modifier =
+            Modifier
+                .fillMaxSize()
+                .padding(start = sidePad, end = sidePad, top = topInset, bottom = bottomInset),
+    ) {
+        Text(
+            text = annotated,
+            modifier =
+                Modifier
+                    .align(BiasAlignment(0f, (settings.kineticTranslationPosition - 50) / 50f))
+                    .fillMaxWidth(),
+            textAlign = TextAlign.Center,
+            fontSize = (15f * scale).sp,
+            lineHeight = (20f * scale).sp,
+            fontWeight = FontWeight.SemiBold,
+            style = TextStyle(shadow = Shadow(Color.Black.copy(alpha = 0.85f), Offset(0f, 2f), 6f)),
+        )
     }
 }
 
@@ -794,11 +1094,13 @@ private fun KineticStage(
     bottomInset: Dp,
     sidePad: Dp,
     onReveal: (Offset) -> Unit,
+    styles: Set<KineticStyle> = settings.kineticStyles,
+    position: Int = settings.kineticPosition,
+    sizeOverridePct: Int? = null,
 ) {
     val seed = line.text.hashCode() xor salt
     val kind =
-        remember(line, settings.kineticStyles, seed) {
-            val styles = settings.kineticStyles
+        remember(line, styles, seed) {
             if (styles.size == 1 && styles.first() != KineticStyle.Auto) styles.first() else chooseKind(line, seed, styles)
         }
     val look =
@@ -808,7 +1110,9 @@ private fun KineticStage(
     val revealed by remember(line) { derivedStateOf { line.words.count { it.startMs <= timeMs.value } } }
     val density = LocalDensity.current
     val speed = settings.kineticSpeed / 100f
-    val sizePct = (if (kind == KineticStyle.Auto) null else settings.kineticStyleSizes[kind]) ?: settings.kineticSize
+    val sizePct =
+        sizeOverridePct
+            ?: ((if (kind == KineticStyle.Auto) null else settings.kineticStyleSizes[kind]) ?: settings.kineticSize)
 
     BoxWithConstraints(
         modifier =
@@ -838,7 +1142,7 @@ private fun KineticStage(
                 letterDelay = (settings.kineticLetterDelay / speed).toInt(),
                 onReveal = onReveal,
             )
-        val shift = (settings.kineticPosition - 50) / 50f * h * 0.35f
+        val shift = (position - 50) / 50f * h * 0.35f
         Box(
             modifier =
                 Modifier.graphicsLayer {

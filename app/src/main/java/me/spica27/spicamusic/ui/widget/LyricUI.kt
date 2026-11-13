@@ -736,6 +736,7 @@ fun LyricsUI(
             seekPreviewTimeProvider = seekPreviewTimeProvider,
             settings = styleSettings,
             displayMode = displayMode,
+            displayOptions = displayOptions,
         )
         return
     }

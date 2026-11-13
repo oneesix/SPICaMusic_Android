@@ -261,6 +261,19 @@ data class LyricsStyleSettings(
     val kineticPosition: Int = 50,
     /** On: glass background with ripples. Off: the normal player background. */
     val kineticRipples: Boolean = true,
+    // ---- Kinetic translation subtitle (the translation button of the bottom bar shows or hides it) ----
+    /** Size of the translation subtitle in percent. */
+    val kineticTranslationSize: Int = 100,
+    /** Vertical position of the translation subtitle: 0 = top, 100 = bottom (just above the bottom bar). */
+    val kineticTranslationPosition: Int = 100,
+    // ---- Kinetic background vocal ----
+    val kineticBgVocalEnabled: Boolean = true,
+    /** Styles of the background vocal. With several, each background vocal picks one at random. */
+    val kineticBgVocalStyles: Set<KineticStyle> = setOf(KineticStyle.Auto),
+    /** Size of the background vocal in percent. */
+    val kineticBgVocalSize: Int = 100,
+    /** Vertical position of the background vocal: 0 = top, 100 = bottom. */
+    val kineticBgVocalPosition: Int = 85,
     // ---- Kinetic text animation (these cost the most performance) ----
     val kineticShadow: Boolean = true,
     val kineticGlow: Boolean = false,
@@ -352,6 +365,11 @@ data class LyricsStyleSettings(
             kineticSize = kineticSize.coerceIn(KINETIC_SIZE_RANGE),
             kineticStyleSizes = kineticStyleSizes.mapValues { it.value.coerceIn(KINETIC_SIZE_RANGE) },
             kineticPosition = kineticPosition.coerceIn(KINETIC_POSITION_RANGE),
+            kineticTranslationSize = kineticTranslationSize.coerceIn(KINETIC_EXTRA_SIZE_RANGE),
+            kineticTranslationPosition = kineticTranslationPosition.coerceIn(KINETIC_POSITION_RANGE),
+            kineticBgVocalSize = kineticBgVocalSize.coerceIn(KINETIC_EXTRA_SIZE_RANGE),
+            kineticBgVocalPosition = kineticBgVocalPosition.coerceIn(KINETIC_POSITION_RANGE),
+            kineticBgVocalStyles = kineticBgVocalStyles.ifEmpty { setOf(KineticStyle.Auto) },
             kineticSpeed = kineticSpeed.coerceIn(KINETIC_SPEED_RANGE),
             kineticLetterDelay = kineticLetterDelay.coerceIn(KINETIC_LETTER_DELAY_RANGE),
             kineticTextColors = kineticTextColors.coerceIn(KINETIC_TEXT_COLORS_RANGE),
@@ -419,6 +437,7 @@ data class LyricsStyleSettings(
         val BG_REVEAL_FADE_RANGE = 200..2000
         val KINETIC_SIZE_RANGE = 50..150
         val KINETIC_POSITION_RANGE = 0..100
+        val KINETIC_EXTRA_SIZE_RANGE = 50..200
         val KINETIC_SPEED_RANGE = 50..200
         val KINETIC_LETTER_DELAY_RANGE = 0..80
         val KINETIC_TEXT_COLORS_RANGE = 2..5
