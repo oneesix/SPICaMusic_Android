@@ -19,27 +19,34 @@ enum class LiquidGlassSetting {
     Rim,
     RimWidth,
     Shadow,
+    Mode,
+    Saturation,
 }
 
-/** 默认值等于改动前底栏的固定参数，所以不动设置时外观不变。 */
+/** 默认值与演示页一致：磨砂模糊、模糊 14、色彩增强 1.7、色调 0.28、边缘高光 0.55、阴影 0.14。 */
 @Immutable
 data class LiquidGlassTuning(
-    val blurDp: Int = 18,
-    val quality: Int = 100,
-    val tintPercent: Int = 40,
+    val blurDp: Int = 14,
+    val quality: Int = 80,
+    val tintPercent: Int = 28,
     val cornerDp: Int = 36,
     val refractionPercent: Int = 30,
     val refractionHeightDp: Int = 10,
     val falloffPercent: Int = 35,
-    val rimPercent: Int = 40,
+    val rimPercent: Int = 55,
     val rimWidthDp: Int = 1,
-    val shadowPercent: Int = 8,
+    val shadowPercent: Int = 14,
+    /** 0 = 磨砂模糊，1 = 折射透镜。 */
+    val mode: Int = 0,
+    val saturationPercent: Int = 170,
 ) {
+    val isLens: Boolean get() = mode == 1
+
     companion object {
         val DefaultValues: List<Int> = LiquidGlassTuning().toList()
 
         fun fromList(v: List<Int>): LiquidGlassTuning =
-            LiquidGlassTuning(v[0], v[1], v[2], v[3], v[4], v[5], v[6], v[7], v[8], v[9])
+            LiquidGlassTuning(v[0], v[1], v[2], v[3], v[4], v[5], v[6], v[7], v[8], v[9], v[10], v[11])
     }
 
     fun toList(): List<Int> =
@@ -54,6 +61,8 @@ data class LiquidGlassTuning(
             rimPercent,
             rimWidthDp,
             shadowPercent,
+            mode,
+            saturationPercent,
         )
 }
 

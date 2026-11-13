@@ -9,9 +9,11 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.luminance
+import androidx.compose.ui.graphics.ColorFilter
+import androidx.compose.ui.graphics.ColorMatrix
 import androidx.compose.ui.unit.dp
 import dev.chrisbanes.haze.ExperimentalHazeApi
 import dev.chrisbanes.haze.HazeInput
@@ -47,17 +49,31 @@ internal fun Modifier.playerBarSurface(
     val tuning = LocalLiquidGlassConfig.current.tuning
     // 圆角设置只作用于悬浮布局的胶囊形状。
     val glassShape = if (shape === FloatingBarDefaults.Shape) RoundedCornerShape(tuning.cornerDp.dp) else shape
-    val clipped = clip(glassShape)
     if (!glassEnabled || hazeState == null || Build.VERSION.SDK_INT < Build.VERSION_CODES.S) {
-        return clipped.background(containerColor)
+        return clip(glassShape).background(containerColor)
     }
 
-    val isDark = containerColor.luminance() < 0.5f
-    // 质量 100 保持原来的 Balanced，低于 100 使用固定分辨率比例。
+    // 外部投影（演示页的 drop shadow），画在裁剪之前，所以不会被裁掉。
+    val shadowAlpha = (tuning.shadowPercent / 100f * 1.5f).coerceIn(0f, 1f)
+    val shadowed =
+        if (shadowAlpha > 0f) {
+            shadow(
+                elevation = 12.dp,
+                shape = glassShape,
+                clip = false,
+                ambientColor = Color.Black.copy(alpha = shadowAlpha),
+                spotColor = Color.Black.copy(alpha = shadowAlpha),
+            )
+        } else {
+            this
+        }
+    val clipped = shadowed.clip(glassShape)
+
+    // 质量 100 使用自动模式，低于 100 使用固定分辨率比例。
     val performanceMode =
         if (tuning.quality >= 100) HazePerformanceMode.Balanced else HazePerformanceMode.Fixed(tuning.quality / 100f)
-    val tintAlpha = (tuning.tintPercent / 100f + if (isDark) 0.12f else 0f).coerceIn(0f, 1f)
-    val rimAlpha = tuning.rimPercent / 100f * 0.8f
+    val tintColor = containerColor.copy(alpha = (tuning.tintPercent / 100f).coerceIn(0f, 1f))
+    val rimAlpha = (tuning.rimPercent / 100f).coerceIn(0f, 1f)
     val rim =
         if (tuning.rimWidthDp > 0 && rimAlpha > 0f) {
             Modifier.border(
@@ -75,51 +91,58 @@ internal fun Modifier.playerBarSurface(
             Modifier
         }
 
-    // Android 12/12L 没有折射着色器，改用纯模糊，不再退回实色。
-    if (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU) {
-        val blurStyle =
-            remember(containerColor, tuning) {
-                HazeBlurStyle {
-                    blurRadius(tuning.blurDp.dp)
-                    noiseFactor(0f)
+    // 折射透镜需要 Android 13+；低版本自动使用磨砂模糊。
+    if (tuning.isLens && Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+        val style =
+            remember(containerColor, glassShape, tuning) {
+                GlassStyle.clear.then {
+                    shape(glassShape)
+                    optics(
+                        refractionStrength = tuning.refractionPercent / 100f,
+                        refractionHeightFraction = tuning.falloffPercent / 100f,
+                        refractionDisplacement = 4.dp,
+                        refractionProfile = RefractionProfile.Edge(tuning.refractionHeightDp.dp),
+                        blurRadius = tuning.blurDp.dp,
+                    )
                     backgroundColor(containerColor.copy(alpha = 0.12f))
-                    colorEffects(listOf(HazeColorEffect.tint(containerColor.copy(alpha = tintAlpha))))
-                    fallbackColorEffect(HazeColorEffect.tint(containerColor.copy(alpha = 0.9f)))
-                    alpha(1f)
+                    tint(tintColor)
+                    specularIntensity(rimAlpha)
+                    edgeShadow(Color.Black.copy(alpha = 0.08f))
+                    lightPosition(Alignment.TopStart)
                 }
             }
         return clipped
-            .hazeBlur(
+            .hazeGlass(
                 input = HazeInput.Sources(hazeState),
-                style = blurStyle,
+                style = style,
                 performanceMode = performanceMode,
-                expandLayerBounds = false,
+                expandLayerBounds = expandLayerBounds,
             ).then(rim)
     }
 
-    val style =
-        remember(containerColor, glassShape, tuning) {
-            GlassStyle.clear.then {
-                shape(glassShape)
-                optics(
-                    refractionStrength = tuning.refractionPercent / 100f,
-                    refractionHeightFraction = tuning.falloffPercent / 100f,
-                    refractionDisplacement = 4.dp,
-                    refractionProfile = RefractionProfile.Edge(tuning.refractionHeightDp.dp),
-                    blurRadius = tuning.blurDp.dp,
-                )
+    // 磨砂模糊：模糊 + 色彩增强（饱和度）+ 色调，与演示页的 Frosted 模式一致。
+    val blurStyle =
+        remember(containerColor, tuning) {
+            val boost = ColorFilter.colorMatrix(ColorMatrix().apply { setToSaturation(tuning.saturationPercent / 100f) })
+            HazeBlurStyle {
+                blurRadius(tuning.blurDp.dp)
+                noiseFactor(0f)
                 backgroundColor(containerColor.copy(alpha = 0.12f))
-                tint(containerColor.copy(alpha = tintAlpha))
-                specularIntensity(tuning.rimPercent / 100f)
-                edgeShadow(Color.Black.copy(alpha = tuning.shadowPercent / 100f))
-                lightPosition(Alignment.TopStart)
+                colorEffects(
+                    listOf(
+                        HazeColorEffect.colorFilter(boost),
+                        HazeColorEffect.tint(tintColor),
+                    ),
+                )
+                fallbackColorEffect(HazeColorEffect.tint(containerColor.copy(alpha = 0.9f)))
+                alpha(1f)
             }
         }
     return clipped
-        .hazeGlass(
+        .hazeBlur(
             input = HazeInput.Sources(hazeState),
-            style = style,
+            style = blurStyle,
             performanceMode = performanceMode,
-            expandLayerBounds = expandLayerBounds,
+            expandLayerBounds = false,
         ).then(rim)
 }

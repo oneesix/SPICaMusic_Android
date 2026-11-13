@@ -1141,13 +1141,13 @@
   <string name="glass_blur">模糊半径</string>
   <string name="glass_blur_desc">背景的磨砂程度</string>
   <string name="glass_quality">模糊质量</string>
-  <string name="glass_quality_desc">越低越省 GPU；100 保持自动模式</string>
+  <string name="glass_quality_desc">越低越省 GPU；100 为自动</string>
   <string name="glass_tint">色调不透明度</string>
   <string name="glass_tint_desc">覆盖在玻璃上的色彩</string>
   <string name="glass_corner">圆角</string>
   <string name="glass_corner_desc">仅悬浮底栏；36 为完整胶囊形</string>
   <string name="glass_refraction">折射强度</string>
-  <string name="glass_refraction_desc">边缘折射背景的程度</string>
+  <string name="glass_refraction_desc">边缘弯曲（仅折射）</string>
   <string name="glass_refraction_height">折射高度</string>
   <string name="glass_refraction_height_desc">折射边缘的宽度</string>
   <string name="glass_falloff">边缘衰减</string>
@@ -1156,7 +1156,13 @@
   <string name="glass_rim_desc">光泽边缘的亮度</string>
   <string name="glass_rim_width">边缘厚度</string>
   <string name="glass_rim_width_desc">高光轮廓的宽度</string>
-  <string name="glass_shadow">边缘阴影</string>
-  <string name="glass_shadow_desc">边缘阴影的深浅</string>
+  <string name="glass_shadow">阴影</string>
+  <string name="glass_shadow_desc">底栏下方的投影</string>
   <string name="glass_reset">重置玻璃设置</string>
+  <string name="glass_mode">玻璃样式</string>
+  <string name="glass_mode_desc">磨砂更柔和；折射会弯曲边缘</string>
+  <string name="glass_mode_frosted">磨砂模糊</string>
+  <string name="glass_mode_lens">折射透镜</string>
+  <string name="glass_saturation">色彩增强</string>
+  <string name="glass_saturation_desc">透出背景的饱和度（仅磨砂）</string>
 </resources>

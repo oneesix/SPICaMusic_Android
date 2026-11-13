@@ -1169,6 +1169,14 @@ private fun LiquidGlassTuningControls(
                     bottom = Spacing.Small,
                 ),
     ) {
+        LyricsSettingsChips(
+            label = stringResource(R.string.glass_mode),
+            description = stringResource(R.string.glass_mode_desc),
+            options = listOf(0, 1),
+            selected = tuning.mode,
+            optionLabel = { stringResource(if (it == 1) R.string.glass_mode_lens else R.string.glass_mode_frosted) },
+            onSelect = { onChange(LiquidGlassSetting.Mode, it) },
+        )
         LyricsSettingsSlider(
             label = stringResource(R.string.glass_blur),
             description = stringResource(R.string.glass_blur_desc),
@@ -1196,6 +1204,17 @@ private fun LiquidGlassTuningControls(
             valueText = { "$it%" },
             onValueChange = { onChange(LiquidGlassSetting.Tint, it) },
         )
+        if (!tuning.isLens) {
+            LyricsSettingsSlider(
+                label = stringResource(R.string.glass_saturation),
+                description = stringResource(R.string.glass_saturation_desc),
+                value = tuning.saturationPercent,
+                range = 50..300,
+                step = 10,
+                valueText = { "$it%" },
+                onValueChange = { onChange(LiquidGlassSetting.Saturation, it) },
+            )
+        }
         LyricsSettingsSlider(
             label = stringResource(R.string.glass_corner),
             description = stringResource(R.string.glass_corner_desc),
@@ -1205,33 +1224,35 @@ private fun LiquidGlassTuningControls(
             valueText = { "$it dp" },
             onValueChange = { onChange(LiquidGlassSetting.Corner, it) },
         )
-        LyricsSettingsSlider(
-            label = stringResource(R.string.glass_refraction),
-            description = stringResource(R.string.glass_refraction_desc),
-            value = tuning.refractionPercent,
-            range = 0..100,
-            step = 5,
-            valueText = { "$it%" },
-            onValueChange = { onChange(LiquidGlassSetting.Refraction, it) },
-        )
-        LyricsSettingsSlider(
-            label = stringResource(R.string.glass_refraction_height),
-            description = stringResource(R.string.glass_refraction_height_desc),
-            value = tuning.refractionHeightDp,
-            range = 2..40,
-            step = 1,
-            valueText = { "$it dp" },
-            onValueChange = { onChange(LiquidGlassSetting.RefractionHeight, it) },
-        )
-        LyricsSettingsSlider(
-            label = stringResource(R.string.glass_falloff),
-            description = stringResource(R.string.glass_falloff_desc),
-            value = tuning.falloffPercent,
-            range = 5..100,
-            step = 5,
-            valueText = { "$it%" },
-            onValueChange = { onChange(LiquidGlassSetting.Falloff, it) },
-        )
+        if (tuning.isLens) {
+            LyricsSettingsSlider(
+                label = stringResource(R.string.glass_refraction),
+                description = stringResource(R.string.glass_refraction_desc),
+                value = tuning.refractionPercent,
+                range = 0..100,
+                step = 5,
+                valueText = { "$it%" },
+                onValueChange = { onChange(LiquidGlassSetting.Refraction, it) },
+            )
+            LyricsSettingsSlider(
+                label = stringResource(R.string.glass_refraction_height),
+                description = stringResource(R.string.glass_refraction_height_desc),
+                value = tuning.refractionHeightDp,
+                range = 2..40,
+                step = 1,
+                valueText = { "$it dp" },
+                onValueChange = { onChange(LiquidGlassSetting.RefractionHeight, it) },
+            )
+            LyricsSettingsSlider(
+                label = stringResource(R.string.glass_falloff),
+                description = stringResource(R.string.glass_falloff_desc),
+                value = tuning.falloffPercent,
+                range = 5..100,
+                step = 5,
+                valueText = { "$it%" },
+                onValueChange = { onChange(LiquidGlassSetting.Falloff, it) },
+            )
+        }
         LyricsSettingsSlider(
             label = stringResource(R.string.glass_rim),
             description = stringResource(R.string.glass_rim_desc),

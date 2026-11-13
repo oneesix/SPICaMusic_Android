@@ -30,6 +30,8 @@ class PreferencesManager(
         val LIQUID_GLASS_RIM = intPreferencesKey("liquid_glass_rim")
         val LIQUID_GLASS_RIM_WIDTH = intPreferencesKey("liquid_glass_rim_width")
         val LIQUID_GLASS_SHADOW = intPreferencesKey("liquid_glass_shadow")
+        val LIQUID_GLASS_MODE = intPreferencesKey("liquid_glass_mode")
+        val LIQUID_GLASS_SATURATION = intPreferencesKey("liquid_glass_saturation")
         val BOTTOM_BAR_LAYOUT = stringPreferencesKey("bottom_bar_layout")
         val THEME_COLOR_STYLE = stringPreferencesKey("theme_color_style")
         val KEEP_SCREEN_ON = booleanPreferencesKey("keep_screen_on")
@@ -601,6 +603,8 @@ class PreferencesManager(
             Keys.LIQUID_GLASS_RIM,
             Keys.LIQUID_GLASS_RIM_WIDTH,
             Keys.LIQUID_GLASS_SHADOW,
+            Keys.LIQUID_GLASS_MODE,
+            Keys.LIQUID_GLASS_SATURATION,
         )
 
     fun getLiquidGlassTuning(defaults: List<Int>): Flow<List<Int>> =
