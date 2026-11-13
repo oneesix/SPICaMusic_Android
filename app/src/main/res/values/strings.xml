@@ -1138,4 +1138,25 @@
   <string name="lyr_set_blur_optimize_desc">Renders the blur at a lower resolution. Off = normal blur</string>
   <string name="lyr_set_blur_quality">Blur quality</string>
   <string name="lyr_set_blur_quality_desc">Lower is smoother on high-resolution screens</string>
+  <string name="glass_blur">Blur</string>
+  <string name="glass_blur_desc">How frosted the backdrop looks</string>
+  <string name="glass_quality">Blur quality</string>
+  <string name="glass_quality_desc">Lower is lighter on the GPU; 100 keeps the automatic mode</string>
+  <string name="glass_tint">Tint opacity</string>
+  <string name="glass_tint_desc">Color wash over the glass</string>
+  <string name="glass_corner">Corner radius</string>
+  <string name="glass_corner_desc">Floating bar only; 36 is a full pill</string>
+  <string name="glass_refraction">Refraction strength</string>
+  <string name="glass_refraction_desc">How much the edge bends what is behind it</string>
+  <string name="glass_refraction_height">Refraction height</string>
+  <string name="glass_refraction_height_desc">Width of the bent rim</string>
+  <string name="glass_falloff">Edge falloff</string>
+  <string name="glass_falloff_desc">How far the bend reaches inward</string>
+  <string name="glass_rim">Rim highlight</string>
+  <string name="glass_rim_desc">Brightness of the glossy edge</string>
+  <string name="glass_rim_width">Rim thickness</string>
+  <string name="glass_rim_width_desc">Width of the bright outline</string>
+  <string name="glass_shadow">Edge shadow</string>
+  <string name="glass_shadow_desc">Darkness of the shadow at the edge</string>
+  <string name="glass_reset">Reset glass settings</string>
 </resources>

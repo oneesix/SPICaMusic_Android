@@ -20,6 +20,16 @@ class PreferencesManager(
     object Keys {
         val DARK_MODE = booleanPreferencesKey("dark_mode")
         val LIQUID_GLASS_ENABLED = booleanPreferencesKey("liquid_glass_enabled")
+        val LIQUID_GLASS_BLUR = intPreferencesKey("liquid_glass_blur")
+        val LIQUID_GLASS_QUALITY = intPreferencesKey("liquid_glass_quality")
+        val LIQUID_GLASS_TINT = intPreferencesKey("liquid_glass_tint")
+        val LIQUID_GLASS_CORNER = intPreferencesKey("liquid_glass_corner")
+        val LIQUID_GLASS_REFRACTION = intPreferencesKey("liquid_glass_refraction")
+        val LIQUID_GLASS_REFRACTION_HEIGHT = intPreferencesKey("liquid_glass_refraction_height")
+        val LIQUID_GLASS_FALLOFF = intPreferencesKey("liquid_glass_falloff")
+        val LIQUID_GLASS_RIM = intPreferencesKey("liquid_glass_rim")
+        val LIQUID_GLASS_RIM_WIDTH = intPreferencesKey("liquid_glass_rim_width")
+        val LIQUID_GLASS_SHADOW = intPreferencesKey("liquid_glass_shadow")
         val BOTTOM_BAR_LAYOUT = stringPreferencesKey("bottom_bar_layout")
         val THEME_COLOR_STYLE = stringPreferencesKey("theme_color_style")
         val KEEP_SCREEN_ON = booleanPreferencesKey("keep_screen_on")
@@ -575,6 +585,41 @@ class PreferencesManager(
     ) {
         context.dataStore.edit { preferences ->
             preferences[key] = value
+        }
+    }
+
+    /** 液态玻璃调节项，顺序固定，与 app 侧 LiquidGlassSetting 的 ordinal 一一对应。 */
+    private val liquidGlassTuningKeys =
+        listOf(
+            Keys.LIQUID_GLASS_BLUR,
+            Keys.LIQUID_GLASS_QUALITY,
+            Keys.LIQUID_GLASS_TINT,
+            Keys.LIQUID_GLASS_CORNER,
+            Keys.LIQUID_GLASS_REFRACTION,
+            Keys.LIQUID_GLASS_REFRACTION_HEIGHT,
+            Keys.LIQUID_GLASS_FALLOFF,
+            Keys.LIQUID_GLASS_RIM,
+            Keys.LIQUID_GLASS_RIM_WIDTH,
+            Keys.LIQUID_GLASS_SHADOW,
+        )
+
+    fun getLiquidGlassTuning(defaults: List<Int>): Flow<List<Int>> =
+        context.dataStore.data.map { preferences ->
+            liquidGlassTuningKeys.mapIndexed { index, key -> preferences[key] ?: defaults[index] }
+        }.distinctUntilChanged()
+
+    suspend fun setLiquidGlassTuning(
+        index: Int,
+        value: Int,
+    ) {
+        context.dataStore.edit { preferences ->
+            preferences[liquidGlassTuningKeys[index]] = value
+        }
+    }
+
+    suspend fun resetLiquidGlassTuning() {
+        context.dataStore.edit { preferences ->
+            liquidGlassTuningKeys.forEach { preferences.remove(it) }
         }
     }
 

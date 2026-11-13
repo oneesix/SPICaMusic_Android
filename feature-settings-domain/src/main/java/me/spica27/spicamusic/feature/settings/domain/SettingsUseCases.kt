@@ -46,6 +46,19 @@ class SettingsUseCases(
         preferencesManager.setBoolean(key, value)
     }
 
+    fun getLiquidGlassTuning(defaults: List<Int>): Flow<List<Int>> = preferencesManager.getLiquidGlassTuning(defaults)
+
+    suspend fun setLiquidGlassTuning(
+        index: Int,
+        value: Int,
+    ) {
+        preferencesManager.setLiquidGlassTuning(index, value)
+    }
+
+    suspend fun resetLiquidGlassTuning() {
+        preferencesManager.resetLiquidGlassTuning()
+    }
+
     fun getInt(
         key: Preferences.Key<Int>,
         defaultValue: Int = 0,

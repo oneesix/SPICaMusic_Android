@@ -101,7 +101,7 @@ internal fun HomeNavigationBar(
             .playerBarSurface(
                 hazeState,
                 appearance.navigationContainerColor(colors),
-                glassEnabled && appearance.isFloating,
+                glassEnabled,
                 appearance.navigationShape,
                 appearance.isFloating,
             ).selectableGroup()

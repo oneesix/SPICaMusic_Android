@@ -91,6 +91,8 @@ import me.spica27.spicamusic.common.entity.DynamicCoverType
 import me.spica27.spicamusic.common.entity.DynamicSpectrumBackground
 import me.spica27.spicamusic.common.entity.ProgressBarStyle
 import me.spica27.spicamusic.common.entity.ThemeColorStyle
+import me.spica27.spicamusic.ui.glass.LiquidGlassSetting
+import me.spica27.spicamusic.ui.glass.LiquidGlassTuning
 import me.spica27.spicamusic.ui.navigation.AboutRoute
 import me.spica27.spicamusic.ui.navigation.AudioEffectsRoute
 import me.spica27.spicamusic.ui.navigation.IgnoredSongsRoute
@@ -125,6 +127,7 @@ fun SettingsScreen() {
 
     val darkMode by viewModel.darkMode.collectAsStateWithLifecycle()
     val liquidGlassEnabled by viewModel.liquidGlassEnabled.collectAsStateWithLifecycle()
+    val liquidGlassTuning by viewModel.liquidGlassTuning.collectAsStateWithLifecycle()
     val bottomBarLayout by viewModel.bottomBarLayout.collectAsStateWithLifecycle()
     val keepScreenOn by viewModel.keepScreenOn.collectAsStateWithLifecycle()
     val backgroundValue by viewModel.dynamicSpectrumBackground.collectAsStateWithLifecycle()
@@ -237,6 +240,13 @@ fun SettingsScreen() {
                         checked = liquidGlassEnabled,
                         onCheckedChange = viewModel::setLiquidGlassEnabled,
                     )
+                    AnimatedVisibility(visible = liquidGlassEnabled) {
+                        LiquidGlassTuningControls(
+                            tuning = liquidGlassTuning,
+                            onChange = viewModel::setLiquidGlassTuning,
+                            onReset = viewModel::resetLiquidGlassTuning,
+                        )
+                    }
                 }
             }
 
@@ -1140,6 +1150,121 @@ private fun Density.mastheadCollapse(listState: LazyListState): Float =
         (listState.firstVisibleItemScrollOffset / MastheadCollapseDistance.toPx()).coerceIn(0f, 1f)
     }
 
+
+/** 液态玻璃调节项：与演示页的滑块一一对应，仅在液态玻璃开启时显示。 */
+@Composable
+private fun LiquidGlassTuningControls(
+    tuning: LiquidGlassTuning,
+    onChange: (LiquidGlassSetting, Int) -> Unit,
+    onReset: () -> Unit,
+) {
+    Column(
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .padding(
+                    start = SettingsRowContentInset,
+                    end = Spacing.Large,
+                    top = Spacing.ExtraSmall,
+                    bottom = Spacing.Small,
+                ),
+    ) {
+        LyricsSettingsSlider(
+            label = stringResource(R.string.glass_blur),
+            description = stringResource(R.string.glass_blur_desc),
+            value = tuning.blurDp,
+            range = 1..40,
+            step = 1,
+            valueText = { "$it dp" },
+            onValueChange = { onChange(LiquidGlassSetting.Blur, it) },
+        )
+        LyricsSettingsSlider(
+            label = stringResource(R.string.glass_quality),
+            description = stringResource(R.string.glass_quality_desc),
+            value = tuning.quality,
+            range = 5..100,
+            step = 5,
+            valueText = { "$it%" },
+            onValueChange = { onChange(LiquidGlassSetting.Quality, it) },
+        )
+        LyricsSettingsSlider(
+            label = stringResource(R.string.glass_tint),
+            description = stringResource(R.string.glass_tint_desc),
+            value = tuning.tintPercent,
+            range = 0..80,
+            step = 2,
+            valueText = { "$it%" },
+            onValueChange = { onChange(LiquidGlassSetting.Tint, it) },
+        )
+        LyricsSettingsSlider(
+            label = stringResource(R.string.glass_corner),
+            description = stringResource(R.string.glass_corner_desc),
+            value = tuning.cornerDp,
+            range = 0..36,
+            step = 1,
+            valueText = { "$it dp" },
+            onValueChange = { onChange(LiquidGlassSetting.Corner, it) },
+        )
+        LyricsSettingsSlider(
+            label = stringResource(R.string.glass_refraction),
+            description = stringResource(R.string.glass_refraction_desc),
+            value = tuning.refractionPercent,
+            range = 0..100,
+            step = 5,
+            valueText = { "$it%" },
+            onValueChange = { onChange(LiquidGlassSetting.Refraction, it) },
+        )
+        LyricsSettingsSlider(
+            label = stringResource(R.string.glass_refraction_height),
+            description = stringResource(R.string.glass_refraction_height_desc),
+            value = tuning.refractionHeightDp,
+            range = 2..40,
+            step = 1,
+            valueText = { "$it dp" },
+            onValueChange = { onChange(LiquidGlassSetting.RefractionHeight, it) },
+        )
+        LyricsSettingsSlider(
+            label = stringResource(R.string.glass_falloff),
+            description = stringResource(R.string.glass_falloff_desc),
+            value = tuning.falloffPercent,
+            range = 5..100,
+            step = 5,
+            valueText = { "$it%" },
+            onValueChange = { onChange(LiquidGlassSetting.Falloff, it) },
+        )
+        LyricsSettingsSlider(
+            label = stringResource(R.string.glass_rim),
+            description = stringResource(R.string.glass_rim_desc),
+            value = tuning.rimPercent,
+            range = 0..100,
+            step = 5,
+            valueText = { "$it%" },
+            onValueChange = { onChange(LiquidGlassSetting.Rim, it) },
+        )
+        LyricsSettingsSlider(
+            label = stringResource(R.string.glass_rim_width),
+            description = stringResource(R.string.glass_rim_width_desc),
+            value = tuning.rimWidthDp,
+            range = 0..6,
+            step = 1,
+            valueText = { "$it dp" },
+            onValueChange = { onChange(LiquidGlassSetting.RimWidth, it) },
+        )
+        LyricsSettingsSlider(
+            label = stringResource(R.string.glass_shadow),
+            description = stringResource(R.string.glass_shadow_desc),
+            value = tuning.shadowPercent,
+            range = 0..50,
+            step = 2,
+            valueText = { "$it%" },
+            onValueChange = { onChange(LiquidGlassSetting.Shadow, it) },
+        )
+        LyricsSettingsResetButton(
+            text = stringResource(R.string.glass_reset),
+            onClick = onReset,
+        )
+    }
+}
 
 /** Verse Flow 外观：Auto / Light / Dark，饱和度、鲜艳度、高亮色（与 HTML 的 Appearance 一致）。 */
 @Composable

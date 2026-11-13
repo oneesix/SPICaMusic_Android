@@ -14,6 +14,8 @@ import me.spica27.spicamusic.common.entity.DynamicSpectrumBackground
 import me.spica27.spicamusic.common.entity.ProgressBarStyle
 import me.spica27.spicamusic.common.entity.ThemeColorStyle
 import me.spica27.spicamusic.feature.settings.domain.SettingsUseCases
+import me.spica27.spicamusic.ui.glass.LiquidGlassSetting
+import me.spica27.spicamusic.ui.glass.LiquidGlassTuning
 import me.spica27.spicamusic.ui.widget.VerseMeshSettings
 import me.spica27.spicamusic.ui.widget.VerseThemeMode
 
@@ -45,6 +47,28 @@ class SettingsViewModel(
     fun setLiquidGlassEnabled(enabled: Boolean) {
         viewModelScope.launch {
             settingsUseCases.setBoolean(SettingsUseCases.Keys.LIQUID_GLASS_ENABLED, enabled)
+        }
+    }
+
+    // 液态玻璃调节项：仅在液态玻璃开启时显示在设置页。
+    val liquidGlassTuning =
+        settingsUseCases
+            .getLiquidGlassTuning(LiquidGlassTuning.DefaultValues)
+            .map(LiquidGlassTuning::fromList)
+            .stateIn(viewModelScope, SharingStarted.Eagerly, LiquidGlassTuning())
+
+    fun setLiquidGlassTuning(
+        setting: LiquidGlassSetting,
+        value: Int,
+    ) {
+        viewModelScope.launch {
+            settingsUseCases.setLiquidGlassTuning(setting.ordinal, value)
+        }
+    }
+
+    fun resetLiquidGlassTuning() {
+        viewModelScope.launch {
+            settingsUseCases.resetLiquidGlassTuning()
         }
     }
 

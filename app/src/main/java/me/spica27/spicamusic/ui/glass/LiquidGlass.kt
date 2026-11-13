@@ -31,6 +31,7 @@ import dev.chrisbanes.haze.hazeSource
 @Immutable
 data class LiquidGlassConfig(
     val enabled: Boolean = false,
+    val tuning: LiquidGlassTuning = LiquidGlassTuning(),
 )
 
 val LocalLiquidGlassConfig = staticCompositionLocalOf { LiquidGlassConfig() }
