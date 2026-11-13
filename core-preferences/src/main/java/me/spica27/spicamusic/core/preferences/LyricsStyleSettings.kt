@@ -210,6 +210,12 @@ data class LyricsStyleSettings(
     val dockGapRight: Int = 10,
     /** false: every button and the pill blur on their own (normal). true: one blur behind the whole bar. */
     val dockSpreadBlur: Boolean = false,
+    /** Optimize the top bar blur: it is rendered at a lower resolution ([headerBlurQuality] percent). Off = normal. */
+    val headerBlurOptimize: Boolean = false,
+    val headerBlurQuality: Int = 45,
+    /** Same for the bottom bar blur. */
+    val dockBlurOptimize: Boolean = false,
+    val dockBlurQuality: Int = 45,
     /** Spread only: the blur fades out above the bar instead of ending at a hard edge. */
     val dockSoftEdge: Boolean = true,
     /** Spread only: height of the fade band above the bar, in dp. */
@@ -326,6 +332,8 @@ data class LyricsStyleSettings(
             headerOutlineWeight = headerOutlineWeight.coerceIn(HEADER_OUTLINE_WEIGHT_RANGE),
             headerOutlineOpacity = headerOutlineOpacity.coerceIn(HEADER_OUTLINE_OPACITY_RANGE),
             dockBlurAmount = dockBlurAmount.coerceIn(DOCK_BLUR_RANGE),
+            headerBlurQuality = headerBlurQuality.coerceIn(BLUR_QUALITY_RANGE),
+            dockBlurQuality = dockBlurQuality.coerceIn(BLUR_QUALITY_RANGE),
             dockSize = dockSize.coerceIn(DOCK_SIZE_RANGE),
             dockBottomPadding = dockBottomPadding.coerceIn(DOCK_BOTTOM_PADDING_RANGE),
             dockPillPadding = dockPillPadding.coerceIn(DOCK_PILL_PADDING_RANGE),
@@ -393,6 +401,7 @@ data class LyricsStyleSettings(
         val HEADER_OUTLINE_WEIGHT_RANGE = 1..8
         val HEADER_OUTLINE_OPACITY_RANGE = 0..100
         val DOCK_BLUR_RANGE = 0..40
+        val BLUR_QUALITY_RANGE = 20..100
         val DOCK_SIZE_RANGE = 40..72
         val DOCK_BOTTOM_PADDING_RANGE = 0..48
         val DOCK_PILL_PADDING_RANGE = 0..16

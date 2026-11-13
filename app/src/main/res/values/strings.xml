@@ -1121,4 +1121,8 @@
   <string name="lyr_set_kinetic_size_all_desc">Sets the same size for every style below</string>
   <string name="lyr_set_kinetic_size_style">Size: %1$s</string>
   <string name="lyr_set_kinetic_size_style_desc">Size of this style only</string>
+  <string name="lyr_set_blur_optimize">Optimize blur</string>
+  <string name="lyr_set_blur_optimize_desc">Renders the blur at a lower resolution. Off = normal blur</string>
+  <string name="lyr_set_blur_quality">Blur quality</string>
+  <string name="lyr_set_blur_quality_desc">Lower is smoother on high-resolution screens</string>
 </resources>

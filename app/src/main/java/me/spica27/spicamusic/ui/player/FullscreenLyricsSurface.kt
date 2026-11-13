@@ -163,6 +163,7 @@ internal fun FullscreenLyricsSurface(
                 blurRadius = style.headerBlurAmount.dp,
                 barHeight = barHeight,
                 fade = if (style.headerSoftEdge) style.headerEdgeFade.dp else 0.dp,
+                optimizeQuality = if (style.headerBlurOptimize) style.headerBlurQuality else null,
                 modifier = Modifier.align(Alignment.TopCenter),
             )
         }
@@ -193,6 +194,7 @@ internal fun FullscreenLyricsSurface(
                 barHeight = dockHeight,
                 fade = if (style.dockSoftEdge) style.dockEdgeFade.dp else 0.dp,
                 fadeOnTop = true,
+                optimizeQuality = if (style.dockBlurOptimize) style.dockBlurQuality else null,
                 modifier = Modifier.align(Alignment.BottomCenter),
             )
         }
@@ -536,6 +538,8 @@ private fun LyricsHeaderBlurLayer(
     fade: Dp,
     /** false: the fade band is below the bar (header). true: above it (bottom bar). */
     fadeOnTop: Boolean = false,
+    /** null = normal blur. A number (percent) = optimized: the blur is rendered at that lower resolution. */
+    optimizeQuality: Int? = null,
     modifier: Modifier = Modifier,
 ) {
     val style =
@@ -583,7 +587,12 @@ private fun LyricsHeaderBlurLayer(
                 }.hazeBlur(
                     input = HazeInput.Sources(hazeState),
                     style = style,
-                    performanceMode = HazePerformanceMode.Balanced,
+                    performanceMode =
+                        if (optimizeQuality != null) {
+                            HazePerformanceMode.Fixed(optimizeQuality / 100f)
+                        } else {
+                            HazePerformanceMode.Balanced
+                        },
                     expandLayerBounds = false,
                 ),
     )

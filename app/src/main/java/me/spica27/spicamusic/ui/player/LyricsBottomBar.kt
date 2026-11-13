@@ -116,7 +116,12 @@ internal fun LyricsBottomBar(
             Modifier.hazeBlur(
                 input = HazeInput.Sources(hazeState),
                 style = blurStyle,
-                performanceMode = HazePerformanceMode.Balanced,
+                performanceMode =
+                    if (s.dockBlurOptimize) {
+                        HazePerformanceMode.Fixed(s.dockBlurQuality / 100f)
+                    } else {
+                        HazePerformanceMode.Balanced
+                    },
                 expandLayerBounds = false,
             )
         } else {

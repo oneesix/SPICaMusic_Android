@@ -138,6 +138,10 @@ class PreferencesManager(
         val LYRIC_DOCK_GAP_LEFT = intPreferencesKey("lyric_dock_gap_left")
         val LYRIC_DOCK_GAP_RIGHT = intPreferencesKey("lyric_dock_gap_right")
         val LYRIC_DOCK_SPREAD_BLUR = booleanPreferencesKey("lyric_dock_spread_blur")
+        val LYRIC_HEADER_BLUR_OPTIMIZE = booleanPreferencesKey("lyric_header_blur_optimize")
+        val LYRIC_HEADER_BLUR_QUALITY = intPreferencesKey("lyric_header_blur_quality")
+        val LYRIC_DOCK_BLUR_OPTIMIZE = booleanPreferencesKey("lyric_dock_blur_optimize")
+        val LYRIC_DOCK_BLUR_QUALITY = intPreferencesKey("lyric_dock_blur_quality")
         val LYRIC_DOCK_SOFT_EDGE = booleanPreferencesKey("lyric_dock_soft_edge")
         val LYRIC_DOCK_EDGE_FADE = intPreferencesKey("lyric_dock_edge_fade")
         val LYRIC_KINETIC_ENABLED = booleanPreferencesKey("lyric_kinetic_enabled")
@@ -259,6 +263,10 @@ class PreferencesManager(
                     dockGapLeft = p[Keys.LYRIC_DOCK_GAP_LEFT] ?: d.dockGapLeft,
                     dockGapRight = p[Keys.LYRIC_DOCK_GAP_RIGHT] ?: d.dockGapRight,
                     dockSpreadBlur = p[Keys.LYRIC_DOCK_SPREAD_BLUR] ?: d.dockSpreadBlur,
+                    headerBlurOptimize = p[Keys.LYRIC_HEADER_BLUR_OPTIMIZE] ?: d.headerBlurOptimize,
+                    headerBlurQuality = p[Keys.LYRIC_HEADER_BLUR_QUALITY] ?: d.headerBlurQuality,
+                    dockBlurOptimize = p[Keys.LYRIC_DOCK_BLUR_OPTIMIZE] ?: d.dockBlurOptimize,
+                    dockBlurQuality = p[Keys.LYRIC_DOCK_BLUR_QUALITY] ?: d.dockBlurQuality,
                     dockSoftEdge = p[Keys.LYRIC_DOCK_SOFT_EDGE] ?: d.dockSoftEdge,
                     dockEdgeFade = p[Keys.LYRIC_DOCK_EDGE_FADE] ?: d.dockEdgeFade,
                     kineticEnabled = p[Keys.LYRIC_KINETIC_ENABLED] ?: d.kineticEnabled,
@@ -380,6 +388,10 @@ class PreferencesManager(
                     dockGapLeft = p[Keys.LYRIC_DOCK_GAP_LEFT] ?: d.dockGapLeft,
                     dockGapRight = p[Keys.LYRIC_DOCK_GAP_RIGHT] ?: d.dockGapRight,
                     dockSpreadBlur = p[Keys.LYRIC_DOCK_SPREAD_BLUR] ?: d.dockSpreadBlur,
+                    headerBlurOptimize = p[Keys.LYRIC_HEADER_BLUR_OPTIMIZE] ?: d.headerBlurOptimize,
+                    headerBlurQuality = p[Keys.LYRIC_HEADER_BLUR_QUALITY] ?: d.headerBlurQuality,
+                    dockBlurOptimize = p[Keys.LYRIC_DOCK_BLUR_OPTIMIZE] ?: d.dockBlurOptimize,
+                    dockBlurQuality = p[Keys.LYRIC_DOCK_BLUR_QUALITY] ?: d.dockBlurQuality,
                     dockSoftEdge = p[Keys.LYRIC_DOCK_SOFT_EDGE] ?: d.dockSoftEdge,
                     dockEdgeFade = p[Keys.LYRIC_DOCK_EDGE_FADE] ?: d.dockEdgeFade,
                     kineticEnabled = p[Keys.LYRIC_KINETIC_ENABLED] ?: d.kineticEnabled,
@@ -492,6 +504,10 @@ class PreferencesManager(
             p[Keys.LYRIC_DOCK_GAP_LEFT] = n.dockGapLeft
             p[Keys.LYRIC_DOCK_GAP_RIGHT] = n.dockGapRight
             p[Keys.LYRIC_DOCK_SPREAD_BLUR] = n.dockSpreadBlur
+            p[Keys.LYRIC_HEADER_BLUR_OPTIMIZE] = n.headerBlurOptimize
+            p[Keys.LYRIC_HEADER_BLUR_QUALITY] = n.headerBlurQuality
+            p[Keys.LYRIC_DOCK_BLUR_OPTIMIZE] = n.dockBlurOptimize
+            p[Keys.LYRIC_DOCK_BLUR_QUALITY] = n.dockBlurQuality
             p[Keys.LYRIC_DOCK_SOFT_EDGE] = n.dockSoftEdge
             p[Keys.LYRIC_DOCK_EDGE_FADE] = n.dockEdgeFade
             p[Keys.LYRIC_KINETIC_ENABLED] = n.kineticEnabled

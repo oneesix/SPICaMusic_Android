@@ -931,6 +931,23 @@ private fun EnhanceHeaderSection(
             valueText = dp,
             onValueChange = { v -> onUpdate { it.copy(headerBlurAmount = v) } },
         )
+        LyricsSettingsToggle(
+            label = stringResource(R.string.lyr_set_blur_optimize),
+            description = stringResource(R.string.lyr_set_blur_optimize_desc),
+            checked = settings.headerBlurOptimize,
+            onCheckedChange = { v -> onUpdate { it.copy(headerBlurOptimize = v) } },
+        )
+        if (settings.headerBlurOptimize) {
+            LyricsSettingsSlider(
+                label = stringResource(R.string.lyr_set_blur_quality),
+                description = stringResource(R.string.lyr_set_blur_quality_desc),
+                value = settings.headerBlurQuality,
+                range = LyricsStyleSettings.BLUR_QUALITY_RANGE,
+                step = 5,
+                valueText = percent,
+                onValueChange = { v -> onUpdate { it.copy(headerBlurQuality = v) } },
+            )
+        }
     }
     // Soft edge works with blur on (the blur fades out) and off (the lyrics fade in).
     LyricsSettingsToggle(
@@ -969,6 +986,23 @@ private fun EnhanceHeaderSection(
             valueText = dp,
             onValueChange = { v -> onUpdate { it.copy(dockBlurAmount = v) } },
         )
+        LyricsSettingsToggle(
+            label = stringResource(R.string.lyr_set_blur_optimize),
+            description = stringResource(R.string.lyr_set_blur_optimize_desc),
+            checked = settings.dockBlurOptimize,
+            onCheckedChange = { v -> onUpdate { it.copy(dockBlurOptimize = v) } },
+        )
+        if (settings.dockBlurOptimize) {
+            LyricsSettingsSlider(
+                label = stringResource(R.string.lyr_set_blur_quality),
+                description = stringResource(R.string.lyr_set_blur_quality_desc),
+                value = settings.dockBlurQuality,
+                range = LyricsStyleSettings.BLUR_QUALITY_RANGE,
+                step = 5,
+                valueText = percent,
+                onValueChange = { v -> onUpdate { it.copy(dockBlurQuality = v) } },
+            )
+        }
         LyricsSettingsChips(
             label = stringResource(R.string.lyr_set_dock_style),
             description = stringResource(R.string.lyr_set_dock_style_desc),
