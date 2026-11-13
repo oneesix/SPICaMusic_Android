@@ -32,6 +32,7 @@ class PreferencesManager(
         val LIQUID_GLASS_SHADOW = intPreferencesKey("liquid_glass_shadow")
         val LIQUID_GLASS_MODE = intPreferencesKey("liquid_glass_mode")
         val LIQUID_GLASS_SATURATION = intPreferencesKey("liquid_glass_saturation")
+        val LIQUID_GLASS_V2_ENABLED = booleanPreferencesKey("liquid_glass_v2_enabled")
         val BOTTOM_BAR_LAYOUT = stringPreferencesKey("bottom_bar_layout")
         val THEME_COLOR_STYLE = stringPreferencesKey("theme_color_style")
         val KEEP_SCREEN_ON = booleanPreferencesKey("keep_screen_on")
@@ -624,6 +625,50 @@ class PreferencesManager(
     suspend fun resetLiquidGlassTuning() {
         context.dataStore.edit { preferences ->
             liquidGlassTuningKeys.forEach { preferences.remove(it) }
+        }
+    }
+
+    /** 液态玻璃 V2 调节项，顺序固定，与 app 侧 LiquidGlassV2Setting 的 ordinal 一一对应。 */
+    private val liquidGlassV2TuningKeys =
+        listOf(
+            "corner",
+            "blur",
+            "refraction_height",
+            "refraction_amount",
+            "depth",
+            "chromatic",
+            "vibrancy",
+            "tint_opacity",
+            "tint_color",
+            "highlight_style",
+            "highlight_width",
+            "highlight_alpha",
+            "highlight_angle",
+            "highlight_falloff",
+            "shadow_radius",
+            "shadow_alpha",
+            "inner_radius",
+            "inner_alpha",
+            "press",
+        ).map { intPreferencesKey("liquid_glass_v2_$it") }
+
+    fun getLiquidGlassV2Tuning(defaults: List<Int>): Flow<List<Int>> =
+        context.dataStore.data.map { preferences ->
+            liquidGlassV2TuningKeys.mapIndexed { index, key -> preferences[key] ?: defaults[index] }
+        }.distinctUntilChanged()
+
+    suspend fun setLiquidGlassV2Tuning(
+        index: Int,
+        value: Int,
+    ) {
+        context.dataStore.edit { preferences ->
+            preferences[liquidGlassV2TuningKeys[index]] = value
+        }
+    }
+
+    suspend fun resetLiquidGlassV2Tuning() {
+        context.dataStore.edit { preferences ->
+            liquidGlassV2TuningKeys.forEach { preferences.remove(it) }
         }
     }
 

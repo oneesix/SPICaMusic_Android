@@ -28,11 +28,16 @@ import me.spica27.spicamusic.ui.adaptive.LocalWindowLayout
 import me.spica27.spicamusic.ui.adaptive.PaneInfo
 import me.spica27.spicamusic.ui.adaptive.ShellInsets
 import me.spica27.spicamusic.ui.adaptive.rememberWindowLayout
+import com.kyant.backdrop.backdrops.rememberLayerBackdrop
 import me.spica27.spicamusic.ui.glass.LiquidGlassConfig
 import me.spica27.spicamusic.ui.glass.LocalDialogHazeState
+import me.spica27.spicamusic.ui.glass.LocalGlassV2Backdrop
+import me.spica27.spicamusic.ui.glass.LiquidGlassV2Config
 import me.spica27.spicamusic.ui.glass.LocalLiquidGlassConfig
+import me.spica27.spicamusic.ui.glass.LocalLiquidGlassV2Config
 import me.spica27.spicamusic.ui.glass.liquidGlassSource
 import me.spica27.spicamusic.ui.glass.rememberLiquidGlassTuning
+import me.spica27.spicamusic.ui.glass.rememberLiquidGlassV2Tuning
 import me.spica27.spicamusic.ui.navigation.LocalBackStack
 import me.spica27.spicamusic.ui.navigation.MotionDialogSceneStrategy
 import me.spica27.spicamusic.ui.navigation.Route
@@ -61,6 +66,13 @@ fun AppScaffold() {
             .collectAsStateWithLifecycle(false)
 
     val liquidGlassTuning = rememberLiquidGlassTuning(preferencesManager)
+
+    val liquidGlassV2Enabled by
+        preferencesManager
+            .getBoolean(PreferencesManager.Keys.LIQUID_GLASS_V2_ENABLED, false)
+            .collectAsStateWithLifecycle(false)
+    val liquidGlassV2Tuning = rememberLiquidGlassV2Tuning(preferencesManager)
+    val glassV2Backdrop = rememberLayerBackdrop()
 
     val themeColorStyleValue by
         preferencesManager
@@ -108,6 +120,8 @@ fun AppScaffold() {
     ) {
         CompositionLocalProvider(
             LocalLiquidGlassConfig provides LiquidGlassConfig(enabled = liquidGlassEnabled, tuning = liquidGlassTuning),
+            LocalLiquidGlassV2Config provides LiquidGlassV2Config(enabled = liquidGlassV2Enabled, tuning = liquidGlassV2Tuning),
+            LocalGlassV2Backdrop provides glassV2Backdrop,
             LocalDialogHazeState provides dialogHazeState,
             LocalPlayerViewModel provides playerViewModel,
             LocalBackStack provides navigator,

@@ -113,6 +113,7 @@ tasks.named("preBuild") {
 dependencies {
   // 模块依赖
   implementation project(':common')
+  implementation project(':backdrop')
   implementation project(':core-preferences')
   implementation project(':feature-library-data')
   implementation project(':feature-player-data')

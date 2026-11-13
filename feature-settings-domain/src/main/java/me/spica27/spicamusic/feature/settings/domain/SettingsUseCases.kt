@@ -11,6 +11,7 @@ class SettingsUseCases(
     object Keys {
         val DARK_MODE = PreferencesManager.Keys.DARK_MODE
         val LIQUID_GLASS_ENABLED = PreferencesManager.Keys.LIQUID_GLASS_ENABLED
+        val LIQUID_GLASS_V2_ENABLED = PreferencesManager.Keys.LIQUID_GLASS_V2_ENABLED
         val BOTTOM_BAR_LAYOUT = PreferencesManager.Keys.BOTTOM_BAR_LAYOUT
         val THEME_COLOR_STYLE = PreferencesManager.Keys.THEME_COLOR_STYLE
         val KEEP_SCREEN_ON = PreferencesManager.Keys.KEEP_SCREEN_ON
@@ -57,6 +58,19 @@ class SettingsUseCases(
 
     suspend fun resetLiquidGlassTuning() {
         preferencesManager.resetLiquidGlassTuning()
+    }
+
+    fun getLiquidGlassV2Tuning(defaults: List<Int>): Flow<List<Int>> = preferencesManager.getLiquidGlassV2Tuning(defaults)
+
+    suspend fun setLiquidGlassV2Tuning(
+        index: Int,
+        value: Int,
+    ) {
+        preferencesManager.setLiquidGlassV2Tuning(index, value)
+    }
+
+    suspend fun resetLiquidGlassV2Tuning() {
+        preferencesManager.resetLiquidGlassV2Tuning()
     }
 
     fun getInt(

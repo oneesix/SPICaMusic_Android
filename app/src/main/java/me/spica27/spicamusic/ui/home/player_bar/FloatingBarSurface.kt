@@ -25,7 +25,10 @@ import dev.chrisbanes.haze.blur.hazeBlur
 import dev.chrisbanes.haze.glass.GlassStyle
 import dev.chrisbanes.haze.glass.RefractionProfile
 import dev.chrisbanes.haze.glass.hazeGlass
+import me.spica27.spicamusic.ui.glass.LocalGlassV2Backdrop
 import me.spica27.spicamusic.ui.glass.LocalLiquidGlassConfig
+import me.spica27.spicamusic.ui.glass.LocalLiquidGlassV2Config
+import me.spica27.spicamusic.ui.glass.liquidGlassV2Surface
 import me.spica27.spicamusic.ui.theme.Spacing
 
 internal object FloatingBarDefaults {
@@ -46,6 +49,19 @@ internal fun Modifier.playerBarSurface(
     shape: RoundedCornerShape,
     expandLayerBounds: Boolean,
 ): Modifier {
+    // 液态玻璃 V2：开启后优先使用（需要 Android 12+ 才有模糊，13+ 才有折射）。
+    val v2Config = LocalLiquidGlassV2Config.current
+    val v2Backdrop = LocalGlassV2Backdrop.current
+    if (v2Config.enabled && v2Backdrop != null && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+        val v2Shape =
+            if (shape === FloatingBarDefaults.Shape) RoundedCornerShape(v2Config.tuning.cornerDp.dp) else shape
+        return liquidGlassV2Surface(
+            backdrop = v2Backdrop,
+            tuning = v2Config.tuning,
+            shape = v2Shape,
+            surfaceColor = containerColor,
+        )
+    }
     val tuning = LocalLiquidGlassConfig.current.tuning
     // 圆角设置只作用于悬浮布局的胶囊形状。
     val glassShape = if (shape === FloatingBarDefaults.Shape) RoundedCornerShape(tuning.cornerDp.dp) else shape

@@ -30,6 +30,7 @@ import me.spica27.spicamusic.R
 import me.spica27.spicamusic.artwork.artwork
 import me.spica27.spicamusic.ui.glass.LocalLiquidGlassConfig
 import me.spica27.spicamusic.ui.glass.liquidGlassSource
+import me.spica27.spicamusic.ui.glass.liquidGlassV2Source
 import me.spica27.spicamusic.ui.home.page.FinderPage
 import me.spica27.spicamusic.ui.home.page.LibraryPage
 import me.spica27.spicamusic.ui.home.page.MusicPage
@@ -128,7 +129,7 @@ fun HomeScreen() {
             )
         },
     ) { padding ->
-        Box(Modifier.fillMaxSize().liquidGlassSource(hazeState)) {
+        Box(Modifier.fillMaxSize().liquidGlassSource(hazeState).liquidGlassV2Source()) {
             pageStateHolder.SaveableStateProvider(currentPage) {
                 when (currentPage) {
                     HomePage.Finder -> FinderPage(bottomContentPadding = padding.calculateBottomPadding())

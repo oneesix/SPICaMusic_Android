@@ -27,6 +27,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBars
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.rememberLazyListState
@@ -46,6 +47,7 @@ import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Landscape
 import androidx.compose.material.icons.filled.Palette
 import androidx.compose.material.icons.filled.Layers
+import androidx.compose.material.icons.filled.BlurOn
 import androidx.compose.material.icons.filled.LensBlur
 import androidx.compose.material.icons.filled.LocationCity
 import androidx.compose.material.icons.filled.MusicOff
@@ -93,6 +95,10 @@ import me.spica27.spicamusic.common.entity.ProgressBarStyle
 import me.spica27.spicamusic.common.entity.ThemeColorStyle
 import me.spica27.spicamusic.ui.glass.LiquidGlassSetting
 import me.spica27.spicamusic.ui.glass.LiquidGlassTuning
+import me.spica27.spicamusic.ui.glass.LiquidGlassV2Preview
+import me.spica27.spicamusic.ui.glass.LiquidGlassV2Setting
+import me.spica27.spicamusic.ui.glass.LiquidGlassV2Tuning
+import me.spica27.spicamusic.ui.glass.tenthsText
 import me.spica27.spicamusic.ui.navigation.AboutRoute
 import me.spica27.spicamusic.ui.navigation.AudioEffectsRoute
 import me.spica27.spicamusic.ui.navigation.IgnoredSongsRoute
@@ -120,6 +126,7 @@ import org.koin.compose.viewmodel.koinViewModel
 /**
  * 设置页
  */
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun SettingsScreen() {
     val backStack = LocalBackStack.current
@@ -128,6 +135,8 @@ fun SettingsScreen() {
     val darkMode by viewModel.darkMode.collectAsStateWithLifecycle()
     val liquidGlassEnabled by viewModel.liquidGlassEnabled.collectAsStateWithLifecycle()
     val liquidGlassTuning by viewModel.liquidGlassTuning.collectAsStateWithLifecycle()
+    val liquidGlassV2Enabled by viewModel.liquidGlassV2Enabled.collectAsStateWithLifecycle()
+    val liquidGlassV2Tuning by viewModel.liquidGlassV2Tuning.collectAsStateWithLifecycle()
     val bottomBarLayout by viewModel.bottomBarLayout.collectAsStateWithLifecycle()
     val keepScreenOn by viewModel.keepScreenOn.collectAsStateWithLifecycle()
     val backgroundValue by viewModel.dynamicSpectrumBackground.collectAsStateWithLifecycle()
@@ -190,6 +199,16 @@ fun SettingsScreen() {
                 )
             }
 
+            // 液态玻璃 V2 预览：开启后固定在顶部，调节任何选项都能立即看到。
+            if (liquidGlassV2Enabled) {
+                stickyHeader(key = "settings_glass_v2_preview") {
+                    LiquidGlassV2Preview(
+                        tuning = liquidGlassV2Tuning,
+                        modifier = Modifier.padding(horizontal = LayoutTokens.MusicHeaderHorizontalPadding),
+                    )
+                }
+            }
+
             item(key = "settings_appearance") {
                 val colorStyleOptions = rememberColorStyleOptions()
                 val bottomBarLayoutOptions = rememberBottomBarLayoutOptions()
@@ -245,6 +264,21 @@ fun SettingsScreen() {
                             tuning = liquidGlassTuning,
                             onChange = viewModel::setLiquidGlassTuning,
                             onReset = viewModel::resetLiquidGlassTuning,
+                        )
+                    }
+                    SettingsItemDivider()
+                    SwitchRow(
+                        title = stringResource(R.string.settings_liquid_glass_v2_title),
+                        summary = stringResource(R.string.settings_liquid_glass_v2_subtitle),
+                        icon = Icons.Default.BlurOn,
+                        checked = liquidGlassV2Enabled,
+                        onCheckedChange = viewModel::setLiquidGlassV2Enabled,
+                    )
+                    AnimatedVisibility(visible = liquidGlassV2Enabled) {
+                        LiquidGlassV2Controls(
+                            tuning = liquidGlassV2Tuning,
+                            onChange = viewModel::setLiquidGlassV2Tuning,
+                            onReset = viewModel::resetLiquidGlassV2Tuning,
                         )
                     }
                 }
@@ -1282,6 +1316,116 @@ private fun LiquidGlassTuningControls(
         )
         LyricsSettingsResetButton(
             text = stringResource(R.string.glass_reset),
+            onClick = onReset,
+        )
+    }
+}
+
+/** 液态玻璃 V2（Kyant Backdrop）的全部调节项；上方固定的预览行实时显示效果。 */
+@Composable
+private fun LiquidGlassV2Controls(
+    tuning: LiquidGlassV2Tuning,
+    onChange: (LiquidGlassV2Setting, Int) -> Unit,
+    onReset: () -> Unit,
+) {
+    @Composable
+    fun GlassSlider(
+        label: Int,
+        setting: LiquidGlassV2Setting,
+        value: Int,
+        range: IntRange,
+        step: Int = 1,
+        text: (Int) -> String,
+    ) = LyricsSettingsSlider(
+        label = stringResource(label),
+        description = "",
+        value = value,
+        range = range,
+        step = step,
+        valueText = text,
+        onValueChange = { onChange(setting, it) },
+    )
+
+    @Composable
+    fun GlassToggle(
+        label: Int,
+        setting: LiquidGlassV2Setting,
+        value: Int,
+    ) = LyricsSettingsToggle(
+        label = stringResource(label),
+        description = "",
+        checked = value == 1,
+        onCheckedChange = { onChange(setting, if (it) 1 else 0) },
+    )
+
+    Column(
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .padding(
+                    start = SettingsRowContentInset,
+                    end = Spacing.Large,
+                    top = Spacing.ExtraSmall,
+                    bottom = Spacing.Small,
+                ),
+    ) {
+        GlassSlider(R.string.glass_v2_corner, LiquidGlassV2Setting.Corner, tuning.cornerDp, 0..60) { "$it dp" }
+        GlassSlider(R.string.glass_v2_refraction_height, LiquidGlassV2Setting.RefractionHeight, tuning.refractionHeightDp, 0..48) { "$it dp" }
+        GlassSlider(R.string.glass_v2_refraction_amount, LiquidGlassV2Setting.RefractionAmount, tuning.refractionAmountDp, 0..80) { "$it dp" }
+        GlassToggle(R.string.glass_v2_depth, LiquidGlassV2Setting.Depth, tuning.depth)
+        GlassToggle(R.string.glass_v2_chromatic, LiquidGlassV2Setting.Chromatic, tuning.chromatic)
+        GlassSlider(R.string.glass_v2_blur, LiquidGlassV2Setting.Blur, tuning.blurDp, 0..32) { "$it dp" }
+        GlassToggle(R.string.glass_v2_vibrancy, LiquidGlassV2Setting.Vibrancy, tuning.vibrancy)
+        GlassSlider(R.string.glass_v2_tint_opacity, LiquidGlassV2Setting.TintOpacity, tuning.tintPercent, 0..100, 2) { "$it%" }
+        LyricsSettingsChips(
+            label = stringResource(R.string.glass_v2_tint_color),
+            description = "",
+            options = listOf(0, 1, 2, 3),
+            selected = tuning.tintColor,
+            optionLabel = {
+                stringResource(
+                    when (it) {
+                        1 -> R.string.glass_v2_tint_white
+                        2 -> R.string.glass_v2_tint_black
+                        3 -> R.string.glass_v2_tint_orange
+                        else -> R.string.glass_v2_tint_surface
+                    },
+                )
+            },
+            onSelect = { onChange(LiquidGlassV2Setting.TintColor, it) },
+        )
+        LyricsSettingsChips(
+            label = stringResource(R.string.glass_v2_highlight_style),
+            description = "",
+            options = listOf(0, 1, 2, 3),
+            selected = tuning.highlightStyle,
+            optionLabel = {
+                stringResource(
+                    when (it) {
+                        1 -> R.string.glass_v2_hl_default
+                        2 -> R.string.glass_v2_hl_ambient
+                        3 -> R.string.glass_v2_hl_plain
+                        else -> R.string.glass_v2_hl_off
+                    },
+                )
+            },
+            onSelect = { onChange(LiquidGlassV2Setting.HighlightStyle, it) },
+        )
+        if (tuning.highlightStyle != 0) {
+            GlassSlider(R.string.glass_v2_highlight_width, LiquidGlassV2Setting.HighlightWidth, tuning.highlightWidthTenths, 0..40) { "${it.tenthsText()} dp" }
+            GlassSlider(R.string.glass_v2_highlight_alpha, LiquidGlassV2Setting.HighlightAlpha, tuning.highlightAlphaPercent, 0..100, 5) { "$it%" }
+        }
+        if (tuning.highlightStyle == 1) {
+            GlassSlider(R.string.glass_v2_highlight_angle, LiquidGlassV2Setting.HighlightAngle, tuning.highlightAngle, 0..360, 5) { "$it°" }
+            GlassSlider(R.string.glass_v2_highlight_falloff, LiquidGlassV2Setting.HighlightFalloff, tuning.highlightFalloffTenths, 0..40) { it.tenthsText() }
+        }
+        GlassSlider(R.string.glass_v2_shadow_radius, LiquidGlassV2Setting.ShadowRadius, tuning.shadowRadiusDp, 0..48) { "$it dp" }
+        GlassSlider(R.string.glass_v2_shadow_alpha, LiquidGlassV2Setting.ShadowAlpha, tuning.shadowAlphaPercent, 0..100, 2) { "$it%" }
+        GlassSlider(R.string.glass_v2_inner_radius, LiquidGlassV2Setting.InnerRadius, tuning.innerShadowRadiusDp, 0..48) { "$it dp" }
+        GlassSlider(R.string.glass_v2_inner_alpha, LiquidGlassV2Setting.InnerAlpha, tuning.innerShadowAlphaPercent, 0..100, 5) { "$it%" }
+        GlassToggle(R.string.glass_v2_press, LiquidGlassV2Setting.Press, tuning.press)
+        LyricsSettingsResetButton(
+            text = stringResource(R.string.glass_v2_reset),
             onClick = onReset,
         )
     }

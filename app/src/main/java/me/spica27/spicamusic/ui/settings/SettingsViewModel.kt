@@ -16,6 +16,8 @@ import me.spica27.spicamusic.common.entity.ThemeColorStyle
 import me.spica27.spicamusic.feature.settings.domain.SettingsUseCases
 import me.spica27.spicamusic.ui.glass.LiquidGlassSetting
 import me.spica27.spicamusic.ui.glass.LiquidGlassTuning
+import me.spica27.spicamusic.ui.glass.LiquidGlassV2Setting
+import me.spica27.spicamusic.ui.glass.LiquidGlassV2Tuning
 import me.spica27.spicamusic.ui.widget.VerseMeshSettings
 import me.spica27.spicamusic.ui.widget.VerseThemeMode
 
@@ -69,6 +71,39 @@ class SettingsViewModel(
     fun resetLiquidGlassTuning() {
         viewModelScope.launch {
             settingsUseCases.resetLiquidGlassTuning()
+        }
+    }
+
+    // 液态玻璃 V2（Kyant Backdrop）：独立开关与调节项，不影响上面的旧版设置。
+    val liquidGlassV2Enabled =
+        settingsUseCases
+            .getBoolean(SettingsUseCases.Keys.LIQUID_GLASS_V2_ENABLED, false)
+            .stateIn(viewModelScope, SharingStarted.Eagerly, false)
+
+    fun setLiquidGlassV2Enabled(enabled: Boolean) {
+        viewModelScope.launch {
+            settingsUseCases.setBoolean(SettingsUseCases.Keys.LIQUID_GLASS_V2_ENABLED, enabled)
+        }
+    }
+
+    val liquidGlassV2Tuning =
+        settingsUseCases
+            .getLiquidGlassV2Tuning(LiquidGlassV2Tuning.DefaultValues)
+            .map(LiquidGlassV2Tuning::fromList)
+            .stateIn(viewModelScope, SharingStarted.Eagerly, LiquidGlassV2Tuning())
+
+    fun setLiquidGlassV2Tuning(
+        setting: LiquidGlassV2Setting,
+        value: Int,
+    ) {
+        viewModelScope.launch {
+            settingsUseCases.setLiquidGlassV2Tuning(setting.ordinal, value)
+        }
+    }
+
+    fun resetLiquidGlassV2Tuning() {
+        viewModelScope.launch {
+            settingsUseCases.resetLiquidGlassV2Tuning()
         }
     }
 
