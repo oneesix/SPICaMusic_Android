@@ -1,0 +1,234 @@
+diff --git a/app/src/main/java/me/spica27/spicamusic/ui/player/FullscreenLyricsSurface.kt b/app/src/main/java/me/spica27/spicamusic/ui/player/FullscreenLyricsSurface.kt
+index 8d507eb..58273e8 100644
+--- a/app/src/main/java/me/spica27/spicamusic/ui/player/FullscreenLyricsSurface.kt
++++ b/app/src/main/java/me/spica27/spicamusic/ui/player/FullscreenLyricsSurface.kt
+@@ -163,6 +163,7 @@ internal fun FullscreenLyricsSurface(
+                 blurRadius = style.headerBlurAmount.dp,
+                 barHeight = barHeight,
+                 fade = if (style.headerSoftEdge) style.headerEdgeFade.dp else 0.dp,
++                optimizeQuality = if (style.headerBlurOptimize) style.headerBlurQuality else null,
+                 modifier = Modifier.align(Alignment.TopCenter),
+             )
+         }
+@@ -193,6 +194,7 @@ internal fun FullscreenLyricsSurface(
+                 barHeight = dockHeight,
+                 fade = if (style.dockSoftEdge) style.dockEdgeFade.dp else 0.dp,
+                 fadeOnTop = true,
++                optimizeQuality = if (style.dockBlurOptimize) style.dockBlurQuality else null,
+                 modifier = Modifier.align(Alignment.BottomCenter),
+             )
+         }
+@@ -536,6 +538,8 @@ private fun LyricsHeaderBlurLayer(
+     fade: Dp,
+     /** false: the fade band is below the bar (header). true: above it (bottom bar). */
+     fadeOnTop: Boolean = false,
++    /** null = normal blur. A number (percent) = optimized: the blur is rendered at that lower resolution. */
++    optimizeQuality: Int? = null,
+     modifier: Modifier = Modifier,
+ ) {
+     val style =
+@@ -583,7 +587,12 @@ private fun LyricsHeaderBlurLayer(
+                 }.hazeBlur(
+                     input = HazeInput.Sources(hazeState),
+                     style = style,
+-                    performanceMode = HazePerformanceMode.Balanced,
++                    performanceMode =
++                        if (optimizeQuality != null) {
++                            HazePerformanceMode.Fixed(optimizeQuality / 100f)
++                        } else {
++                            HazePerformanceMode.Balanced
++                        },
+                     expandLayerBounds = false,
+                 ),
+     )
+diff --git a/app/src/main/java/me/spica27/spicamusic/ui/player/LyricsBottomBar.kt b/app/src/main/java/me/spica27/spicamusic/ui/player/LyricsBottomBar.kt
+index 9623288..13cf1b0 100644
+--- a/app/src/main/java/me/spica27/spicamusic/ui/player/LyricsBottomBar.kt
++++ b/app/src/main/java/me/spica27/spicamusic/ui/player/LyricsBottomBar.kt
+@@ -116,7 +116,12 @@ internal fun LyricsBottomBar(
+             Modifier.hazeBlur(
+                 input = HazeInput.Sources(hazeState),
+                 style = blurStyle,
+-                performanceMode = HazePerformanceMode.Balanced,
++                performanceMode =
++                    if (s.dockBlurOptimize) {
++                        HazePerformanceMode.Fixed(s.dockBlurQuality / 100f)
++                    } else {
++                        HazePerformanceMode.Balanced
++                    },
+                 expandLayerBounds = false,
+             )
+         } else {
+diff --git a/app/src/main/java/me/spica27/spicamusic/ui/widget/LyricsSettingsSheet.kt b/app/src/main/java/me/spica27/spicamusic/ui/widget/LyricsSettingsSheet.kt
+index efd0ef9..0062599 100644
+--- a/app/src/main/java/me/spica27/spicamusic/ui/widget/LyricsSettingsSheet.kt
++++ b/app/src/main/java/me/spica27/spicamusic/ui/widget/LyricsSettingsSheet.kt
+@@ -931,6 +931,23 @@ private fun EnhanceHeaderSection(
+             valueText = dp,
+             onValueChange = { v -> onUpdate { it.copy(headerBlurAmount = v) } },
+         )
++        LyricsSettingsToggle(
++            label = stringResource(R.string.lyr_set_blur_optimize),
++            description = stringResource(R.string.lyr_set_blur_optimize_desc),
++            checked = settings.headerBlurOptimize,
++            onCheckedChange = { v -> onUpdate { it.copy(headerBlurOptimize = v) } },
++        )
++        if (settings.headerBlurOptimize) {
++            LyricsSettingsSlider(
++                label = stringResource(R.string.lyr_set_blur_quality),
++                description = stringResource(R.string.lyr_set_blur_quality_desc),
++                value = settings.headerBlurQuality,
++                range = LyricsStyleSettings.BLUR_QUALITY_RANGE,
++                step = 5,
++                valueText = percent,
++                onValueChange = { v -> onUpdate { it.copy(headerBlurQuality = v) } },
++            )
++        }
+     }
+     // Soft edge works with blur on (the blur fades out) and off (the lyrics fade in).
+     LyricsSettingsToggle(
+@@ -969,6 +986,23 @@ private fun EnhanceHeaderSection(
+             valueText = dp,
+             onValueChange = { v -> onUpdate { it.copy(dockBlurAmount = v) } },
+         )
++        LyricsSettingsToggle(
++            label = stringResource(R.string.lyr_set_blur_optimize),
++            description = stringResource(R.string.lyr_set_blur_optimize_desc),
++            checked = settings.dockBlurOptimize,
++            onCheckedChange = { v -> onUpdate { it.copy(dockBlurOptimize = v) } },
++        )
++        if (settings.dockBlurOptimize) {
++            LyricsSettingsSlider(
++                label = stringResource(R.string.lyr_set_blur_quality),
++                description = stringResource(R.string.lyr_set_blur_quality_desc),
++                value = settings.dockBlurQuality,
++                range = LyricsStyleSettings.BLUR_QUALITY_RANGE,
++                step = 5,
++                valueText = percent,
++                onValueChange = { v -> onUpdate { it.copy(dockBlurQuality = v) } },
++            )
++        }
+         LyricsSettingsChips(
+             label = stringResource(R.string.lyr_set_dock_style),
+             description = stringResource(R.string.lyr_set_dock_style_desc),
+diff --git a/app/src/main/res/values-zh-rTW/strings.xml b/app/src/main/res/values-zh-rTW/strings.xml
+index 15b25e2..0875d1f 100644
+--- a/app/src/main/res/values-zh-rTW/strings.xml
++++ b/app/src/main/res/values-zh-rTW/strings.xml
+@@ -1120,4 +1120,8 @@
+   <string name="lyr_set_kinetic_size_all_desc">為下面每個樣式設定相同大小</string>
+   <string name="lyr_set_kinetic_size_style">大小：%1$s</string>
+   <string name="lyr_set_kinetic_size_style_desc">只改變此樣式的大小</string>
++  <string name="lyr_set_blur_optimize">最佳化模糊</string>
++  <string name="lyr_set_blur_optimize_desc">以較低解析度算繪模糊。關閉 = 一般模糊</string>
++  <string name="lyr_set_blur_quality">模糊品質</string>
++  <string name="lyr_set_blur_quality_desc">數值越低，在高解析度螢幕上越流暢</string>
+ </resources>
+diff --git a/app/src/main/res/values-zh/strings.xml b/app/src/main/res/values-zh/strings.xml
+index 8be3c8d..8154cbb 100644
+--- a/app/src/main/res/values-zh/strings.xml
++++ b/app/src/main/res/values-zh/strings.xml
+@@ -1121,4 +1121,8 @@
+   <string name="lyr_set_kinetic_size_all_desc">为下面每个样式设置相同大小</string>
+   <string name="lyr_set_kinetic_size_style">大小：%1$s</string>
+   <string name="lyr_set_kinetic_size_style_desc">只改变此样式的大小</string>
++  <string name="lyr_set_blur_optimize">优化模糊</string>
++  <string name="lyr_set_blur_optimize_desc">以较低分辨率渲染模糊。关闭 = 普通模糊</string>
++  <string name="lyr_set_blur_quality">模糊质量</string>
++  <string name="lyr_set_blur_quality_desc">数值越低，在高分辨率屏幕上越流畅</string>
+ </resources>
+diff --git a/app/src/main/res/values/strings.xml b/app/src/main/res/values/strings.xml
+index 19b03c4..305c1f6 100644
+--- a/app/src/main/res/values/strings.xml
++++ b/app/src/main/res/values/strings.xml
+@@ -1121,4 +1121,8 @@
+   <string name="lyr_set_kinetic_size_all_desc">Sets the same size for every style below</string>
+   <string name="lyr_set_kinetic_size_style">Size: %1$s</string>
+   <string name="lyr_set_kinetic_size_style_desc">Size of this style only</string>
++  <string name="lyr_set_blur_optimize">Optimize blur</string>
++  <string name="lyr_set_blur_optimize_desc">Renders the blur at a lower resolution. Off = normal blur</string>
++  <string name="lyr_set_blur_quality">Blur quality</string>
++  <string name="lyr_set_blur_quality_desc">Lower is smoother on high-resolution screens</string>
+ </resources>
+diff --git a/core-preferences/src/main/java/me/spica27/spicamusic/core/preferences/LyricsStyleSettings.kt b/core-preferences/src/main/java/me/spica27/spicamusic/core/preferences/LyricsStyleSettings.kt
+index 3a91f69..1e24f76 100644
+--- a/core-preferences/src/main/java/me/spica27/spicamusic/core/preferences/LyricsStyleSettings.kt
++++ b/core-preferences/src/main/java/me/spica27/spicamusic/core/preferences/LyricsStyleSettings.kt
+@@ -210,6 +210,12 @@ data class LyricsStyleSettings(
+     val dockGapRight: Int = 10,
+     /** false: every button and the pill blur on their own (normal). true: one blur behind the whole bar. */
+     val dockSpreadBlur: Boolean = false,
++    /** Optimize the top bar blur: it is rendered at a lower resolution ([headerBlurQuality] percent). Off = normal. */
++    val headerBlurOptimize: Boolean = false,
++    val headerBlurQuality: Int = 45,
++    /** Same for the bottom bar blur. */
++    val dockBlurOptimize: Boolean = false,
++    val dockBlurQuality: Int = 45,
+     /** Spread only: the blur fades out above the bar instead of ending at a hard edge. */
+     val dockSoftEdge: Boolean = true,
+     /** Spread only: height of the fade band above the bar, in dp. */
+@@ -326,6 +332,8 @@ data class LyricsStyleSettings(
+             headerOutlineWeight = headerOutlineWeight.coerceIn(HEADER_OUTLINE_WEIGHT_RANGE),
+             headerOutlineOpacity = headerOutlineOpacity.coerceIn(HEADER_OUTLINE_OPACITY_RANGE),
+             dockBlurAmount = dockBlurAmount.coerceIn(DOCK_BLUR_RANGE),
++            headerBlurQuality = headerBlurQuality.coerceIn(BLUR_QUALITY_RANGE),
++            dockBlurQuality = dockBlurQuality.coerceIn(BLUR_QUALITY_RANGE),
+             dockSize = dockSize.coerceIn(DOCK_SIZE_RANGE),
+             dockBottomPadding = dockBottomPadding.coerceIn(DOCK_BOTTOM_PADDING_RANGE),
+             dockPillPadding = dockPillPadding.coerceIn(DOCK_PILL_PADDING_RANGE),
+@@ -393,6 +401,7 @@ data class LyricsStyleSettings(
+         val HEADER_OUTLINE_WEIGHT_RANGE = 1..8
+         val HEADER_OUTLINE_OPACITY_RANGE = 0..100
+         val DOCK_BLUR_RANGE = 0..40
++        val BLUR_QUALITY_RANGE = 20..100
+         val DOCK_SIZE_RANGE = 40..72
+         val DOCK_BOTTOM_PADDING_RANGE = 0..48
+         val DOCK_PILL_PADDING_RANGE = 0..16
+diff --git a/core-preferences/src/main/java/me/spica27/spicamusic/core/preferences/PreferencesManager.kt b/core-preferences/src/main/java/me/spica27/spicamusic/core/preferences/PreferencesManager.kt
+index c4427fa..ac170ea 100644
+--- a/core-preferences/src/main/java/me/spica27/spicamusic/core/preferences/PreferencesManager.kt
++++ b/core-preferences/src/main/java/me/spica27/spicamusic/core/preferences/PreferencesManager.kt
+@@ -138,6 +138,10 @@ class PreferencesManager(
+         val LYRIC_DOCK_GAP_LEFT = intPreferencesKey("lyric_dock_gap_left")
+         val LYRIC_DOCK_GAP_RIGHT = intPreferencesKey("lyric_dock_gap_right")
+         val LYRIC_DOCK_SPREAD_BLUR = booleanPreferencesKey("lyric_dock_spread_blur")
++        val LYRIC_HEADER_BLUR_OPTIMIZE = booleanPreferencesKey("lyric_header_blur_optimize")
++        val LYRIC_HEADER_BLUR_QUALITY = intPreferencesKey("lyric_header_blur_quality")
++        val LYRIC_DOCK_BLUR_OPTIMIZE = booleanPreferencesKey("lyric_dock_blur_optimize")
++        val LYRIC_DOCK_BLUR_QUALITY = intPreferencesKey("lyric_dock_blur_quality")
+         val LYRIC_DOCK_SOFT_EDGE = booleanPreferencesKey("lyric_dock_soft_edge")
+         val LYRIC_DOCK_EDGE_FADE = intPreferencesKey("lyric_dock_edge_fade")
+         val LYRIC_KINETIC_ENABLED = booleanPreferencesKey("lyric_kinetic_enabled")
+@@ -259,6 +263,10 @@ class PreferencesManager(
+                     dockGapLeft = p[Keys.LYRIC_DOCK_GAP_LEFT] ?: d.dockGapLeft,
+                     dockGapRight = p[Keys.LYRIC_DOCK_GAP_RIGHT] ?: d.dockGapRight,
+                     dockSpreadBlur = p[Keys.LYRIC_DOCK_SPREAD_BLUR] ?: d.dockSpreadBlur,
++                    headerBlurOptimize = p[Keys.LYRIC_HEADER_BLUR_OPTIMIZE] ?: d.headerBlurOptimize,
++                    headerBlurQuality = p[Keys.LYRIC_HEADER_BLUR_QUALITY] ?: d.headerBlurQuality,
++                    dockBlurOptimize = p[Keys.LYRIC_DOCK_BLUR_OPTIMIZE] ?: d.dockBlurOptimize,
++                    dockBlurQuality = p[Keys.LYRIC_DOCK_BLUR_QUALITY] ?: d.dockBlurQuality,
+                     dockSoftEdge = p[Keys.LYRIC_DOCK_SOFT_EDGE] ?: d.dockSoftEdge,
+                     dockEdgeFade = p[Keys.LYRIC_DOCK_EDGE_FADE] ?: d.dockEdgeFade,
+                     kineticEnabled = p[Keys.LYRIC_KINETIC_ENABLED] ?: d.kineticEnabled,
+@@ -380,6 +388,10 @@ class PreferencesManager(
+                     dockGapLeft = p[Keys.LYRIC_DOCK_GAP_LEFT] ?: d.dockGapLeft,
+                     dockGapRight = p[Keys.LYRIC_DOCK_GAP_RIGHT] ?: d.dockGapRight,
+                     dockSpreadBlur = p[Keys.LYRIC_DOCK_SPREAD_BLUR] ?: d.dockSpreadBlur,
++                    headerBlurOptimize = p[Keys.LYRIC_HEADER_BLUR_OPTIMIZE] ?: d.headerBlurOptimize,
++                    headerBlurQuality = p[Keys.LYRIC_HEADER_BLUR_QUALITY] ?: d.headerBlurQuality,
++                    dockBlurOptimize = p[Keys.LYRIC_DOCK_BLUR_OPTIMIZE] ?: d.dockBlurOptimize,
++                    dockBlurQuality = p[Keys.LYRIC_DOCK_BLUR_QUALITY] ?: d.dockBlurQuality,
+                     dockSoftEdge = p[Keys.LYRIC_DOCK_SOFT_EDGE] ?: d.dockSoftEdge,
+                     dockEdgeFade = p[Keys.LYRIC_DOCK_EDGE_FADE] ?: d.dockEdgeFade,
+                     kineticEnabled = p[Keys.LYRIC_KINETIC_ENABLED] ?: d.kineticEnabled,
+@@ -492,6 +504,10 @@ class PreferencesManager(
+             p[Keys.LYRIC_DOCK_GAP_LEFT] = n.dockGapLeft
+             p[Keys.LYRIC_DOCK_GAP_RIGHT] = n.dockGapRight
+             p[Keys.LYRIC_DOCK_SPREAD_BLUR] = n.dockSpreadBlur
++            p[Keys.LYRIC_HEADER_BLUR_OPTIMIZE] = n.headerBlurOptimize
++            p[Keys.LYRIC_HEADER_BLUR_QUALITY] = n.headerBlurQuality
++            p[Keys.LYRIC_DOCK_BLUR_OPTIMIZE] = n.dockBlurOptimize
++            p[Keys.LYRIC_DOCK_BLUR_QUALITY] = n.dockBlurQuality
+             p[Keys.LYRIC_DOCK_SOFT_EDGE] = n.dockSoftEdge
+             p[Keys.LYRIC_DOCK_EDGE_FADE] = n.dockEdgeFade
+             p[Keys.LYRIC_KINETIC_ENABLED] = n.kineticEnabled
