@@ -672,6 +672,59 @@ class PreferencesManager(
         }
     }
 
+    /** 底栏自定义（位置、尺寸、标签内容）：数值项顺序与 app 侧 BottomBarSetting 的 ordinal 对应。 */
+    private val bottomBarIntKeys =
+        listOf(
+            "mini_h",
+            "mini_raise",
+            "mini_w",
+            "mini_height",
+            "tabs_h",
+            "tabs_raise",
+            "tabs_w",
+            "tabs_height",
+            "label_mode",
+            "search_tab",
+            "bubble",
+            "bubble_size",
+        ).map { intPreferencesKey("bottom_bar_$it") }
+
+    /** 文本项：每个标签依次存放 图标名、文字，共 4 个标签（发现、音乐、曲库、搜索）。 */
+    private val bottomBarTextKeys =
+        (0 until 4).flatMap {
+            listOf(stringPreferencesKey("bottom_bar_icon_$it"), stringPreferencesKey("bottom_bar_label_$it"))
+        }
+
+    fun getBottomBarCustomization(
+        defaultInts: List<Int>,
+        defaultTexts: List<String>,
+    ): Flow<Pair<List<Int>, List<String>>> =
+        context.dataStore.data.map { preferences ->
+            bottomBarIntKeys.mapIndexed { index, key -> preferences[key] ?: defaultInts[index] } to
+                bottomBarTextKeys.mapIndexed { index, key -> preferences[key] ?: defaultTexts[index] }
+        }.distinctUntilChanged()
+
+    suspend fun setBottomBarInt(
+        index: Int,
+        value: Int,
+    ) {
+        context.dataStore.edit { preferences -> preferences[bottomBarIntKeys[index]] = value }
+    }
+
+    suspend fun setBottomBarText(
+        index: Int,
+        value: String,
+    ) {
+        context.dataStore.edit { preferences -> preferences[bottomBarTextKeys[index]] = value }
+    }
+
+    suspend fun resetBottomBarCustomization() {
+        context.dataStore.edit { preferences ->
+            bottomBarIntKeys.forEach { preferences.remove(it) }
+            bottomBarTextKeys.forEach { preferences.remove(it) }
+        }
+    }
+
     fun getInt(
         key: Preferences.Key<Int>,
         defaultValue: Int = 0,

@@ -36,3 +36,6 @@
     <methods>;
 }
 
+
+# Lucide 图标按名称搜索（反射读取 R.drawable 与 getIdentifier），避免被 R8 精简。
+-keep class me.spica27.spicamusic.R$drawable { public static final int *; }

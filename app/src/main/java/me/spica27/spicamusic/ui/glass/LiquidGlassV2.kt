@@ -54,6 +54,7 @@ import com.kyant.backdrop.shadow.InnerShadow
 import com.kyant.backdrop.shadow.Shadow
 import kotlinx.coroutines.flow.map
 import me.spica27.spicamusic.core.preferences.PreferencesManager
+import me.spica27.spicamusic.ui.home.player_bar.LocalBottomBarCustomization
 import kotlin.math.roundToInt
 
 /** 液态玻璃 V2（Kyant Backdrop）调节项；ordinal 与 PreferencesManager 中的存储顺序一致。 */
@@ -150,7 +151,8 @@ fun rememberLiquidGlassV2Tuning(preferencesManager: PreferencesManager): LiquidG
 fun Modifier.liquidGlassV2Source(): Modifier {
     val config = LocalLiquidGlassV2Config.current
     val backdrop = LocalGlassV2Backdrop.current
-    return if (config.enabled && backdrop != null) layerBackdrop(backdrop) else this
+    val bubbleOn = LocalBottomBarCustomization.current.bubble == 1
+    return if ((config.enabled || bubbleOn) && backdrop != null) layerBackdrop(backdrop) else this
 }
 
 /** 设置页滑块的显示用：十分之一单位。 */
@@ -242,6 +244,40 @@ fun Modifier.liquidGlassV2Surface(
         },
     )
 }
+
+/**
+ * 长按底栏时的“气泡”：放大的折射镜片，带色散、景深与高光；缩放、透明度由调用方按按压进度给出。
+ * 折射需要 Android 13+，调用方应在更低版本回退为普通指示条。
+ */
+fun Modifier.liquidGlassBubble(
+    backdrop: Backdrop,
+    shape: Shape,
+    scaleXProvider: () -> Float,
+    scaleYProvider: () -> Float,
+    alphaProvider: () -> Float,
+): Modifier =
+    drawBackdrop(
+        backdrop = backdrop,
+        shape = { shape },
+        effects = {
+            vibrancy()
+            val height = 14.dp.toPx().coerceAtMost(size.minDimension / 2f)
+            lens(
+                refractionHeight = height,
+                refractionAmount = 36.dp.toPx(),
+                depthEffect = true,
+                chromaticAberration = true,
+            )
+        },
+        highlight = { Highlight(width = 1.dp, alpha = 1f, style = HighlightStyle.Default(angle = 45f, falloff = 1f)) },
+        shadow = { Shadow(radius = 14.dp, color = Color.Black.copy(alpha = 0.18f)) },
+        layerBlock = {
+            scaleX = scaleXProvider()
+            scaleY = scaleYProvider()
+            alpha = alphaProvider()
+        },
+        onDrawSurface = { drawRect(Color.White.copy(alpha = 0.08f)) },
+    )
 
 /** 设置页顶部固定的一行预览：调节任何选项都能立即看到效果；开启“按压”后可按住玻璃。 */
 @Composable

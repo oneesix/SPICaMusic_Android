@@ -35,6 +35,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
+import androidx.compose.ui.BiasAlignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.draw.drawBehind
@@ -126,6 +127,8 @@ internal fun HomePlayerScaffold(
     val keyboardVisible = WindowInsets.isImeVisible
     val colors = MaterialTheme.colorScheme
     val appearance = BottomBarAppearance.forLayout(layout)
+    // 底栏自定义：左右/上下位置与宽高。
+    val custom = LocalBottomBarCustomization.current
     val collapsedPlayerColor = appearance.miniPlayerContainerColor(colors)
     val density = LocalDensity.current
     val layoutDirection = LocalLayoutDirection.current
@@ -179,11 +182,13 @@ internal fun HomePlayerScaffold(
 
     // 复用槽位内容，展开进度仅在布局和绘制阶段读取。
     val miniSlot: @Composable () -> Unit =
-        remember(playerAvailable, keyboardVisible, miniPlayer, dragModifier, appearance, enter, exit, hiddenSemantics) {
+        remember(playerAvailable, keyboardVisible, miniPlayer, dragModifier, appearance, enter, exit, hiddenSemantics, custom) {
             {
                 Box(
                     hiddenSemantics.graphicsLayer {
                         alpha = (1f - progress() / MiniPlayerFadeEnd).coerceIn(0f, 1f)
+                        // 向上抬高；随播放器展开逐渐归位。
+                        translationY = -custom.miniRaise.dp.toPx() * (1f - progress().coerceIn(0f, 1f))
                     },
                 ) {
                     AnimatedVisibility(visible = playerAvailable && !keyboardVisible, enter = enter, exit = exit) {
@@ -201,19 +206,26 @@ internal fun HomePlayerScaffold(
                                     end = appearance.horizontalMargin,
                                     bottom = appearance.gap,
                                 ),
-                        ) { miniPlayer(dragModifier) }
+                        ) {
+                            Box(
+                                Modifier
+                                    .align(BiasAlignment(custom.miniHorizontal / 50f - 1f, 0f))
+                                    .fillMaxWidth(custom.miniWidth / 100f)
+                                    .then(if (custom.miniHeight >= 44) Modifier.height(custom.miniHeight.dp) else Modifier),
+                            ) { miniPlayer(dragModifier) }
+                        }
                     }
                 }
             }
         }
     val navigationSlot: @Composable () -> Unit =
-        remember(keyboardVisible, navigationBar, appearance, colors.surface, navigationBottomPadding, enter, exit, hiddenSemantics) {
+        remember(keyboardVisible, navigationBar, appearance, colors.surface, navigationBottomPadding, enter, exit, hiddenSemantics, custom) {
             {
                 Box(
                     hiddenSemantics.graphicsLayer {
                         val fraction = progress()
                         alpha = (1f - fraction / NavigationFadeEnd).coerceIn(0f, 1f)
-                        translationY = size.height * fraction
+                        translationY = size.height * fraction - custom.tabsRaise.dp.toPx() * (1f - fraction.coerceIn(0f, 1f))
                     },
                 ) {
                     AnimatedVisibility(visible = !keyboardVisible, enter = enter, exit = exit) {
@@ -247,7 +259,14 @@ internal fun HomePlayerScaffold(
                                     end = appearance.horizontalMargin,
                                     bottom = appearance.bottomMargin,
                                 ),
-                        ) { navigationBar() }
+                        ) {
+                            Box(
+                                Modifier
+                                    .align(BiasAlignment(custom.tabsHorizontal / 50f - 1f, 0f))
+                                    .fillMaxWidth(custom.tabsWidth / 100f)
+                                    .then(if (custom.tabsHeight >= 44) Modifier.height(custom.tabsHeight.dp) else Modifier),
+                            ) { navigationBar() }
+                        }
                     }
                 }
             }

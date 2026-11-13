@@ -38,6 +38,8 @@ import me.spica27.spicamusic.ui.glass.LocalLiquidGlassV2Config
 import me.spica27.spicamusic.ui.glass.liquidGlassSource
 import me.spica27.spicamusic.ui.glass.rememberLiquidGlassTuning
 import me.spica27.spicamusic.ui.glass.rememberLiquidGlassV2Tuning
+import me.spica27.spicamusic.ui.home.player_bar.LocalBottomBarCustomization
+import me.spica27.spicamusic.ui.home.player_bar.rememberBottomBarCustomization
 import me.spica27.spicamusic.ui.navigation.LocalBackStack
 import me.spica27.spicamusic.ui.navigation.MotionDialogSceneStrategy
 import me.spica27.spicamusic.ui.navigation.Route
@@ -73,6 +75,7 @@ fun AppScaffold() {
             .collectAsStateWithLifecycle(false)
     val liquidGlassV2Tuning = rememberLiquidGlassV2Tuning(preferencesManager)
     val glassV2Backdrop = rememberLayerBackdrop()
+    val bottomBarCustomization = rememberBottomBarCustomization(preferencesManager)
 
     val themeColorStyleValue by
         preferencesManager
@@ -122,6 +125,7 @@ fun AppScaffold() {
             LocalLiquidGlassConfig provides LiquidGlassConfig(enabled = liquidGlassEnabled, tuning = liquidGlassTuning),
             LocalLiquidGlassV2Config provides LiquidGlassV2Config(enabled = liquidGlassV2Enabled, tuning = liquidGlassV2Tuning),
             LocalGlassV2Backdrop provides glassV2Backdrop,
+            LocalBottomBarCustomization provides bottomBarCustomization,
             LocalDialogHazeState provides dialogHazeState,
             LocalPlayerViewModel provides playerViewModel,
             LocalBackStack provides navigator,

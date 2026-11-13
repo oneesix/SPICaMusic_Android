@@ -73,6 +73,29 @@ class SettingsUseCases(
         preferencesManager.resetLiquidGlassV2Tuning()
     }
 
+    fun getBottomBarCustomization(
+        defaultInts: List<Int>,
+        defaultTexts: List<String>,
+    ): Flow<Pair<List<Int>, List<String>>> = preferencesManager.getBottomBarCustomization(defaultInts, defaultTexts)
+
+    suspend fun setBottomBarInt(
+        index: Int,
+        value: Int,
+    ) {
+        preferencesManager.setBottomBarInt(index, value)
+    }
+
+    suspend fun setBottomBarText(
+        index: Int,
+        value: String,
+    ) {
+        preferencesManager.setBottomBarText(index, value)
+    }
+
+    suspend fun resetBottomBarCustomization() {
+        preferencesManager.resetBottomBarCustomization()
+    }
+
     fun getInt(
         key: Preferences.Key<Int>,
         defaultValue: Int = 0,

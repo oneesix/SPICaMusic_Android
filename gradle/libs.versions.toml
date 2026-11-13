@@ -121,6 +121,7 @@ pinyin4j = { module = "com.belerweb:pinyin4j", version.ref = "pinyin4jVersion" }
 prettytime = { module = "org.ocpsoft.prettytime:prettytime", version.ref = "prettytimeVersion" }
 retrofit = { module = "com.squareup.retrofit2:retrofit", version.ref = "retrofitVersion" }
 sandwich-retrofit = { module = "com.github.skydoves:sandwich-retrofit", version.ref = "sandwichRetrofitVersion" }
+lucide-icons = { module = "com.composables:icons-lucide-android", version = "2.2.1" }
 kyant-shapes = { module = "io.github.kyant0:shapes", version = "1.2.1" }
 taglib = { module = "io.github.kyant0:taglib", version.ref = "taglibVersion" }
 timber = { module = "com.jakewharton.timber:timber", version.ref = "timberVersion" }

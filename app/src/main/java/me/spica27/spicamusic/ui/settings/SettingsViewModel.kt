@@ -18,6 +18,8 @@ import me.spica27.spicamusic.ui.glass.LiquidGlassSetting
 import me.spica27.spicamusic.ui.glass.LiquidGlassTuning
 import me.spica27.spicamusic.ui.glass.LiquidGlassV2Setting
 import me.spica27.spicamusic.ui.glass.LiquidGlassV2Tuning
+import me.spica27.spicamusic.ui.home.player_bar.BottomBarCustomization
+import me.spica27.spicamusic.ui.home.player_bar.BottomBarSetting
 import me.spica27.spicamusic.ui.widget.VerseMeshSettings
 import me.spica27.spicamusic.ui.widget.VerseThemeMode
 
@@ -104,6 +106,39 @@ class SettingsViewModel(
     fun resetLiquidGlassV2Tuning() {
         viewModelScope.launch {
             settingsUseCases.resetLiquidGlassV2Tuning()
+        }
+    }
+
+    // 底栏自定义：迷你播放条与导航栏的位置/尺寸、标签图标与文字、搜索标签、长按气泡。
+    val bottomBarCustomization =
+        settingsUseCases
+            .getBottomBarCustomization(BottomBarCustomization.DefaultInts, BottomBarCustomization.DefaultTexts)
+            .map { (ints, texts) -> BottomBarCustomization.from(ints, texts) }
+            .stateIn(viewModelScope, SharingStarted.Eagerly, BottomBarCustomization())
+
+    fun setBottomBarInt(
+        setting: BottomBarSetting,
+        value: Int,
+    ) {
+        viewModelScope.launch {
+            settingsUseCases.setBottomBarInt(setting.ordinal, value)
+        }
+    }
+
+    /** slot：0 发现，1 音乐，2 曲库，3 搜索；isIcon 为 true 时写入图标名，否则写入标签文字。 */
+    fun setBottomBarText(
+        slot: Int,
+        isIcon: Boolean,
+        value: String,
+    ) {
+        viewModelScope.launch {
+            settingsUseCases.setBottomBarText(slot * 2 + if (isIcon) 0 else 1, value)
+        }
+    }
+
+    fun resetBottomBarCustomization() {
+        viewModelScope.launch {
+            settingsUseCases.resetBottomBarCustomization()
         }
     }
 

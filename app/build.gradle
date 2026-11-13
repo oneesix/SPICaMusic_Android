@@ -114,6 +114,7 @@ dependencies {
   // 模块依赖
   implementation project(':common')
   implementation project(':backdrop')
+  implementation libs.lucide.icons
   implementation project(':core-preferences')
   implementation project(':feature-library-data')
   implementation project(':feature-player-data')

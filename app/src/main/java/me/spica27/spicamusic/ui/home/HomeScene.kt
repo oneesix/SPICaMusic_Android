@@ -41,6 +41,7 @@ import me.spica27.spicamusic.ui.home.player_bar.PlayerSheetHandle
 import me.spica27.spicamusic.ui.home.player_bar.rememberPlayerSheetState
 import me.spica27.spicamusic.ui.navigation.HomeRoute
 import me.spica27.spicamusic.ui.navigation.LocalBackStack
+import me.spica27.spicamusic.ui.navigation.SearchRoute
 import me.spica27.spicamusic.ui.player.DEFAULT_PAGE
 import me.spica27.spicamusic.ui.player.ExpandedPlayerScreen
 import me.spica27.spicamusic.ui.player.LocalPlayerViewModel
@@ -91,6 +92,7 @@ fun HomeScreen() {
                 glassEnabled = glassEnabled,
                 hazeState = hazeState,
                 layout = bottomBarLayout,
+                onSearchClick = { backStack.add(SearchRoute) },
             )
         },
         miniPlayer = { dragModifier ->
