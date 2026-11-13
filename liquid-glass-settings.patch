@@ -1,0 +1,648 @@
+diff --git a/app/src/main/java/me/spica27/spicamusic/ui/AppScaffold.kt b/app/src/main/java/me/spica27/spicamusic/ui/AppScaffold.kt
+index 27e1bc4..d40a82c 100644
+--- a/app/src/main/java/me/spica27/spicamusic/ui/AppScaffold.kt
++++ b/app/src/main/java/me/spica27/spicamusic/ui/AppScaffold.kt
+@@ -32,6 +32,7 @@ import me.spica27.spicamusic.ui.glass.LiquidGlassConfig
+ import me.spica27.spicamusic.ui.glass.LocalDialogHazeState
+ import me.spica27.spicamusic.ui.glass.LocalLiquidGlassConfig
+ import me.spica27.spicamusic.ui.glass.liquidGlassSource
++import me.spica27.spicamusic.ui.glass.rememberLiquidGlassTuning
+ import me.spica27.spicamusic.ui.navigation.LocalBackStack
+ import me.spica27.spicamusic.ui.navigation.MotionDialogSceneStrategy
+ import me.spica27.spicamusic.ui.navigation.Route
+@@ -59,6 +60,8 @@ fun AppScaffold() {
+             .getBoolean(PreferencesManager.Keys.LIQUID_GLASS_ENABLED, false)
+             .collectAsStateWithLifecycle(false)
+ 
++    val liquidGlassTuning = rememberLiquidGlassTuning(preferencesManager)
++
+     val themeColorStyleValue by
+         preferencesManager
+             .getString(PreferencesManager.Keys.THEME_COLOR_STYLE, ThemeColorStyle.Textured.value)
+@@ -104,7 +107,7 @@ fun AppScaffold() {
+         fontFamily = appFontFamily,
+     ) {
+         CompositionLocalProvider(
+-            LocalLiquidGlassConfig provides LiquidGlassConfig(enabled = liquidGlassEnabled),
++            LocalLiquidGlassConfig provides LiquidGlassConfig(enabled = liquidGlassEnabled, tuning = liquidGlassTuning),
+             LocalDialogHazeState provides dialogHazeState,
+             LocalPlayerViewModel provides playerViewModel,
+             LocalBackStack provides navigator,
+diff --git a/app/src/main/java/me/spica27/spicamusic/ui/glass/LiquidGlass.kt b/app/src/main/java/me/spica27/spicamusic/ui/glass/LiquidGlass.kt
+index 6f08d1b..76ecdbd 100644
+--- a/app/src/main/java/me/spica27/spicamusic/ui/glass/LiquidGlass.kt
++++ b/app/src/main/java/me/spica27/spicamusic/ui/glass/LiquidGlass.kt
+@@ -31,6 +31,7 @@ import dev.chrisbanes.haze.hazeSource
+ @Immutable
+ data class LiquidGlassConfig(
+     val enabled: Boolean = false,
++    val tuning: LiquidGlassTuning = LiquidGlassTuning(),
+ )
+ 
+ val LocalLiquidGlassConfig = staticCompositionLocalOf { LiquidGlassConfig() }
+diff --git a/app/src/main/java/me/spica27/spicamusic/ui/glass/LiquidGlassTuning.kt b/app/src/main/java/me/spica27/spicamusic/ui/glass/LiquidGlassTuning.kt
+new file mode 100644
+index 0000000..6f45546
+--- /dev/null
++++ b/app/src/main/java/me/spica27/spicamusic/ui/glass/LiquidGlassTuning.kt
+@@ -0,0 +1,69 @@
++package me.spica27.spicamusic.ui.glass
++
++import androidx.compose.runtime.Composable
++import androidx.compose.runtime.Immutable
++import androidx.compose.runtime.remember
++import androidx.lifecycle.compose.collectAsStateWithLifecycle
++import kotlinx.coroutines.flow.map
++import me.spica27.spicamusic.core.preferences.PreferencesManager
++
++/** 液态玻璃调节项；ordinal 与 PreferencesManager 中的存储顺序一致。 */
++enum class LiquidGlassSetting {
++    Blur,
++    Quality,
++    Tint,
++    Corner,
++    Refraction,
++    RefractionHeight,
++    Falloff,
++    Rim,
++    RimWidth,
++    Shadow,
++}
++
++/** 默认值等于改动前底栏的固定参数，所以不动设置时外观不变。 */
++@Immutable
++data class LiquidGlassTuning(
++    val blurDp: Int = 18,
++    val quality: Int = 100,
++    val tintPercent: Int = 40,
++    val cornerDp: Int = 36,
++    val refractionPercent: Int = 30,
++    val refractionHeightDp: Int = 10,
++    val falloffPercent: Int = 35,
++    val rimPercent: Int = 40,
++    val rimWidthDp: Int = 1,
++    val shadowPercent: Int = 8,
++) {
++    companion object {
++        val DefaultValues: List<Int> = LiquidGlassTuning().toList()
++
++        fun fromList(v: List<Int>): LiquidGlassTuning =
++            LiquidGlassTuning(v[0], v[1], v[2], v[3], v[4], v[5], v[6], v[7], v[8], v[9])
++    }
++
++    fun toList(): List<Int> =
++        listOf(
++            blurDp,
++            quality,
++            tintPercent,
++            cornerDp,
++            refractionPercent,
++            refractionHeightDp,
++            falloffPercent,
++            rimPercent,
++            rimWidthDp,
++            shadowPercent,
++        )
++}
++
++@Composable
++fun rememberLiquidGlassTuning(preferencesManager: PreferencesManager): LiquidGlassTuning {
++    val flow =
++        remember(preferencesManager) {
++            preferencesManager
++                .getLiquidGlassTuning(LiquidGlassTuning.DefaultValues)
++                .map(LiquidGlassTuning::fromList)
++        }
++    return flow.collectAsStateWithLifecycle(LiquidGlassTuning()).value
++}
+diff --git a/app/src/main/java/me/spica27/spicamusic/ui/home/player_bar/FloatingBarSurface.kt b/app/src/main/java/me/spica27/spicamusic/ui/home/player_bar/FloatingBarSurface.kt
+index 56d9a58..3c9e6eb 100644
+--- a/app/src/main/java/me/spica27/spicamusic/ui/home/player_bar/FloatingBarSurface.kt
++++ b/app/src/main/java/me/spica27/spicamusic/ui/home/player_bar/FloatingBarSurface.kt
+@@ -2,12 +2,14 @@ package me.spica27.spicamusic.ui.home.player_bar
+ 
+ import android.os.Build
+ import androidx.compose.foundation.background
++import androidx.compose.foundation.border
+ import androidx.compose.foundation.shape.RoundedCornerShape
+ import androidx.compose.runtime.Composable
+ import androidx.compose.runtime.remember
+ import androidx.compose.ui.Alignment
+ import androidx.compose.ui.Modifier
+ import androidx.compose.ui.draw.clip
++import androidx.compose.ui.graphics.Brush
+ import androidx.compose.ui.graphics.Color
+ import androidx.compose.ui.graphics.luminance
+ import androidx.compose.ui.unit.dp
+@@ -15,9 +17,13 @@ import dev.chrisbanes.haze.ExperimentalHazeApi
+ import dev.chrisbanes.haze.HazeInput
+ import dev.chrisbanes.haze.HazePerformanceMode
+ import dev.chrisbanes.haze.HazeState
++import dev.chrisbanes.haze.blur.HazeBlurStyle
++import dev.chrisbanes.haze.blur.HazeColorEffect
++import dev.chrisbanes.haze.blur.hazeBlur
+ import dev.chrisbanes.haze.glass.GlassStyle
+ import dev.chrisbanes.haze.glass.RefractionProfile
+ import dev.chrisbanes.haze.glass.hazeGlass
++import me.spica27.spicamusic.ui.glass.LocalLiquidGlassConfig
+ import me.spica27.spicamusic.ui.theme.Spacing
+ 
+ internal object FloatingBarDefaults {
+@@ -28,7 +34,7 @@ internal object FloatingBarDefaults {
+     val Shape = RoundedCornerShape(CornerRadius)
+ }
+ 
+-/** 底栏共享玻璃参数，形状及图层范围由布局决定，前景控件保持清晰。 */
++/** 底栏共享玻璃参数，形状及图层范围由布局决定，前景控件保持清晰。参数来自设置页的液态玻璃调节项。 */
+ @OptIn(ExperimentalHazeApi::class)
+ @Composable
+ internal fun Modifier.playerBarSurface(
+@@ -38,33 +44,82 @@ internal fun Modifier.playerBarSurface(
+     shape: RoundedCornerShape,
+     expandLayerBounds: Boolean,
+ ): Modifier {
+-    val clipped = clip(shape)
+-    if (!glassEnabled || hazeState == null || Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU) {
++    val tuning = LocalLiquidGlassConfig.current.tuning
++    // 圆角设置只作用于悬浮布局的胶囊形状。
++    val glassShape = if (shape === FloatingBarDefaults.Shape) RoundedCornerShape(tuning.cornerDp.dp) else shape
++    val clipped = clip(glassShape)
++    if (!glassEnabled || hazeState == null || Build.VERSION.SDK_INT < Build.VERSION_CODES.S) {
+         return clipped.background(containerColor)
+     }
+ 
++    val isDark = containerColor.luminance() < 0.5f
++    // 质量 100 保持原来的 Balanced，低于 100 使用固定分辨率比例。
++    val performanceMode =
++        if (tuning.quality >= 100) HazePerformanceMode.Balanced else HazePerformanceMode.Fixed(tuning.quality / 100f)
++    val tintAlpha = (tuning.tintPercent / 100f + if (isDark) 0.12f else 0f).coerceIn(0f, 1f)
++    val rimAlpha = tuning.rimPercent / 100f * 0.8f
++    val rim =
++        if (tuning.rimWidthDp > 0 && rimAlpha > 0f) {
++            Modifier.border(
++                tuning.rimWidthDp.dp,
++                Brush.linearGradient(
++                    listOf(
++                        Color.White.copy(alpha = rimAlpha),
++                        Color.White.copy(alpha = rimAlpha * 0.25f),
++                        Color.White.copy(alpha = rimAlpha * 0.6f),
++                    ),
++                ),
++                glassShape,
++            )
++        } else {
++            Modifier
++        }
++
++    // Android 12/12L 没有折射着色器，改用纯模糊，不再退回实色。
++    if (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU) {
++        val blurStyle =
++            remember(containerColor, tuning) {
++                HazeBlurStyle {
++                    blurRadius(tuning.blurDp.dp)
++                    noiseFactor(0f)
++                    backgroundColor(containerColor.copy(alpha = 0.12f))
++                    colorEffects(listOf(HazeColorEffect.tint(containerColor.copy(alpha = tintAlpha))))
++                    fallbackColorEffect(HazeColorEffect.tint(containerColor.copy(alpha = 0.9f)))
++                    alpha(1f)
++                }
++            }
++        return clipped
++            .hazeBlur(
++                input = HazeInput.Sources(hazeState),
++                style = blurStyle,
++                performanceMode = performanceMode,
++                expandLayerBounds = false,
++            ).then(rim)
++    }
++
+     val style =
+-        remember(containerColor, shape) {
++        remember(containerColor, glassShape, tuning) {
+             GlassStyle.clear.then {
+-                shape(shape)
++                shape(glassShape)
+                 optics(
+-                    refractionStrength = 0.3f,
+-                    refractionHeightFraction = 0.35f,
++                    refractionStrength = tuning.refractionPercent / 100f,
++                    refractionHeightFraction = tuning.falloffPercent / 100f,
+                     refractionDisplacement = 4.dp,
+-                    refractionProfile = RefractionProfile.Edge(10.dp),
+-                    blurRadius = 18.dp,
++                    refractionProfile = RefractionProfile.Edge(tuning.refractionHeightDp.dp),
++                    blurRadius = tuning.blurDp.dp,
+                 )
+                 backgroundColor(containerColor.copy(alpha = 0.12f))
+-                tint(containerColor.copy(alpha = if (containerColor.luminance() < 0.5f) 0.52f else 0.40f))
+-                specularIntensity(0.4f)
+-                edgeShadow(Color.Black.copy(alpha = 0.08f))
++                tint(containerColor.copy(alpha = tintAlpha))
++                specularIntensity(tuning.rimPercent / 100f)
++                edgeShadow(Color.Black.copy(alpha = tuning.shadowPercent / 100f))
+                 lightPosition(Alignment.TopStart)
+             }
+         }
+-    return clipped.hazeGlass(
+-        input = HazeInput.Sources(hazeState),
+-        style = style,
+-        performanceMode = HazePerformanceMode.Balanced,
+-        expandLayerBounds = expandLayerBounds,
+-    )
++    return clipped
++        .hazeGlass(
++            input = HazeInput.Sources(hazeState),
++            style = style,
++            performanceMode = performanceMode,
++            expandLayerBounds = expandLayerBounds,
++        ).then(rim)
+ }
+diff --git a/app/src/main/java/me/spica27/spicamusic/ui/home/player_bar/HomeNavigationBar.kt b/app/src/main/java/me/spica27/spicamusic/ui/home/player_bar/HomeNavigationBar.kt
+index 5823978..6391100 100644
+--- a/app/src/main/java/me/spica27/spicamusic/ui/home/player_bar/HomeNavigationBar.kt
++++ b/app/src/main/java/me/spica27/spicamusic/ui/home/player_bar/HomeNavigationBar.kt
+@@ -101,7 +101,7 @@ internal fun HomeNavigationBar(
+             .playerBarSurface(
+                 hazeState,
+                 appearance.navigationContainerColor(colors),
+-                glassEnabled && appearance.isFloating,
++                glassEnabled,
+                 appearance.navigationShape,
+                 appearance.isFloating,
+             ).selectableGroup()
+diff --git a/app/src/main/java/me/spica27/spicamusic/ui/settings/SettingsScene.kt b/app/src/main/java/me/spica27/spicamusic/ui/settings/SettingsScene.kt
+index 5ae3c2b..1eb6197 100644
+--- a/app/src/main/java/me/spica27/spicamusic/ui/settings/SettingsScene.kt
++++ b/app/src/main/java/me/spica27/spicamusic/ui/settings/SettingsScene.kt
+@@ -91,6 +91,8 @@ import me.spica27.spicamusic.common.entity.DynamicCoverType
+ import me.spica27.spicamusic.common.entity.DynamicSpectrumBackground
+ import me.spica27.spicamusic.common.entity.ProgressBarStyle
+ import me.spica27.spicamusic.common.entity.ThemeColorStyle
++import me.spica27.spicamusic.ui.glass.LiquidGlassSetting
++import me.spica27.spicamusic.ui.glass.LiquidGlassTuning
+ import me.spica27.spicamusic.ui.navigation.AboutRoute
+ import me.spica27.spicamusic.ui.navigation.AudioEffectsRoute
+ import me.spica27.spicamusic.ui.navigation.IgnoredSongsRoute
+@@ -125,6 +127,7 @@ fun SettingsScreen() {
+ 
+     val darkMode by viewModel.darkMode.collectAsStateWithLifecycle()
+     val liquidGlassEnabled by viewModel.liquidGlassEnabled.collectAsStateWithLifecycle()
++    val liquidGlassTuning by viewModel.liquidGlassTuning.collectAsStateWithLifecycle()
+     val bottomBarLayout by viewModel.bottomBarLayout.collectAsStateWithLifecycle()
+     val keepScreenOn by viewModel.keepScreenOn.collectAsStateWithLifecycle()
+     val backgroundValue by viewModel.dynamicSpectrumBackground.collectAsStateWithLifecycle()
+@@ -237,6 +240,13 @@ fun SettingsScreen() {
+                         checked = liquidGlassEnabled,
+                         onCheckedChange = viewModel::setLiquidGlassEnabled,
+                     )
++                    AnimatedVisibility(visible = liquidGlassEnabled) {
++                        LiquidGlassTuningControls(
++                            tuning = liquidGlassTuning,
++                            onChange = viewModel::setLiquidGlassTuning,
++                            onReset = viewModel::resetLiquidGlassTuning,
++                        )
++                    }
+                 }
+             }
+ 
+@@ -1141,6 +1151,121 @@ private fun Density.mastheadCollapse(listState: LazyListState): Float =
+     }
+ 
+ 
++/** 液态玻璃调节项：与演示页的滑块一一对应，仅在液态玻璃开启时显示。 */
++@Composable
++private fun LiquidGlassTuningControls(
++    tuning: LiquidGlassTuning,
++    onChange: (LiquidGlassSetting, Int) -> Unit,
++    onReset: () -> Unit,
++) {
++    Column(
++        modifier =
++            Modifier
++                .fillMaxWidth()
++                .padding(
++                    start = SettingsRowContentInset,
++                    end = Spacing.Large,
++                    top = Spacing.ExtraSmall,
++                    bottom = Spacing.Small,
++                ),
++    ) {
++        LyricsSettingsSlider(
++            label = stringResource(R.string.glass_blur),
++            description = stringResource(R.string.glass_blur_desc),
++            value = tuning.blurDp,
++            range = 1..40,
++            step = 1,
++            valueText = { "$it dp" },
++            onValueChange = { onChange(LiquidGlassSetting.Blur, it) },
++        )
++        LyricsSettingsSlider(
++            label = stringResource(R.string.glass_quality),
++            description = stringResource(R.string.glass_quality_desc),
++            value = tuning.quality,
++            range = 5..100,
++            step = 5,
++            valueText = { "$it%" },
++            onValueChange = { onChange(LiquidGlassSetting.Quality, it) },
++        )
++        LyricsSettingsSlider(
++            label = stringResource(R.string.glass_tint),
++            description = stringResource(R.string.glass_tint_desc),
++            value = tuning.tintPercent,
++            range = 0..80,
++            step = 2,
++            valueText = { "$it%" },
++            onValueChange = { onChange(LiquidGlassSetting.Tint, it) },
++        )
++        LyricsSettingsSlider(
++            label = stringResource(R.string.glass_corner),
++            description = stringResource(R.string.glass_corner_desc),
++            value = tuning.cornerDp,
++            range = 0..36,
++            step = 1,
++            valueText = { "$it dp" },
++            onValueChange = { onChange(LiquidGlassSetting.Corner, it) },
++        )
++        LyricsSettingsSlider(
++            label = stringResource(R.string.glass_refraction),
++            description = stringResource(R.string.glass_refraction_desc),
++            value = tuning.refractionPercent,
++            range = 0..100,
++            step = 5,
++            valueText = { "$it%" },
++            onValueChange = { onChange(LiquidGlassSetting.Refraction, it) },
++        )
++        LyricsSettingsSlider(
++            label = stringResource(R.string.glass_refraction_height),
++            description = stringResource(R.string.glass_refraction_height_desc),
++            value = tuning.refractionHeightDp,
++            range = 2..40,
++            step = 1,
++            valueText = { "$it dp" },
++            onValueChange = { onChange(LiquidGlassSetting.RefractionHeight, it) },
++        )
++        LyricsSettingsSlider(
++            label = stringResource(R.string.glass_falloff),
++            description = stringResource(R.string.glass_falloff_desc),
++            value = tuning.falloffPercent,
++            range = 5..100,
++            step = 5,
++            valueText = { "$it%" },
++            onValueChange = { onChange(LiquidGlassSetting.Falloff, it) },
++        )
++        LyricsSettingsSlider(
++            label = stringResource(R.string.glass_rim),
++            description = stringResource(R.string.glass_rim_desc),
++            value = tuning.rimPercent,
++            range = 0..100,
++            step = 5,
++            valueText = { "$it%" },
++            onValueChange = { onChange(LiquidGlassSetting.Rim, it) },
++        )
++        LyricsSettingsSlider(
++            label = stringResource(R.string.glass_rim_width),
++            description = stringResource(R.string.glass_rim_width_desc),
++            value = tuning.rimWidthDp,
++            range = 0..6,
++            step = 1,
++            valueText = { "$it dp" },
++            onValueChange = { onChange(LiquidGlassSetting.RimWidth, it) },
++        )
++        LyricsSettingsSlider(
++            label = stringResource(R.string.glass_shadow),
++            description = stringResource(R.string.glass_shadow_desc),
++            value = tuning.shadowPercent,
++            range = 0..50,
++            step = 2,
++            valueText = { "$it%" },
++            onValueChange = { onChange(LiquidGlassSetting.Shadow, it) },
++        )
++        LyricsSettingsResetButton(
++            text = stringResource(R.string.glass_reset),
++            onClick = onReset,
++        )
++    }
++}
++
+ /** Verse Flow 外观：Auto / Light / Dark，饱和度、鲜艳度、高亮色（与 HTML 的 Appearance 一致）。 */
+ @Composable
+ private fun VerseAppearanceControls(
+diff --git a/app/src/main/java/me/spica27/spicamusic/ui/settings/SettingsViewModel.kt b/app/src/main/java/me/spica27/spicamusic/ui/settings/SettingsViewModel.kt
+index adc3703..cd25d08 100644
+--- a/app/src/main/java/me/spica27/spicamusic/ui/settings/SettingsViewModel.kt
++++ b/app/src/main/java/me/spica27/spicamusic/ui/settings/SettingsViewModel.kt
+@@ -14,6 +14,8 @@ import me.spica27.spicamusic.common.entity.DynamicSpectrumBackground
+ import me.spica27.spicamusic.common.entity.ProgressBarStyle
+ import me.spica27.spicamusic.common.entity.ThemeColorStyle
+ import me.spica27.spicamusic.feature.settings.domain.SettingsUseCases
++import me.spica27.spicamusic.ui.glass.LiquidGlassSetting
++import me.spica27.spicamusic.ui.glass.LiquidGlassTuning
+ import me.spica27.spicamusic.ui.widget.VerseMeshSettings
+ import me.spica27.spicamusic.ui.widget.VerseThemeMode
+ 
+@@ -48,6 +50,28 @@ class SettingsViewModel(
+         }
+     }
+ 
++    // 液态玻璃调节项：仅在液态玻璃开启时显示在设置页。
++    val liquidGlassTuning =
++        settingsUseCases
++            .getLiquidGlassTuning(LiquidGlassTuning.DefaultValues)
++            .map(LiquidGlassTuning::fromList)
++            .stateIn(viewModelScope, SharingStarted.Eagerly, LiquidGlassTuning())
++
++    fun setLiquidGlassTuning(
++        setting: LiquidGlassSetting,
++        value: Int,
++    ) {
++        viewModelScope.launch {
++            settingsUseCases.setLiquidGlassTuning(setting.ordinal, value)
++        }
++    }
++
++    fun resetLiquidGlassTuning() {
++        viewModelScope.launch {
++            settingsUseCases.resetLiquidGlassTuning()
++        }
++    }
++
+     // 底栏布局独立于玻璃材质，默认传统。
+     val bottomBarLayout =
+         settingsUseCases
+diff --git a/app/src/main/res/values-zh-rTW/strings.xml b/app/src/main/res/values-zh-rTW/strings.xml
+index 99c0d97..343e7cf 100644
+--- a/app/src/main/res/values-zh-rTW/strings.xml
++++ b/app/src/main/res/values-zh-rTW/strings.xml
+@@ -1137,4 +1137,25 @@
+   <string name="lyr_set_blur_optimize_desc">以較低解析度算繪模糊。關閉 = 一般模糊</string>
+   <string name="lyr_set_blur_quality">模糊品質</string>
+   <string name="lyr_set_blur_quality_desc">數值越低，在高解析度螢幕上越流暢</string>
++  <string name="glass_blur">模糊半徑</string>
++  <string name="glass_blur_desc">背景的磨砂程度</string>
++  <string name="glass_quality">模糊品質</string>
++  <string name="glass_quality_desc">越低越省 GPU；100 維持自動模式</string>
++  <string name="glass_tint">色調不透明度</string>
++  <string name="glass_tint_desc">覆蓋在玻璃上的色彩</string>
++  <string name="glass_corner">圓角</string>
++  <string name="glass_corner_desc">僅懸浮底欄；36 為完整膠囊形</string>
++  <string name="glass_refraction">折射強度</string>
++  <string name="glass_refraction_desc">邊緣折射背景的程度</string>
++  <string name="glass_refraction_height">折射高度</string>
++  <string name="glass_refraction_height_desc">折射邊緣的寬度</string>
++  <string name="glass_falloff">邊緣衰減</string>
++  <string name="glass_falloff_desc">折射向內延伸的範圍</string>
++  <string name="glass_rim">邊緣高光</string>
++  <string name="glass_rim_desc">光澤邊緣的亮度</string>
++  <string name="glass_rim_width">邊緣厚度</string>
++  <string name="glass_rim_width_desc">高光輪廓的寬度</string>
++  <string name="glass_shadow">邊緣陰影</string>
++  <string name="glass_shadow_desc">邊緣陰影的深淺</string>
++  <string name="glass_reset">重置玻璃設定</string>
+ </resources>
+diff --git a/app/src/main/res/values-zh/strings.xml b/app/src/main/res/values-zh/strings.xml
+index 1ff8b48..3b78ecc 100644
+--- a/app/src/main/res/values-zh/strings.xml
++++ b/app/src/main/res/values-zh/strings.xml
+@@ -1138,4 +1138,25 @@
+   <string name="lyr_set_blur_optimize_desc">以较低分辨率渲染模糊。关闭 = 普通模糊</string>
+   <string name="lyr_set_blur_quality">模糊质量</string>
+   <string name="lyr_set_blur_quality_desc">数值越低，在高分辨率屏幕上越流畅</string>
++  <string name="glass_blur">模糊半径</string>
++  <string name="glass_blur_desc">背景的磨砂程度</string>
++  <string name="glass_quality">模糊质量</string>
++  <string name="glass_quality_desc">越低越省 GPU；100 保持自动模式</string>
++  <string name="glass_tint">色调不透明度</string>
++  <string name="glass_tint_desc">覆盖在玻璃上的色彩</string>
++  <string name="glass_corner">圆角</string>
++  <string name="glass_corner_desc">仅悬浮底栏；36 为完整胶囊形</string>
++  <string name="glass_refraction">折射强度</string>
++  <string name="glass_refraction_desc">边缘折射背景的程度</string>
++  <string name="glass_refraction_height">折射高度</string>
++  <string name="glass_refraction_height_desc">折射边缘的宽度</string>
++  <string name="glass_falloff">边缘衰减</string>
++  <string name="glass_falloff_desc">折射向内延伸的范围</string>
++  <string name="glass_rim">边缘高光</string>
++  <string name="glass_rim_desc">光泽边缘的亮度</string>
++  <string name="glass_rim_width">边缘厚度</string>
++  <string name="glass_rim_width_desc">高光轮廓的宽度</string>
++  <string name="glass_shadow">边缘阴影</string>
++  <string name="glass_shadow_desc">边缘阴影的深浅</string>
++  <string name="glass_reset">重置玻璃设置</string>
+ </resources>
+diff --git a/app/src/main/res/values/strings.xml b/app/src/main/res/values/strings.xml
+index 507fdf8..0432c30 100644
+--- a/app/src/main/res/values/strings.xml
++++ b/app/src/main/res/values/strings.xml
+@@ -1138,4 +1138,25 @@
+   <string name="lyr_set_blur_optimize_desc">Renders the blur at a lower resolution. Off = normal blur</string>
+   <string name="lyr_set_blur_quality">Blur quality</string>
+   <string name="lyr_set_blur_quality_desc">Lower is smoother on high-resolution screens</string>
++  <string name="glass_blur">Blur</string>
++  <string name="glass_blur_desc">How frosted the backdrop looks</string>
++  <string name="glass_quality">Blur quality</string>
++  <string name="glass_quality_desc">Lower is lighter on the GPU; 100 keeps the automatic mode</string>
++  <string name="glass_tint">Tint opacity</string>
++  <string name="glass_tint_desc">Color wash over the glass</string>
++  <string name="glass_corner">Corner radius</string>
++  <string name="glass_corner_desc">Floating bar only; 36 is a full pill</string>
++  <string name="glass_refraction">Refraction strength</string>
++  <string name="glass_refraction_desc">How much the edge bends what is behind it</string>
++  <string name="glass_refraction_height">Refraction height</string>
++  <string name="glass_refraction_height_desc">Width of the bent rim</string>
++  <string name="glass_falloff">Edge falloff</string>
++  <string name="glass_falloff_desc">How far the bend reaches inward</string>
++  <string name="glass_rim">Rim highlight</string>
++  <string name="glass_rim_desc">Brightness of the glossy edge</string>
++  <string name="glass_rim_width">Rim thickness</string>
++  <string name="glass_rim_width_desc">Width of the bright outline</string>
++  <string name="glass_shadow">Edge shadow</string>
++  <string name="glass_shadow_desc">Darkness of the shadow at the edge</string>
++  <string name="glass_reset">Reset glass settings</string>
+ </resources>
+diff --git a/core-preferences/src/main/java/me/spica27/spicamusic/core/preferences/PreferencesManager.kt b/core-preferences/src/main/java/me/spica27/spicamusic/core/preferences/PreferencesManager.kt
+index b02a5de..59f6851 100644
+--- a/core-preferences/src/main/java/me/spica27/spicamusic/core/preferences/PreferencesManager.kt
++++ b/core-preferences/src/main/java/me/spica27/spicamusic/core/preferences/PreferencesManager.kt
+@@ -20,6 +20,16 @@ class PreferencesManager(
+     object Keys {
+         val DARK_MODE = booleanPreferencesKey("dark_mode")
+         val LIQUID_GLASS_ENABLED = booleanPreferencesKey("liquid_glass_enabled")
++        val LIQUID_GLASS_BLUR = intPreferencesKey("liquid_glass_blur")
++        val LIQUID_GLASS_QUALITY = intPreferencesKey("liquid_glass_quality")
++        val LIQUID_GLASS_TINT = intPreferencesKey("liquid_glass_tint")
++        val LIQUID_GLASS_CORNER = intPreferencesKey("liquid_glass_corner")
++        val LIQUID_GLASS_REFRACTION = intPreferencesKey("liquid_glass_refraction")
++        val LIQUID_GLASS_REFRACTION_HEIGHT = intPreferencesKey("liquid_glass_refraction_height")
++        val LIQUID_GLASS_FALLOFF = intPreferencesKey("liquid_glass_falloff")
++        val LIQUID_GLASS_RIM = intPreferencesKey("liquid_glass_rim")
++        val LIQUID_GLASS_RIM_WIDTH = intPreferencesKey("liquid_glass_rim_width")
++        val LIQUID_GLASS_SHADOW = intPreferencesKey("liquid_glass_shadow")
+         val BOTTOM_BAR_LAYOUT = stringPreferencesKey("bottom_bar_layout")
+         val THEME_COLOR_STYLE = stringPreferencesKey("theme_color_style")
+         val KEEP_SCREEN_ON = booleanPreferencesKey("keep_screen_on")
+@@ -578,6 +588,41 @@ class PreferencesManager(
+         }
+     }
+ 
++    /** 液态玻璃调节项，顺序固定，与 app 侧 LiquidGlassSetting 的 ordinal 一一对应。 */
++    private val liquidGlassTuningKeys =
++        listOf(
++            Keys.LIQUID_GLASS_BLUR,
++            Keys.LIQUID_GLASS_QUALITY,
++            Keys.LIQUID_GLASS_TINT,
++            Keys.LIQUID_GLASS_CORNER,
++            Keys.LIQUID_GLASS_REFRACTION,
++            Keys.LIQUID_GLASS_REFRACTION_HEIGHT,
++            Keys.LIQUID_GLASS_FALLOFF,
++            Keys.LIQUID_GLASS_RIM,
++            Keys.LIQUID_GLASS_RIM_WIDTH,
++            Keys.LIQUID_GLASS_SHADOW,
++        )
++
++    fun getLiquidGlassTuning(defaults: List<Int>): Flow<List<Int>> =
++        context.dataStore.data.map { preferences ->
++            liquidGlassTuningKeys.mapIndexed { index, key -> preferences[key] ?: defaults[index] }
++        }.distinctUntilChanged()
++
++    suspend fun setLiquidGlassTuning(
++        index: Int,
++        value: Int,
++    ) {
++        context.dataStore.edit { preferences ->
++            preferences[liquidGlassTuningKeys[index]] = value
++        }
++    }
++
++    suspend fun resetLiquidGlassTuning() {
++        context.dataStore.edit { preferences ->
++            liquidGlassTuningKeys.forEach { preferences.remove(it) }
++        }
++    }
++
+     fun getInt(
+         key: Preferences.Key<Int>,
+         defaultValue: Int = 0,
+diff --git a/feature-settings-domain/src/main/java/me/spica27/spicamusic/feature/settings/domain/SettingsUseCases.kt b/feature-settings-domain/src/main/java/me/spica27/spicamusic/feature/settings/domain/SettingsUseCases.kt
+index 026774f..33aae15 100644
+--- a/feature-settings-domain/src/main/java/me/spica27/spicamusic/feature/settings/domain/SettingsUseCases.kt
++++ b/feature-settings-domain/src/main/java/me/spica27/spicamusic/feature/settings/domain/SettingsUseCases.kt
+@@ -46,6 +46,19 @@ class SettingsUseCases(
+         preferencesManager.setBoolean(key, value)
+     }
+ 
++    fun getLiquidGlassTuning(defaults: List<Int>): Flow<List<Int>> = preferencesManager.getLiquidGlassTuning(defaults)
++
++    suspend fun setLiquidGlassTuning(
++        index: Int,
++        value: Int,
++    ) {
++        preferencesManager.setLiquidGlassTuning(index, value)
++    }
++
++    suspend fun resetLiquidGlassTuning() {
++        preferencesManager.resetLiquidGlassTuning()
++    }
++
+     fun getInt(
+         key: Preferences.Key<Int>,
+         defaultValue: Int = 0,
