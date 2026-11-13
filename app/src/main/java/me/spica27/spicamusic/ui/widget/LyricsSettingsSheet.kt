@@ -1235,22 +1235,6 @@ private fun KineticSection(
         valueText = { "$it%" },
         onValueChange = { v -> onUpdate { it.copy(kineticTranslationSize = v) } },
     )
-    LyricsSettingsSlider(
-        label = stringResource(R.string.lyr_set_kinetic_tl_position),
-        description = stringResource(R.string.lyr_set_kinetic_tl_position_desc),
-        value = settings.kineticTranslationPosition,
-        range = LyricsStyleSettings.KINETIC_POSITION_RANGE,
-        step = 1,
-        valueText = { v ->
-            when {
-                v <= 3 -> top
-                v >= 97 -> bottom
-                v in 47..53 -> middle
-                else -> "$v%"
-            }
-        },
-        onValueChange = { v -> onUpdate { it.copy(kineticTranslationPosition = v) } },
-    )
 
     // ---- Background vocal ----
     LyricsSettingsSection(stringResource(R.string.lyr_set_kinetic_section_bgv))
@@ -1261,29 +1245,6 @@ private fun KineticSection(
         onCheckedChange = { v -> onUpdate { it.copy(kineticBgVocalEnabled = v) } },
     )
     if (settings.kineticBgVocalEnabled) {
-        LyricsSettingsMultiChips(
-            label = stringResource(R.string.lyr_set_kinetic_bgv_style),
-            description = stringResource(R.string.lyr_set_kinetic_style_desc),
-            options = KineticStyle.entries,
-            isSelected = { it in settings.kineticBgVocalStyles },
-            optionLabel = { style ->
-                stringResource(
-                    when (style) {
-                        KineticStyle.Auto -> R.string.lyr_set_kinetic_auto
-                        KineticStyle.Stack -> R.string.lyr_set_kinetic_stack
-                        KineticStyle.Slide -> R.string.lyr_set_kinetic_slide
-                        KineticStyle.Zoom -> R.string.lyr_set_kinetic_zoom
-                        KineticStyle.Letters -> R.string.lyr_set_kinetic_letters
-                        KineticStyle.Scatter -> R.string.lyr_set_kinetic_scatter
-                        KineticStyle.Graph -> R.string.lyr_set_kinetic_graph
-                        KineticStyle.Flow -> R.string.lyr_set_kinetic_flow
-                    },
-                )
-            },
-            onToggle = { style ->
-                onUpdate { it.copy(kineticBgVocalStyles = toggleKineticStyle(it.kineticBgVocalStyles, style)) }
-            },
-        )
         LyricsSettingsSlider(
             label = stringResource(R.string.lyr_set_kinetic_bgv_size),
             description = stringResource(R.string.lyr_set_kinetic_bgv_size_desc),
@@ -1292,22 +1253,6 @@ private fun KineticSection(
             step = 5,
             valueText = { "$it%" },
             onValueChange = { v -> onUpdate { it.copy(kineticBgVocalSize = v) } },
-        )
-        LyricsSettingsSlider(
-            label = stringResource(R.string.lyr_set_kinetic_bgv_position),
-            description = stringResource(R.string.lyr_set_kinetic_bgv_position_desc),
-            value = settings.kineticBgVocalPosition,
-            range = LyricsStyleSettings.KINETIC_POSITION_RANGE,
-            step = 1,
-            valueText = { v ->
-                when {
-                    v <= 3 -> top
-                    v >= 97 -> bottom
-                    v in 47..53 -> middle
-                    else -> "$v%"
-                }
-            },
-            onValueChange = { v -> onUpdate { it.copy(kineticBgVocalPosition = v) } },
         )
     }
 
