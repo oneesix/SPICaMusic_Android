@@ -419,7 +419,7 @@ data class LyricsStyleSettings(
         val HEADER_OUTLINE_WEIGHT_RANGE = 1..8
         val HEADER_OUTLINE_OPACITY_RANGE = 0..100
         val DOCK_BLUR_RANGE = 0..40
-        val BLUR_QUALITY_RANGE = 20..100
+        val BLUR_QUALITY_RANGE = 5..100
         val DOCK_SIZE_RANGE = 40..72
         val DOCK_BOTTOM_PADDING_RANGE = 0..48
         val DOCK_PILL_PADDING_RANGE = 0..16

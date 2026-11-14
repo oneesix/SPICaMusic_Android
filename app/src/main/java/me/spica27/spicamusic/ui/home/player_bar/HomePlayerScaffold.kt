@@ -366,6 +366,7 @@ internal fun HomePlayerScaffold(
                         solidHeight = blurSolid.toDp(),
                         fadeHeight = blurFade.toDp(),
                         alpha = { (1f - progress() / NavigationFadeEnd).coerceIn(0f, 1f) },
+                        optimizeQuality = if (custom.blurOptimize == 1) custom.blurQuality else null,
                     )
                 }.single().measure(Constraints.fixed(width, blurSolid + blurFade))
             } else {
@@ -399,7 +400,15 @@ private fun BottomBlurBand(
     solidHeight: Dp,
     fadeHeight: Dp,
     alpha: () -> Float,
+    /** null = normal blur. A number (percent) = the blur is rendered at that lower resolution. */
+    optimizeQuality: Int? = null,
 ) {
+    val performanceMode =
+        if (optimizeQuality != null) {
+            HazePerformanceMode.Fixed(optimizeQuality.coerceIn(5, 100) / 100f)
+        } else {
+            HazePerformanceMode.Balanced
+        }
     val background = MaterialTheme.colorScheme.background
     val hardStyle =
         remember(background, amount) {
@@ -427,7 +436,7 @@ private fun BottomBlurBand(
                     .hazeBlur(
                         input = HazeInput.Sources(hazeState),
                         style = fadeStyle,
-                        performanceMode = HazePerformanceMode.Balanced,
+                        performanceMode = performanceMode,
                     ),
             )
         }
@@ -439,7 +448,7 @@ private fun BottomBlurBand(
                     .hazeBlur(
                         input = HazeInput.Sources(hazeState),
                         style = hardStyle,
-                        performanceMode = HazePerformanceMode.Balanced,
+                        performanceMode = performanceMode,
                     ),
             )
         }

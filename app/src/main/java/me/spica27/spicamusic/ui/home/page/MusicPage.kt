@@ -919,6 +919,12 @@ private fun MusicTopBlur(
         (statusBarTop + custom.top.dp + maxOf(custom.height, 44).dp + custom.blurPosition.dp).coerceAtLeast(0.dp)
     val blurOn = custom.blur == 1 && custom.blurAmount > 0
     val soft = custom.softEdge == 1 && custom.edgeFade > 0
+    val performanceMode =
+        if (custom.blurOptimize == 1) {
+            HazePerformanceMode.Fixed(custom.blurQuality.coerceIn(5, 100) / 100f)
+        } else {
+            HazePerformanceMode.Balanced
+        }
     Box(modifier = modifier.fillMaxWidth()) {
         if (blurOn) {
             val amount = custom.blurAmount
@@ -938,7 +944,7 @@ private fun MusicTopBlur(
                         .hazeBlur(
                             input = HazeInput.Sources(hazeState),
                             style = hardStyle,
-                            performanceMode = HazePerformanceMode.Balanced,
+                            performanceMode = performanceMode,
                         ),
             )
             if (soft) {
@@ -960,7 +966,7 @@ private fun MusicTopBlur(
                             .hazeBlur(
                                 input = HazeInput.Sources(hazeState),
                                 style = fadeStyle,
-                                performanceMode = HazePerformanceMode.Balanced,
+                                performanceMode = performanceMode,
                             ),
                 )
             }

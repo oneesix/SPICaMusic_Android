@@ -44,6 +44,8 @@ class PreferencesManager(
         val MUSIC_TOP_BAR_BLUR_POSITION = intPreferencesKey("music_top_bar_blur_position")
         val MUSIC_TOP_BAR_SOFT_EDGE = intPreferencesKey("music_top_bar_soft_edge")
         val MUSIC_TOP_BAR_EDGE_FADE = intPreferencesKey("music_top_bar_edge_fade")
+        val MUSIC_TOP_BAR_BLUR_OPTIMIZE = intPreferencesKey("music_top_bar_blur_optimize")
+        val MUSIC_TOP_BAR_BLUR_QUALITY = intPreferencesKey("music_top_bar_blur_quality")
         val THEME_COLOR_STYLE = stringPreferencesKey("theme_color_style")
         val KEEP_SCREEN_ON = booleanPreferencesKey("keep_screen_on")
         val ALBUM_NEW_STYLE = booleanPreferencesKey("album_new_style")
@@ -738,6 +740,8 @@ class PreferencesManager(
             "blur_position",
             "blur_soft",
             "blur_fade",
+            "blur_optimize",
+            "blur_quality",
         ).map { intPreferencesKey("bottom_bar_$it") }
 
     /** 文本项：每个标签依次存放 图标名、文字，共 4 个标签（发现、音乐、曲库、搜索）。 */
