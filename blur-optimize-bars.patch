@@ -1,0 +1,263 @@
+diff --git a/app/src/main/java/me/spica27/spicamusic/ui/home/page/MusicPage.kt b/app/src/main/java/me/spica27/spicamusic/ui/home/page/MusicPage.kt
+index 250d09f..7fe49ad 100644
+--- a/app/src/main/java/me/spica27/spicamusic/ui/home/page/MusicPage.kt
++++ b/app/src/main/java/me/spica27/spicamusic/ui/home/page/MusicPage.kt
+@@ -919,6 +919,12 @@ private fun MusicTopBlur(
+         (statusBarTop + custom.top.dp + maxOf(custom.height, 44).dp + custom.blurPosition.dp).coerceAtLeast(0.dp)
+     val blurOn = custom.blur == 1 && custom.blurAmount > 0
+     val soft = custom.softEdge == 1 && custom.edgeFade > 0
++    val performanceMode =
++        if (custom.blurOptimize == 1) {
++            HazePerformanceMode.Fixed(custom.blurQuality.coerceIn(5, 100) / 100f)
++        } else {
++            HazePerformanceMode.Balanced
++        }
+     Box(modifier = modifier.fillMaxWidth()) {
+         if (blurOn) {
+             val amount = custom.blurAmount
+@@ -938,7 +944,7 @@ private fun MusicTopBlur(
+                         .hazeBlur(
+                             input = HazeInput.Sources(hazeState),
+                             style = hardStyle,
+-                            performanceMode = HazePerformanceMode.Balanced,
++                            performanceMode = performanceMode,
+                         ),
+             )
+             if (soft) {
+@@ -960,7 +966,7 @@ private fun MusicTopBlur(
+                             .hazeBlur(
+                                 input = HazeInput.Sources(hazeState),
+                                 style = fadeStyle,
+-                                performanceMode = HazePerformanceMode.Balanced,
++                                performanceMode = performanceMode,
+                             ),
+                 )
+             }
+diff --git a/app/src/main/java/me/spica27/spicamusic/ui/home/page/MusicTopBarCustomization.kt b/app/src/main/java/me/spica27/spicamusic/ui/home/page/MusicTopBarCustomization.kt
+index a736019..4a6cb3f 100644
+--- a/app/src/main/java/me/spica27/spicamusic/ui/home/page/MusicTopBarCustomization.kt
++++ b/app/src/main/java/me/spica27/spicamusic/ui/home/page/MusicTopBarCustomization.kt
+@@ -20,6 +20,8 @@ enum class MusicTopBarSetting {
+     BlurPosition,
+     SoftEdge,
+     EdgeFade,
++    BlurOptimize,
++    BlurQuality,
+ }
+ 
+ /**
+@@ -42,6 +44,9 @@ data class MusicTopBarCustomization(
+     val blurPosition: Int = 8,
+     val softEdge: Int = 1,
+     val edgeFade: Int = 24,
++    /** 1 = render the blur at a lower resolution ([blurQuality] percent). 0 = normal blur. */
++    val blurOptimize: Int = 0,
++    val blurQuality: Int = 45,
+ ) {
+     fun valueOf(setting: MusicTopBarSetting): Int =
+         when (setting) {
+@@ -55,6 +60,8 @@ data class MusicTopBarCustomization(
+             MusicTopBarSetting.BlurPosition -> blurPosition
+             MusicTopBarSetting.SoftEdge -> softEdge
+             MusicTopBarSetting.EdgeFade -> edgeFade
++            MusicTopBarSetting.BlurOptimize -> blurOptimize
++            MusicTopBarSetting.BlurQuality -> blurQuality
+         }
+ 
+     companion object {
+@@ -70,6 +77,8 @@ data class MusicTopBarCustomization(
+                 blurPosition = values[7],
+                 softEdge = values[8],
+                 edgeFade = values[9],
++                blurOptimize = values[10],
++                blurQuality = values[11],
+             )
+     }
+ }
+@@ -86,6 +95,8 @@ internal fun MusicTopBarSetting.preferenceKey() =
+         MusicTopBarSetting.BlurPosition -> PreferencesManager.Keys.MUSIC_TOP_BAR_BLUR_POSITION
+         MusicTopBarSetting.SoftEdge -> PreferencesManager.Keys.MUSIC_TOP_BAR_SOFT_EDGE
+         MusicTopBarSetting.EdgeFade -> PreferencesManager.Keys.MUSIC_TOP_BAR_EDGE_FADE
++        MusicTopBarSetting.BlurOptimize -> PreferencesManager.Keys.MUSIC_TOP_BAR_BLUR_OPTIMIZE
++        MusicTopBarSetting.BlurQuality -> PreferencesManager.Keys.MUSIC_TOP_BAR_BLUR_QUALITY
+     }
+ 
+ internal fun MusicTopBarSetting.defaultValue(): Int = MusicTopBarCustomization().valueOf(this)
+diff --git a/app/src/main/java/me/spica27/spicamusic/ui/home/player_bar/BottomBarCustomization.kt b/app/src/main/java/me/spica27/spicamusic/ui/home/player_bar/BottomBarCustomization.kt
+index 1eaa200..1efc0f3 100644
+--- a/app/src/main/java/me/spica27/spicamusic/ui/home/player_bar/BottomBarCustomization.kt
++++ b/app/src/main/java/me/spica27/spicamusic/ui/home/player_bar/BottomBarCustomization.kt
+@@ -27,6 +27,8 @@ enum class BottomBarSetting {
+     BlurPosition,
+     SoftEdge,
+     EdgeFade,
++    BlurOptimize,
++    BlurQuality,
+ }
+ 
+ /** 标签显示方式。 */
+@@ -61,6 +63,9 @@ data class BottomBarCustomization(
+     val blurPosition: Int = 8,
+     val softEdge: Int = 1,
+     val edgeFade: Int = 32,
++    /** 1 = render the blur at a lower resolution ([blurQuality] percent). 0 = normal blur. */
++    val blurOptimize: Int = 0,
++    val blurQuality: Int = 45,
+     val icons: List<String> = DefaultIcons,
+     val labels: List<String> = DefaultLabels,
+ ) {
+@@ -94,6 +99,8 @@ data class BottomBarCustomization(
+             blurPosition = ints[14],
+             softEdge = ints[15],
+             edgeFade = ints[16],
++            blurOptimize = ints[17],
++            blurQuality = ints[18],
+             icons = List(4) { texts[it * 2] },
+             labels = List(4) { texts[it * 2 + 1] },
+         )
+@@ -118,6 +125,8 @@ data class BottomBarCustomization(
+             blurPosition,
+             softEdge,
+             edgeFade,
++            blurOptimize,
++            blurQuality,
+         )
+ }
+ 
+diff --git a/app/src/main/java/me/spica27/spicamusic/ui/home/player_bar/HomePlayerScaffold.kt b/app/src/main/java/me/spica27/spicamusic/ui/home/player_bar/HomePlayerScaffold.kt
+index 87a9298..5a56ad0 100644
+--- a/app/src/main/java/me/spica27/spicamusic/ui/home/player_bar/HomePlayerScaffold.kt
++++ b/app/src/main/java/me/spica27/spicamusic/ui/home/player_bar/HomePlayerScaffold.kt
+@@ -366,6 +366,7 @@ internal fun HomePlayerScaffold(
+                         solidHeight = blurSolid.toDp(),
+                         fadeHeight = blurFade.toDp(),
+                         alpha = { (1f - progress() / NavigationFadeEnd).coerceIn(0f, 1f) },
++                        optimizeQuality = if (custom.blurOptimize == 1) custom.blurQuality else null,
+                     )
+                 }.single().measure(Constraints.fixed(width, blurSolid + blurFade))
+             } else {
+@@ -399,7 +400,15 @@ private fun BottomBlurBand(
+     solidHeight: Dp,
+     fadeHeight: Dp,
+     alpha: () -> Float,
++    /** null = normal blur. A number (percent) = the blur is rendered at that lower resolution. */
++    optimizeQuality: Int? = null,
+ ) {
++    val performanceMode =
++        if (optimizeQuality != null) {
++            HazePerformanceMode.Fixed(optimizeQuality.coerceIn(5, 100) / 100f)
++        } else {
++            HazePerformanceMode.Balanced
++        }
+     val background = MaterialTheme.colorScheme.background
+     val hardStyle =
+         remember(background, amount) {
+@@ -427,7 +436,7 @@ private fun BottomBlurBand(
+                     .hazeBlur(
+                         input = HazeInput.Sources(hazeState),
+                         style = fadeStyle,
+-                        performanceMode = HazePerformanceMode.Balanced,
++                        performanceMode = performanceMode,
+                     ),
+             )
+         }
+@@ -439,7 +448,7 @@ private fun BottomBlurBand(
+                     .hazeBlur(
+                         input = HazeInput.Sources(hazeState),
+                         style = hardStyle,
+-                        performanceMode = HazePerformanceMode.Balanced,
++                        performanceMode = performanceMode,
+                     ),
+             )
+         }
+diff --git a/app/src/main/java/me/spica27/spicamusic/ui/settings/BottomBarSettings.kt b/app/src/main/java/me/spica27/spicamusic/ui/settings/BottomBarSettings.kt
+index 852a538..645f1b4 100644
+--- a/app/src/main/java/me/spica27/spicamusic/ui/settings/BottomBarSettings.kt
++++ b/app/src/main/java/me/spica27/spicamusic/ui/settings/BottomBarSettings.kt
+@@ -154,6 +154,23 @@ internal fun BottomBarSettingsContent(
+         )
+         if (custom.blur == 1) {
+             GeometrySlider(R.string.mtb_blur_amount, BottomBarSetting.BlurAmount, custom.blurAmount, 0..40, " dp")
++            LyricsSettingsToggle(
++                label = stringResource(R.string.lyr_set_blur_optimize),
++                description = stringResource(R.string.lyr_set_blur_optimize_desc),
++                checked = custom.blurOptimize == 1,
++                onCheckedChange = { onInt(BottomBarSetting.BlurOptimize, if (it) 1 else 0) },
++            )
++            if (custom.blurOptimize == 1) {
++                LyricsSettingsSlider(
++                    label = stringResource(R.string.lyr_set_blur_quality),
++                    description = stringResource(R.string.lyr_set_blur_quality_desc),
++                    value = custom.blurQuality,
++                    range = 5..100,
++                    step = 5,
++                    valueText = { "$it%" },
++                    onValueChange = { onInt(BottomBarSetting.BlurQuality, it) },
++                )
++            }
+             LyricsSettingsSlider(
+                 label = stringResource(R.string.mtb_blur_position),
+                 description = stringResource(R.string.bb_blur_position_sub),
+diff --git a/app/src/main/java/me/spica27/spicamusic/ui/settings/MusicTopBarSettings.kt b/app/src/main/java/me/spica27/spicamusic/ui/settings/MusicTopBarSettings.kt
+index 620031c..22f7458 100644
+--- a/app/src/main/java/me/spica27/spicamusic/ui/settings/MusicTopBarSettings.kt
++++ b/app/src/main/java/me/spica27/spicamusic/ui/settings/MusicTopBarSettings.kt
+@@ -99,6 +99,23 @@ internal fun MusicTopBarSettingsContent(
+                 valueText = { "$it dp" },
+                 onValueChange = { onInt(MusicTopBarSetting.BlurAmount, it) },
+             )
++            LyricsSettingsToggle(
++                label = stringResource(R.string.lyr_set_blur_optimize),
++                description = stringResource(R.string.lyr_set_blur_optimize_desc),
++                checked = custom.blurOptimize == 1,
++                onCheckedChange = { onInt(MusicTopBarSetting.BlurOptimize, if (it) 1 else 0) },
++            )
++            if (custom.blurOptimize == 1) {
++                LyricsSettingsSlider(
++                    label = stringResource(R.string.lyr_set_blur_quality),
++                    description = stringResource(R.string.lyr_set_blur_quality_desc),
++                    value = custom.blurQuality,
++                    range = 5..100,
++                    step = 5,
++                    valueText = { "$it%" },
++                    onValueChange = { onInt(MusicTopBarSetting.BlurQuality, it) },
++                )
++            }
+             LyricsSettingsSlider(
+                 label = stringResource(R.string.mtb_blur_position),
+                 description = stringResource(R.string.mtb_blur_position_sub),
+diff --git a/core-preferences/src/main/java/me/spica27/spicamusic/core/preferences/LyricsStyleSettings.kt b/core-preferences/src/main/java/me/spica27/spicamusic/core/preferences/LyricsStyleSettings.kt
+index 5ffaffa..7bf5c77 100644
+--- a/core-preferences/src/main/java/me/spica27/spicamusic/core/preferences/LyricsStyleSettings.kt
++++ b/core-preferences/src/main/java/me/spica27/spicamusic/core/preferences/LyricsStyleSettings.kt
+@@ -419,7 +419,7 @@ data class LyricsStyleSettings(
+         val HEADER_OUTLINE_WEIGHT_RANGE = 1..8
+         val HEADER_OUTLINE_OPACITY_RANGE = 0..100
+         val DOCK_BLUR_RANGE = 0..40
+-        val BLUR_QUALITY_RANGE = 20..100
++        val BLUR_QUALITY_RANGE = 5..100
+         val DOCK_SIZE_RANGE = 40..72
+         val DOCK_BOTTOM_PADDING_RANGE = 0..48
+         val DOCK_PILL_PADDING_RANGE = 0..16
+diff --git a/core-preferences/src/main/java/me/spica27/spicamusic/core/preferences/PreferencesManager.kt b/core-preferences/src/main/java/me/spica27/spicamusic/core/preferences/PreferencesManager.kt
+index 58c7d31..ff16590 100644
+--- a/core-preferences/src/main/java/me/spica27/spicamusic/core/preferences/PreferencesManager.kt
++++ b/core-preferences/src/main/java/me/spica27/spicamusic/core/preferences/PreferencesManager.kt
+@@ -44,6 +44,8 @@ class PreferencesManager(
+         val MUSIC_TOP_BAR_BLUR_POSITION = intPreferencesKey("music_top_bar_blur_position")
+         val MUSIC_TOP_BAR_SOFT_EDGE = intPreferencesKey("music_top_bar_soft_edge")
+         val MUSIC_TOP_BAR_EDGE_FADE = intPreferencesKey("music_top_bar_edge_fade")
++        val MUSIC_TOP_BAR_BLUR_OPTIMIZE = intPreferencesKey("music_top_bar_blur_optimize")
++        val MUSIC_TOP_BAR_BLUR_QUALITY = intPreferencesKey("music_top_bar_blur_quality")
+         val THEME_COLOR_STYLE = stringPreferencesKey("theme_color_style")
+         val KEEP_SCREEN_ON = booleanPreferencesKey("keep_screen_on")
+         val ALBUM_NEW_STYLE = booleanPreferencesKey("album_new_style")
+@@ -738,6 +740,8 @@ class PreferencesManager(
+             "blur_position",
+             "blur_soft",
+             "blur_fade",
++            "blur_optimize",
++            "blur_quality",
+         ).map { intPreferencesKey("bottom_bar_$it") }
+ 
+     /** 文本项：每个标签依次存放 图标名、文字，共 4 个标签（发现、音乐、曲库、搜索）。 */
