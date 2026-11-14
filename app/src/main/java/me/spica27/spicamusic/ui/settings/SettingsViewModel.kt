@@ -209,6 +209,18 @@ class SettingsViewModel(
         }
     }
 
+    // New album style
+    val albumNewStyle =
+        settingsUseCases
+            .getBoolean(SettingsUseCases.Keys.ALBUM_NEW_STYLE, false)
+            .stateIn(viewModelScope, SharingStarted.Eagerly, false)
+
+    fun setAlbumNewStyle(enabled: Boolean) {
+        viewModelScope.launch {
+            settingsUseCases.setBoolean(SettingsUseCases.Keys.ALBUM_NEW_STYLE, enabled)
+        }
+    }
+
     // 动态频谱
     val dynamicSpectrumBackground =
         settingsUseCases

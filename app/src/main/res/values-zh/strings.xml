@@ -364,6 +364,8 @@
   <string name="settings_dark_mode_subtitle">启用深色主题</string>
   <string name="settings_playback">播放</string>
   <string name="settings_sound_effects_subtitle">均衡器、响度等音效设置</string>
+  <string name="settings_album_new_style_title">新专辑样式</string>
+  <string name="settings_album_new_style_subtitle">将专辑信息显示在封面内</string>
   <string name="settings_keep_screen_on">屏幕常亮</string>
   <string name="settings_keep_screen_on_subtitle">播放时保持屏幕常亮</string>
   <string name="settings_dynamic_spectrum">动态频谱背景</string>

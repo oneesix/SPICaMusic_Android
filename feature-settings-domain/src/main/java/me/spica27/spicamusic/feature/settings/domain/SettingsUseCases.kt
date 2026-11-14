@@ -15,6 +15,7 @@ class SettingsUseCases(
         val BOTTOM_BAR_LAYOUT = PreferencesManager.Keys.BOTTOM_BAR_LAYOUT
         val THEME_COLOR_STYLE = PreferencesManager.Keys.THEME_COLOR_STYLE
         val KEEP_SCREEN_ON = PreferencesManager.Keys.KEEP_SCREEN_ON
+        val ALBUM_NEW_STYLE = PreferencesManager.Keys.ALBUM_NEW_STYLE
         val DYNAMIC_SPECTRUM_BACKGROUND = PreferencesManager.Keys.DYNAMIC_SPECTRUM_BACKGROUND
         val VERSE_THEME_MODE = PreferencesManager.Keys.VERSE_THEME_MODE
         val VERSE_THEME_SATURATION = PreferencesManager.Keys.VERSE_THEME_SATURATION

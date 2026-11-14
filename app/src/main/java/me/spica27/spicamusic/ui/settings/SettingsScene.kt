@@ -40,6 +40,7 @@ import androidx.compose.material.icons.filled.Bedtime
 import androidx.compose.material.icons.filled.BlurOn
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.ChevronRight
+import androidx.compose.material.icons.filled.Album
 import androidx.compose.material.icons.filled.DarkMode
 import androidx.compose.material.icons.filled.ExpandMore
 import androidx.compose.material.icons.filled.GraphicEq
@@ -141,6 +142,7 @@ fun SettingsScreen() {
     val bottomBarLayout by viewModel.bottomBarLayout.collectAsStateWithLifecycle()
     val musicTopBarCustomization by viewModel.musicTopBarCustomization.collectAsStateWithLifecycle()
     val keepScreenOn by viewModel.keepScreenOn.collectAsStateWithLifecycle()
+    val albumNewStyle by viewModel.albumNewStyle.collectAsStateWithLifecycle()
     val backgroundValue by viewModel.dynamicSpectrumBackground.collectAsStateWithLifecycle()
     val verseMode by viewModel.verseThemeMode.collectAsStateWithLifecycle()
     val verseSaturation by viewModel.verseSaturation.collectAsStateWithLifecycle()
@@ -244,6 +246,14 @@ fun SettingsScreen() {
                         expandedKey = expandedRowKey,
                         onExpandChange = { expandedRowKey = it },
                         onValueChange = { viewModel.setBottomBarLayout(BottomBarLayout.fromString(it)) },
+                    )
+                    SettingsItemDivider()
+                    SwitchRow(
+                        title = stringResource(R.string.settings_album_new_style_title),
+                        summary = stringResource(R.string.settings_album_new_style_subtitle),
+                        icon = Icons.Default.Album,
+                        checked = albumNewStyle,
+                        onCheckedChange = viewModel::setAlbumNewStyle,
                     )
                     SettingsItemDivider()
                     SwitchRow(

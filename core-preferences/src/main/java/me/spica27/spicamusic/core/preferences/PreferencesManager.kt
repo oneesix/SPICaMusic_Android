@@ -46,6 +46,7 @@ class PreferencesManager(
         val MUSIC_TOP_BAR_EDGE_FADE = intPreferencesKey("music_top_bar_edge_fade")
         val THEME_COLOR_STYLE = stringPreferencesKey("theme_color_style")
         val KEEP_SCREEN_ON = booleanPreferencesKey("keep_screen_on")
+        val ALBUM_NEW_STYLE = booleanPreferencesKey("album_new_style")
         val DYNAMIC_SPECTRUM_BACKGROUND = stringPreferencesKey("dynamic_spectrum_background")
         // ---- Verse Flow 外观（Auto / Light / Dark、饱和度、鲜艳度、高亮色相）----
         val VERSE_THEME_MODE = stringPreferencesKey("verse_theme_mode")

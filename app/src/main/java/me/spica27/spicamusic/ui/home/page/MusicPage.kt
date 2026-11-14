@@ -197,6 +197,7 @@ import me.spica27.spicamusic.ui.widget.clickHighlight
 import me.spica27.spicamusic.ui.widget.combinedClickHighlight
 import me.spica27.spicamusic.ui.widget.displayName
 import me.spica27.spicamusic.ui.widget.materialSharedAxisZ
+import me.spica27.spicamusic.ui.widget.rememberAlbumArtColor
 import me.spica27.spicamusic.ui.widget.rememberIOSOverScrollEffect
 import org.koin.compose.viewmodel.koinActivityViewModel
 import kotlin.math.abs
@@ -431,6 +432,10 @@ fun MusicPage(bottomContentPadding: Dp = 0.dp) {
     val preferencesManager = koinInject<PreferencesManager>()
     val barCustom = rememberMusicTopBarCustomization(preferencesManager)
     val bottomBarLayout by homeViewModel.bottomBarLayout.collectAsStateWithLifecycle()
+    val albumNewStyle by
+        preferencesManager
+            .getBoolean(PreferencesManager.Keys.ALBUM_NEW_STYLE)
+            .collectAsStateWithLifecycle(false)
     val glassEnabled = LocalLiquidGlassConfig.current.enabled
     val glassHazeState = rememberHazeState()
     val pageBackdrop = rememberLayerBackdrop()
@@ -613,6 +618,7 @@ fun MusicPage(bottomContentPadding: Dp = 0.dp) {
                             val row = index / 2
                             MusicAlbumCard(
                                 album = album,
+                                newStyle = albumNewStyle,
                                 onClick = { backStack.add(AlbumDetailRoute(album)) },
                                 modifier =
                                     Modifier
@@ -1368,13 +1374,18 @@ private fun MusicSongRow(
     }
 }
 
-/** 专辑卡：方形封面 + 标题 + 「歌手 · N 首」 */
+/**
+ * 专辑卡：方形封面 + 标题 + 「歌手 · N 首」。
+ * newStyle 开启时信息放进封面底部，渐变色取自封面主色。
+ */
 @Composable
 private fun MusicAlbumCard(
     album: Album,
+    newStyle: Boolean,
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    val subtitle = "${album.artistDisplay()} · ${stringResource(R.string.songs_count_format, album.numberOfSongs)}"
     Column(
         modifier =
             modifier
@@ -1383,33 +1394,73 @@ private fun MusicAlbumCard(
                 .clickHighlight(onClick = onClick),
         verticalArrangement = Arrangement.spacedBy(Spacing.Small),
     ) {
-        AudioCover(
-            artwork = album.artwork(),
+        Box(
             modifier =
                 Modifier
                     .fillMaxWidth()
                     .aspectRatio(1f)
                     .clip(Shapes.ExtraLargeCornerBasedShape),
-        )
-        Column(
-            modifier = Modifier.padding(bottom = Spacing.Small),
-            verticalArrangement = Arrangement.spacedBy(2.dp),
         ) {
-            Text(
-                text = album.title,
-                style = MaterialTheme.typography.bodyMedium,
-                fontWeight = FontWeight.SemiBold,
-                color = MaterialTheme.colorScheme.onSurface,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
+            AudioCover(
+                artwork = album.artwork(),
+                modifier = Modifier.fillMaxSize(),
             )
-            Text(
-                text = "${album.artistDisplay()} · ${stringResource(R.string.songs_count_format, album.numberOfSongs)}",
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-            )
+            if (newStyle) {
+                val artColor = rememberAlbumArtColor(album.artwork())
+                val shade =
+                    androidx.compose.ui.graphics
+                        .lerp(artColor ?: Color.Black, Color.Black, 0.4f)
+                Column(
+                    modifier =
+                        Modifier
+                            .align(Alignment.BottomStart)
+                            .fillMaxWidth()
+                            .background(
+                                androidx.compose.ui.graphics.Brush.verticalGradient(
+                                    listOf(Color.Transparent, shade),
+                                ),
+                            ).padding(start = 12.dp, end = 12.dp, top = 28.dp, bottom = 10.dp),
+                    verticalArrangement = Arrangement.spacedBy(2.dp),
+                ) {
+                    Text(
+                        text = album.title,
+                        style = MaterialTheme.typography.bodyMedium,
+                        fontWeight = FontWeight.SemiBold,
+                        color = Color.White,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                    Text(
+                        text = subtitle,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = Color.White.copy(alpha = 0.8f),
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                }
+            }
+        }
+        if (!newStyle) {
+            Column(
+                modifier = Modifier.padding(bottom = Spacing.Small),
+                verticalArrangement = Arrangement.spacedBy(2.dp),
+            ) {
+                Text(
+                    text = album.title,
+                    style = MaterialTheme.typography.bodyMedium,
+                    fontWeight = FontWeight.SemiBold,
+                    color = MaterialTheme.colorScheme.onSurface,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+                Text(
+                    text = subtitle,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            }
         }
     }
 }

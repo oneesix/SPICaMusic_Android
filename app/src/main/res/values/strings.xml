@@ -363,6 +363,8 @@
   <string name="settings_dark_mode_subtitle">Enable dark theme</string>
   <string name="settings_playback">Playback</string>
   <string name="settings_sound_effects_subtitle">Equalizer, loudness and other effects</string>
+  <string name="settings_album_new_style_title">New album style</string>
+  <string name="settings_album_new_style_subtitle">Show album info inside the cover</string>
   <string name="settings_keep_screen_on">Keep Screen On</string>
   <string name="settings_keep_screen_on_subtitle">Keep screen on during playback</string>
   <string name="settings_dynamic_spectrum">Dynamic Spectrum Background</string>
