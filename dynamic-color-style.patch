@@ -1,0 +1,318 @@
+diff --git a/app/src/main/java/me/spica27/spicamusic/ui/AppScaffold.kt b/app/src/main/java/me/spica27/spicamusic/ui/AppScaffold.kt
+index 552c97b..04ede80 100644
+--- a/app/src/main/java/me/spica27/spicamusic/ui/AppScaffold.kt
++++ b/app/src/main/java/me/spica27/spicamusic/ui/AppScaffold.kt
+@@ -20,6 +20,7 @@ import com.skydoves.landscapist.core.Landscapist
+ import com.skydoves.landscapist.image.LocalLandscapist
+ import dev.chrisbanes.haze.rememberHazeState
+ import me.spica27.spicamusic.common.entity.ThemeColorStyle
++import me.spica27.spicamusic.ui.widget.DynamicStyleScope
+ import me.spica27.spicamusic.core.preferences.LyricsStyleSettings
+ import me.spica27.spicamusic.core.preferences.PreferencesManager
+ import me.spica27.spicamusic.ui.adaptive.LocalPaneInfo
+@@ -121,6 +122,12 @@ fun AppScaffold() {
+         themeColorStyle = ThemeColorStyle.fromString(themeColorStyleValue),
+         fontFamily = appFontFamily,
+     ) {
++        val currentMediaItem by playerViewModel.currentMediaItem.collectAsStateWithLifecycle()
++        DynamicStyleScope(
++            enabled = themeColorStyleValue == ThemeColorStyle.Dynamic.value,
++            settings = lyricsStyle,
++            artworkUri = currentMediaItem?.mediaMetadata?.artworkUri,
++        ) {
+         CompositionLocalProvider(
+             LocalLiquidGlassConfig provides LiquidGlassConfig(enabled = liquidGlassEnabled, tuning = liquidGlassTuning),
+             LocalLiquidGlassV2Config provides LiquidGlassV2Config(enabled = liquidGlassV2Enabled, tuning = liquidGlassV2Tuning),
+@@ -156,6 +163,7 @@ fun AppScaffold() {
+                 )
+             }
+         }
++        }
+     }
+ }
+ 
+diff --git a/app/src/main/java/me/spica27/spicamusic/ui/settings/SettingsScene.kt b/app/src/main/java/me/spica27/spicamusic/ui/settings/SettingsScene.kt
+index 54e065a..f87723e 100644
+--- a/app/src/main/java/me/spica27/spicamusic/ui/settings/SettingsScene.kt
++++ b/app/src/main/java/me/spica27/spicamusic/ui/settings/SettingsScene.kt
+@@ -94,6 +94,7 @@ import me.spica27.spicamusic.common.entity.DynamicCoverType
+ import me.spica27.spicamusic.common.entity.DynamicSpectrumBackground
+ import me.spica27.spicamusic.common.entity.ProgressBarStyle
+ import me.spica27.spicamusic.common.entity.ThemeColorStyle
++import me.spica27.spicamusic.core.preferences.LyricsStyleSettings
+ import me.spica27.spicamusic.ui.glass.LiquidGlassSetting
+ import me.spica27.spicamusic.ui.glass.LiquidGlassTuning
+ import me.spica27.spicamusic.ui.glass.LiquidGlassV2Preview
+@@ -152,6 +153,7 @@ fun SettingsScreen() {
+     val coverTapValue by viewModel.dynamicCoverType.collectAsStateWithLifecycle()
+     val progressWaveformValue by viewModel.progressBarStyle.collectAsStateWithLifecycle()
+     val colorStyleValue by viewModel.themeColorStyle.collectAsStateWithLifecycle()
++    val lyricsStyle by viewModel.lyricsStyle.collectAsStateWithLifecycle()
+     val playerViewModel = LocalPlayerViewModel.current
+     val sleepTimer by playerViewModel.sleepTimer.collectAsStateWithLifecycle()
+ 
+@@ -235,6 +237,12 @@ fun SettingsScreen() {
+                         onExpandChange = { expandedRowKey = it },
+                         onValueChange = viewModel::setThemeColorStyle,
+                     )
++                    AnimatedVisibility(visible = colorStyleValue == ThemeColorStyle.Dynamic.value) {
++                        DynamicStyleControls(
++                            settings = lyricsStyle,
++                            onUpdate = viewModel::updateLyricsStyle,
++                        )
++                    }
+                     SettingsItemDivider()
+                     InlineSelectRow(
+                         rowKey = "bottom_bar_layout",
+@@ -1036,7 +1044,9 @@ private fun rememberColorStyleOptions(): ImmutableList<SettingsOption> {
+     val texturedDesc = stringResource(R.string.color_style_textured_desc)
+     val flatLabel = stringResource(R.string.theme_color_style_flat)
+     val flatDesc = stringResource(R.string.color_style_flat_desc)
+-    return remember(texturedLabel, texturedDesc, flatLabel, flatDesc) {
++    val dynamicLabel = stringResource(R.string.theme_color_style_dynamic)
++    val dynamicDesc = stringResource(R.string.color_style_dynamic_desc)
++    return remember(texturedLabel, texturedDesc, flatLabel, flatDesc, dynamicLabel, dynamicDesc) {
+         ImmutableList.copyOf(
+             listOf(
+                 SettingsOption(
+@@ -1051,6 +1061,12 @@ private fun rememberColorStyleOptions(): ImmutableList<SettingsOption> {
+                     flatDesc,
+                     Icons.Default.Layers,
+                 ),
++                SettingsOption(
++                    ThemeColorStyle.Dynamic.value,
++                    dynamicLabel,
++                    dynamicDesc,
++                    Icons.Default.Album,
++                ),
+             ),
+         )
+     }
+@@ -1362,6 +1378,73 @@ private fun LiquidGlassTuningControls(
+     }
+ }
+ 
++/** 颜色风格“动态”的调节项：与歌词设置里的“播放器界面配色”是同一组设置。 */
++@Composable
++private fun DynamicStyleControls(
++    settings: LyricsStyleSettings,
++    onUpdate: ((LyricsStyleSettings) -> LyricsStyleSettings) -> Unit,
++) {
++    Column(
++        modifier =
++            Modifier
++                .fillMaxWidth()
++                .padding(
++                    start = SettingsRowContentInset,
++                    end = Spacing.Large,
++                    top = Spacing.ExtraSmall,
++                    bottom = Spacing.Small,
++                ),
++    ) {
++        LyricsSettingsToggle(
++            label = stringResource(R.string.lyr_set_dyn_bg),
++            description = stringResource(R.string.lyr_set_dyn_bg_desc),
++            checked = settings.dynamicBackgroundEnabled,
++            onCheckedChange = { v -> onUpdate { it.copy(dynamicBackgroundEnabled = v) } },
++        )
++        LyricsSettingsChips(
++            label = stringResource(R.string.lyr_set_dyn_mode),
++            description = stringResource(R.string.lyr_set_dyn_mode_desc),
++            options = listOf("auto", "dark", "light"),
++            selected = settings.dynamicLyricsMode,
++            optionLabel = {
++                when (it) {
++                    "dark" -> stringResource(R.string.verse_mode_dark)
++                    "light" -> stringResource(R.string.verse_mode_light)
++                    else -> stringResource(R.string.verse_mode_auto)
++                }
++            },
++            onSelect = { v -> onUpdate { it.copy(dynamicLyricsMode = v) } },
++        )
++        LyricsSettingsSlider(
++            label = stringResource(R.string.lyr_set_dyn_opacity),
++            description = stringResource(R.string.lyr_set_dyn_opacity_desc),
++            value = settings.dynamicLyricsOpacity,
++            range = LyricsStyleSettings.DYNAMIC_OPACITY_RANGE,
++            step = 5,
++            valueText = { "$it%" },
++            onValueChange = { v -> onUpdate { it.copy(dynamicLyricsOpacity = v) } },
++        )
++        LyricsSettingsSlider(
++            label = stringResource(R.string.lyr_set_dyn_saturation),
++            description = stringResource(R.string.lyr_set_dyn_saturation_desc),
++            value = settings.dynamicLyricsSaturation,
++            range = LyricsStyleSettings.DYNAMIC_SATURATION_RANGE,
++            step = 5,
++            valueText = { "$it%" },
++            onValueChange = { v -> onUpdate { it.copy(dynamicLyricsSaturation = v) } },
++        )
++        LyricsSettingsSlider(
++            label = stringResource(R.string.lyr_set_dyn_contrast),
++            description = stringResource(R.string.lyr_set_dyn_contrast_desc),
++            value = settings.dynamicLyricsContrast,
++            range = LyricsStyleSettings.DYNAMIC_CONTRAST_RANGE,
++            step = 5,
++            valueText = { "$it%" },
++            onValueChange = { v -> onUpdate { it.copy(dynamicLyricsContrast = v) } },
++        )
++    }
++}
++
+ /** 液态玻璃 V2（Kyant Backdrop）的全部调节项；上方固定的预览行实时显示效果。 */
+ @Composable
+ private fun LiquidGlassV2Controls(
+diff --git a/app/src/main/java/me/spica27/spicamusic/ui/settings/SettingsViewModel.kt b/app/src/main/java/me/spica27/spicamusic/ui/settings/SettingsViewModel.kt
+index e379333..783e86d 100644
+--- a/app/src/main/java/me/spica27/spicamusic/ui/settings/SettingsViewModel.kt
++++ b/app/src/main/java/me/spica27/spicamusic/ui/settings/SettingsViewModel.kt
+@@ -13,6 +13,7 @@ import me.spica27.spicamusic.common.entity.DynamicCoverType
+ import me.spica27.spicamusic.common.entity.DynamicSpectrumBackground
+ import me.spica27.spicamusic.common.entity.ProgressBarStyle
+ import me.spica27.spicamusic.common.entity.ThemeColorStyle
++import me.spica27.spicamusic.core.preferences.LyricsStyleSettings
+ import me.spica27.spicamusic.feature.settings.domain.SettingsUseCases
+ import me.spica27.spicamusic.ui.glass.LiquidGlassSetting
+ import me.spica27.spicamusic.ui.glass.LiquidGlassTuning
+@@ -197,6 +198,15 @@ class SettingsViewModel(
+         }
+     }
+ 
++    // 颜色风格“动态”共用歌词设置里的“播放器界面配色”选项。
++    val lyricsStyle =
++        settingsUseCases.lyricsStyle
++            .stateIn(viewModelScope, SharingStarted.Eagerly, LyricsStyleSettings())
++
++    fun updateLyricsStyle(transform: (LyricsStyleSettings) -> LyricsStyleSettings) {
++        viewModelScope.launch { settingsUseCases.updateLyricsStyle(transform) }
++    }
++
+     // 屏幕常亮
+     val keepScreenOn =
+         settingsUseCases
+diff --git a/app/src/main/java/me/spica27/spicamusic/ui/theme/Theme.kt b/app/src/main/java/me/spica27/spicamusic/ui/theme/Theme.kt
+index 958235e..5c48b44 100644
+--- a/app/src/main/java/me/spica27/spicamusic/ui/theme/Theme.kt
++++ b/app/src/main/java/me/spica27/spicamusic/ui/theme/Theme.kt
+@@ -77,7 +77,8 @@ fun SPICaMusicTheme(
+ ) {
+     val colorScheme =
+         when (themeColorStyle) {
+-            ThemeColorStyle.Textured -> {
++            // Dynamic 使用与 Textured 相同的底色，前景色由 DynamicStyleScope 另行覆盖。
++            ThemeColorStyle.Textured, ThemeColorStyle.Dynamic -> {
+                 val targetScheme =
+                     rememberDynamicColorScheme(
+                         seedColor = themeColor,
+diff --git a/app/src/main/java/me/spica27/spicamusic/ui/widget/DynamicStyleScope.kt b/app/src/main/java/me/spica27/spicamusic/ui/widget/DynamicStyleScope.kt
+new file mode 100644
+index 0000000..6cd2722
+--- /dev/null
++++ b/app/src/main/java/me/spica27/spicamusic/ui/widget/DynamicStyleScope.kt
+@@ -0,0 +1,37 @@
++package me.spica27.spicamusic.ui.widget
++
++import android.net.Uri
++import androidx.compose.foundation.layout.Box
++import androidx.compose.foundation.layout.fillMaxSize
++import androidx.compose.runtime.Composable
++import androidx.compose.ui.Modifier
++import androidx.compose.ui.draw.drawWithContent
++import me.spica27.spicamusic.core.preferences.LyricsStyleSettings
++
++/**
++ * 颜色风格“动态”：复用歌词设置里“播放器界面配色”的引擎和全部选项，
++ * 让整个应用的前景色（文字、图标、按钮、进度条）跟随当前专辑封面。
++ * 背景着色开启时，在内容上方叠一层不拦截触摸的封面色。
++ */
++@Composable
++fun DynamicStyleScope(
++    enabled: Boolean,
++    settings: LyricsStyleSettings,
++    artworkUri: Uri?,
++    content: @Composable () -> Unit,
++) {
++    val colors = rememberDynamicPlayerColors(settings.copy(dynamicLyricsEnabled = enabled), artworkUri)
++    DynamicPlayerColorScope(colors = colors) {
++        Box(
++            modifier =
++                Modifier
++                    .fillMaxSize()
++                    .drawWithContent {
++                        drawContent()
++                        colors?.backgroundTint?.let { drawRect(it) }
++                    },
++        ) {
++            content()
++        }
++    }
++}
+diff --git a/app/src/main/res/values-zh-rTW/strings.xml b/app/src/main/res/values-zh-rTW/strings.xml
+index ad27f96..4a0799b 100644
+--- a/app/src/main/res/values-zh-rTW/strings.xml
++++ b/app/src/main/res/values-zh-rTW/strings.xml
+@@ -711,6 +711,8 @@
+   <string name="settings_option_off">關閉</string>
+   <string name="color_style_textured_desc">從封面取色，產生柔和的同色系配色</string>
+   <string name="color_style_flat_desc">高對比度的純色扁平配色</string>
++  <string name="theme_color_style_dynamic">動態</string>
++  <string name="color_style_dynamic_desc">顏色跟隨專輯封面，使用「播放器介面配色」引擎</string>
+   <string name="bg_top_glow">頂部流光</string>
+   <string name="bg_top_glow_desc">頂部邊緣的一道柔光</string>
+   <string name="bg_liquid_aurora">液態極光</string>
+diff --git a/app/src/main/res/values-zh/strings.xml b/app/src/main/res/values-zh/strings.xml
+index b47f200..5ab4a85 100644
+--- a/app/src/main/res/values-zh/strings.xml
++++ b/app/src/main/res/values-zh/strings.xml
+@@ -713,6 +713,8 @@
+   <string name="settings_option_off">关闭</string>
+   <string name="color_style_textured_desc">从封面取色，生成柔和的同色系配色</string>
+   <string name="color_style_flat_desc">高对比度的纯色扁平配色</string>
++  <string name="theme_color_style_dynamic">动态</string>
++  <string name="color_style_dynamic_desc">颜色跟随专辑封面，使用“播放器界面配色”引擎</string>
+   <string name="bg_top_glow">顶部流光</string>
+   <string name="bg_top_glow_desc">顶部边缘的一道柔光</string>
+   <string name="bg_liquid_aurora">液态极光</string>
+diff --git a/app/src/main/res/values/strings.xml b/app/src/main/res/values/strings.xml
+index f68c9d4..ce442e9 100644
+--- a/app/src/main/res/values/strings.xml
++++ b/app/src/main/res/values/strings.xml
+@@ -713,6 +713,8 @@
+   <string name="settings_option_off">Off</string>
+   <string name="color_style_textured_desc">A tonal palette derived from the album art</string>
+   <string name="color_style_flat_desc">Flat, high-contrast solid colors</string>
++  <string name="theme_color_style_dynamic">Dynamic</string>
++  <string name="color_style_dynamic_desc">Colors follow the album art, using the Color player UI engine</string>
+   <string name="bg_top_glow">Top Glow</string>
+   <string name="bg_top_glow_desc">A soft band of light along the top edge</string>
+   <string name="bg_liquid_aurora">Liquid Aurora</string>
+diff --git a/common/src/main/java/me/spica27/spicamusic/common/entity/ThemeColorStyle.kt b/common/src/main/java/me/spica27/spicamusic/common/entity/ThemeColorStyle.kt
+index fbd7b53..70af74f 100644
+--- a/common/src/main/java/me/spica27/spicamusic/common/entity/ThemeColorStyle.kt
++++ b/common/src/main/java/me/spica27/spicamusic/common/entity/ThemeColorStyle.kt
+@@ -20,6 +20,12 @@ sealed class ThemeColorStyle(
+         "扁平化",
+     )
+ 
++    /** 动态：用“播放器界面配色”引擎，让全应用的文字、图标、按钮颜色跟随专辑封面。 */
++    object Dynamic : ThemeColorStyle(
++        "dynamic",
++        "动态",
++    )
++
+     override fun toString(): String = name
+ 
+     companion object {
+@@ -27,10 +33,11 @@ sealed class ThemeColorStyle(
+             when (value) {
+                 Textured.value -> Textured
+                 Flat.value -> Flat
++                Dynamic.value -> Dynamic
+                 else -> Textured
+             }
+ 
+         val presets: List<ThemeColorStyle>
+-            get() = listOf(Textured, Flat)
++            get() = listOf(Textured, Flat, Dynamic)
+     }
+ }
