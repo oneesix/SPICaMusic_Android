@@ -1,0 +1,1289 @@
+diff --git a/app/src/main/java/me/spica27/spicamusic/ui/player/ExpandedPlayerScreen.kt b/app/src/main/java/me/spica27/spicamusic/ui/player/ExpandedPlayerScreen.kt
+index 98c8111..127b5c8 100644
+--- a/app/src/main/java/me/spica27/spicamusic/ui/player/ExpandedPlayerScreen.kt
++++ b/app/src/main/java/me/spica27/spicamusic/ui/player/ExpandedPlayerScreen.kt
+@@ -590,7 +590,83 @@ fun ExpandedPlayerScreen(
+                                     snapPositionalThreshold = .2f,
+                                 ),
+                         ) { page ->
+-                            if (page == DEFAULT_PAGE) {
++                            if (page == DEFAULT_PAGE && dynamicStyle.newPlayerUi) {
++                                // New player UI: shares the top bar and bottom bar with the lyrics page.
++                                Box(modifier = Modifier.fillMaxSize()) {
++                                    ShowOnIdleContent(
++                                        modifier = Modifier.fillMaxSize(),
++                                        visible = isPlayerPageRevealed,
++                                        delayMillis = 225,
++                                        enter = Nav3Transitions.expand().targetContentEnter,
++                                        skipFirstEnter = playerPageRevealedOnce,
++                                    ) {
++                                        NewPlayerSurface(
++                                            playerViewModel = viewModel,
++                                            hazeState = hazeState,
++                                            title =
++                                                currentMediaItem
++                                                    ?.mediaMetadata
++                                                    ?.title
++                                                    ?.toString()
++                                                    ?: stringResource(R.string.unknown_song),
++                                            artist =
++                                                currentMediaItem
++                                                    ?.mediaMetadata
++                                                    ?.artist
++                                                    ?.toString()
++                                                    ?: stringResource(R.string.unknown_artist),
++                                            artwork = currentMediaItem?.mediaMetadata?.artwork(),
++                                            isLike = songLikeState,
++                                            onLikeClick = { viewModel.toggleLikeCurrentSong() },
++                                            isSeeking = isSeekingState,
++                                            seekPositionProvider = {
++                                                if (animationsEnabled) seekValueState.floatValue else positionHolder.seekPosition
++                                            },
++                                            durationMs = duration,
++                                            onSeekChange = {
++                                                isSeekingState = true
++                                                seekValueState.floatValue = it * duration
++                                                positionHolder.seekPosition = seekValueState.floatValue
++                                            },
++                                            onSeekFinished = {
++                                                viewModel.seekTo(seekValueState.floatValue.toLong())
++                                                isSeekingState = false
++                                            },
++                                            progressAnimationsEnabled =
++                                                isPlaying && isAppInForeground && animationsEnabled && !LocalReducedMotion.current,
++                                            isPlaying = isPlaying,
++                                            onPlayPauseClick = { viewModel.togglePlayPause() },
++                                            onPreviousClick = { viewModel.skipToPrevious() },
++                                            onNextClick = { viewModel.skipToNext() },
++                                            onQueueClick = {
++                                                coroutineScope.launch {
++                                                    pagerState.animateScrollToPage(
++                                                        QUEUE_PAGE,
++                                                        animationSpec =
++                                                            tween(
++                                                                durationMillis = 320,
++                                                                easing = EaseOutEmphasized,
++                                                            ),
++                                                    )
++                                                }
++                                            },
++                                            onLyricsClick = { playerSurface = PlayerSurface.Lyrics },
++                                            modifier = Modifier.fillMaxSize(),
++                                            coverSwipeModifier =
++                                                Modifier.surfaceSwipe(
++                                                    fromLyrics = false,
++                                                    widthPx = { surfaceWidthPx },
++                                                    progress = surfaceProgress,
++                                                    onSettle = settleSurface,
++                                                    onDragActive = { surfaceDragging = it },
++                                                ),
++                                        )
++                                    }
++                                    Box(modifier = Modifier.align(Alignment.TopCenter).statusBarsPadding()) {
++                                        dragHandle()
++                                    }
++                                }
++                            } else if (page == DEFAULT_PAGE) {
+                                 Column(
+                                     modifier =
+                                         Modifier
+diff --git a/app/src/main/java/me/spica27/spicamusic/ui/player/FullscreenLyricsSurface.kt b/app/src/main/java/me/spica27/spicamusic/ui/player/FullscreenLyricsSurface.kt
+index 58273e8..eddce69 100644
+--- a/app/src/main/java/me/spica27/spicamusic/ui/player/FullscreenLyricsSurface.kt
++++ b/app/src/main/java/me/spica27/spicamusic/ui/player/FullscreenLyricsSurface.kt
+@@ -73,6 +73,7 @@ import me.spica27.spicamusic.ui.theme.Spacing
+ import me.spica27.spicamusic.ui.widget.AudioCover
+ import me.spica27.spicamusic.ui.widget.LyricsCircleButton
+ import me.spica27.spicamusic.ui.widget.LyricsSettingsSheet
++import me.spica27.spicamusic.ui.widget.PlayerUiSettingsSheet
+ import me.spica27.spicamusic.ui.widget.LyricsToolbarMenuContent
+ import me.spica27.spicamusic.ui.widget.audio_seekbar.GlowParticleSeekBar
+ import me.spica27.spicamusic.ui.widget.rememberLyricsEdgePadding
+@@ -217,7 +218,7 @@ internal fun FullscreenLyricsSurface(
+ }
+ 
+ @Composable
+-private fun FullscreenLyricsHeader(
++internal fun FullscreenLyricsHeader(
+     title: String,
+     artist: String,
+     artwork: MusicArtwork?,
+@@ -235,7 +236,14 @@ private fun FullscreenLyricsHeader(
+     progressAnimationsEnabled: Boolean,
+     onBarHeightChange: (Int) -> Unit,
+     modifier: Modifier = Modifier,
++    /** New player UI: shown instead of the song title (the playlist name or "Now playing"). */
++    titleOverride: String? = null,
++    /** New player UI: the info line shows the play time ("01:22 / 03:44") instead of artist, album and year. */
++    timeAsInfo: Boolean = false,
++    /** New player UI: one padding value above and below the header row. null = the lyrics defaults. */
++    verticalPaddingOverride: Dp? = null,
+ ) {
++    val shownTitle = titleOverride ?: title
+     // 与歌词文字的左边距一致，左右对称
+     val edge = rememberLyricsEdgePadding()
+ 
+@@ -247,6 +255,7 @@ private fun FullscreenLyricsHeader(
+     val backStack = LocalBackStack.current
+     var menuExpanded by remember { mutableStateOf(false) }
+     var showLyricsSettings by remember { mutableStateOf(false) }
++    var showPlayerUiSettings by remember { mutableStateOf(false) }
+ 
+     // Enhance header off = the original header (default sizes, no line, no blur).
+     val enhanced = styleSettings.enhanceHeader
+@@ -321,7 +330,12 @@ private fun FullscreenLyricsHeader(
+                     modifier =
+                         Modifier
+                             .fillMaxWidth()
+-                            .padding(start = edge, end = edge, top = Spacing.Medium, bottom = bottomPadding),
++                            .padding(
++                                start = edge,
++                                end = edge,
++                                top = verticalPaddingOverride ?: Spacing.Medium,
++                                bottom = verticalPaddingOverride ?: bottomPadding,
++                            ),
+                     verticalAlignment = Alignment.CenterVertically,
+                     horizontalArrangement = Arrangement.spacedBy(Spacing.Medium),
+                 ) {
+@@ -331,7 +345,7 @@ private fun FullscreenLyricsHeader(
+                         horizontalAlignment = Alignment.CenterHorizontally,
+                     ) {
+                         Text(
+-                            text = title,
++                            text = shownTitle,
+                             style = MaterialTheme.typography.titleLarge,
+                             fontSize = titleSize,
+                             lineHeight = titleSize * 1.25f,
+@@ -351,17 +365,26 @@ private fun FullscreenLyricsHeader(
+                             transitionSpec = { fadeIn(tween(160)) togetherWith fadeOut(tween(120)) },
+                             label = "lyrics_info_or_seeking",
+                         ) { seeking ->
+-                            Text(
+-                                text = if (seeking) stringResource(R.string.lyrics_seeking) else infoLine,
+-                                style = MaterialTheme.typography.bodyMedium,
+-                                fontSize = artistSize,
+-                                lineHeight = artistSize * 1.3f,
+-                                textAlign = TextAlign.Center,
+-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+-                                maxLines = 1,
+-                                overflow = TextOverflow.Ellipsis,
+-                                modifier = Modifier.fillMaxWidth(),
+-                            )
++                            if (timeAsInfo) {
++                                HeaderTimeText(
++                                    seekPositionProvider = seekPositionProvider,
++                                    durationMs = durationMs,
++                                    fontSize = artistSize,
++                                    textAlign = TextAlign.Center,
++                                )
++                            } else {
++                                Text(
++                                    text = if (seeking) stringResource(R.string.lyrics_seeking) else infoLine,
++                                    style = MaterialTheme.typography.bodyMedium,
++                                    fontSize = artistSize,
++                                    lineHeight = artistSize * 1.3f,
++                                    textAlign = TextAlign.Center,
++                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
++                                    maxLines = 1,
++                                    overflow = TextOverflow.Ellipsis,
++                                    modifier = Modifier.fillMaxWidth(),
++                                )
++                            }
+                         }
+                     }
+                     dotsButton()
+@@ -381,7 +404,12 @@ private fun FullscreenLyricsHeader(
+                     modifier =
+                         Modifier
+                             .fillMaxWidth()
+-                            .padding(start = edge, end = edge, top = Spacing.Medium, bottom = bottomPadding),
++                            .padding(
++                                start = edge,
++                                end = edge,
++                                top = verticalPaddingOverride ?: Spacing.Medium,
++                                bottom = verticalPaddingOverride ?: bottomPadding,
++                            ),
+                     verticalAlignment = Alignment.CenterVertically,
+                     horizontalArrangement = Arrangement.spacedBy(Spacing.Medium),
+                 ) {
+@@ -412,7 +440,7 @@ private fun FullscreenLyricsHeader(
+ 
+                     Column(modifier = Modifier.weight(1f)) {
+                         Text(
+-                            text = title,
++                            text = shownTitle,
+                             style = MaterialTheme.typography.titleLarge,
+                             fontSize = titleSize,
+                             lineHeight = titleSize * 1.25f,
+@@ -422,15 +450,24 @@ private fun FullscreenLyricsHeader(
+                             overflow = TextOverflow.Ellipsis,
+                         )
+                         Spacer(modifier = Modifier.height(2.dp))
+-                        Text(
+-                            text = artist,
+-                            style = MaterialTheme.typography.bodyMedium,
+-                            fontSize = artistSize,
+-                            lineHeight = artistSize * 1.3f,
+-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+-                            maxLines = 1,
+-                            overflow = TextOverflow.Ellipsis,
+-                        )
++                        if (timeAsInfo) {
++                            HeaderTimeText(
++                                seekPositionProvider = seekPositionProvider,
++                                durationMs = durationMs,
++                                fontSize = artistSize,
++                                textAlign = TextAlign.Start,
++                            )
++                        } else {
++                            Text(
++                                text = artist,
++                                style = MaterialTheme.typography.bodyMedium,
++                                fontSize = artistSize,
++                                lineHeight = artistSize * 1.3f,
++                                color = MaterialTheme.colorScheme.onSurfaceVariant,
++                                maxLines = 1,
++                                overflow = TextOverflow.Ellipsis,
++                            )
++                        }
+                     }
+ 
+                     Row(
+@@ -468,10 +505,22 @@ private fun FullscreenLyricsHeader(
+                     viewModel.openPanel()
+                     backStack.add(LyricsSourceRoute)
+                 },
++                onOpenPlayerUiSettings = {
++                    menuExpanded = false
++                    showPlayerUiSettings = true
++                },
+             )
+         }
+     }
+ 
++    if (showPlayerUiSettings) {
++        PlayerUiSettingsSheet(
++            settings = styleSettings,
++            onUpdate = styleViewModel::update,
++            onDismiss = { showPlayerUiSettings = false },
++        )
++    }
++
+     if (showLyricsSettings) {
+         LyricsSettingsSheet(
+             settings = styleSettings,
+@@ -505,6 +554,26 @@ private fun LyricsHeaderProgressBar(
+     )
+ }
+ 
++/** "01:22 / 03:44" in the info line of the new player UI top bar. Only this composable reads the position. */
++@Composable
++private fun HeaderTimeText(
++    seekPositionProvider: () -> Float,
++    durationMs: Long,
++    fontSize: TextUnit,
++    textAlign: TextAlign,
++) {
++    Text(
++        text = "${formatTime(seekPositionProvider().toLong())} / ${formatTime(durationMs)}",
++        style = MaterialTheme.typography.bodyMedium.copy(fontFeatureSettings = "tnum"),
++        fontSize = fontSize,
++        lineHeight = fontSize * 1.3f,
++        textAlign = textAlign,
++        color = MaterialTheme.colorScheme.onSurfaceVariant,
++        maxLines = 1,
++        modifier = Modifier.fillMaxWidth(),
++    )
++}
++
+ /** "1:23 / 3:45" shown in place of the title while the progress bar is dragged. */
+ @Composable
+ private fun LyricsSeekTimeText(
+@@ -531,7 +600,7 @@ private fun LyricsSeekTimeText(
+  */
+ @OptIn(ExperimentalHazeApi::class)
+ @Composable
+-private fun LyricsHeaderBlurLayer(
++internal fun LyricsHeaderBlurLayer(
+     hazeState: HazeState,
+     blurRadius: Dp,
+     barHeight: Dp,
+diff --git a/app/src/main/java/me/spica27/spicamusic/ui/player/LyricsBottomBar.kt b/app/src/main/java/me/spica27/spicamusic/ui/player/LyricsBottomBar.kt
+index 13cf1b0..03dc911 100644
+--- a/app/src/main/java/me/spica27/spicamusic/ui/player/LyricsBottomBar.kt
++++ b/app/src/main/java/me/spica27/spicamusic/ui/player/LyricsBottomBar.kt
+@@ -16,8 +16,12 @@ import androidx.compose.foundation.layout.size
+ import androidx.compose.foundation.layout.width
+ import androidx.compose.foundation.shape.CircleShape
+ import androidx.compose.material.icons.Icons
++import androidx.compose.material.icons.automirrored.filled.PlaylistPlay
+ import androidx.compose.material.icons.rounded.Pause
+ import androidx.compose.material.icons.rounded.PlayArrow
++import androidx.compose.material.icons.rounded.Repeat
++import androidx.compose.material.icons.rounded.RepeatOne
++import androidx.compose.material.icons.rounded.Shuffle
+ import androidx.compose.material.icons.rounded.Translate
+ import androidx.compose.material3.Icon
+ import androidx.compose.material3.MaterialTheme
+@@ -50,6 +54,7 @@ import dev.chrisbanes.haze.blur.HazeColorEffect
+ import dev.chrisbanes.haze.blur.hazeBlur
+ import me.spica27.spicamusic.R
+ import me.spica27.spicamusic.artwork.MusicArtwork
++import me.spica27.spicamusic.player.api.PlayMode
+ import me.spica27.spicamusic.ui.widget.AudioCover
+ import me.spica27.spicamusic.ui.widget.rememberLyricsEdgePadding
+ import org.koin.compose.viewmodel.koinActivityViewModel
+@@ -75,6 +80,8 @@ internal fun LyricsBottomBar(
+     /** Height of the whole bar in px, so the "spread" blur layer can match it. */
+     onHeightChange: (Int) -> Unit,
+     modifier: Modifier = Modifier,
++    /** New player UI: mix | next track pill with queue button | repeat, instead of the lyrics buttons. */
++    player: PlayerDockState? = null,
+ ) {
+     val viewModel: LyricsViewModel = koinActivityViewModel()
+     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+@@ -137,8 +144,25 @@ internal fun LyricsBottomBar(
+                 .padding(start = edge, end = edge, top = 10.dp, bottom = s.dockBottomPadding.dp),
+         verticalAlignment = Alignment.CenterVertically,
+     ) {
+-        // Left: transliteration
+-        DockCircleButton(
++        // Left: transliteration (new player UI: mix)
++        if (player != null) {
++            DockCircleButton(
++                size = size,
++                fill = fill,
++                glass = glass,
++                on = player.playMode == PlayMode.SHUFFLE,
++                available = true,
++                description = stringResource(R.string.player_ui_mix),
++                onClick = player.onMixClick,
++            ) { tint ->
++                Icon(
++                    imageVector = Icons.Rounded.Shuffle,
++                    contentDescription = null,
++                    tint = tint,
++                    modifier = Modifier.size(size * 0.46f),
++                )
++            }
++        } else DockCircleButton(
+             size = size,
+             fill = fill,
+             glass = glass,
+@@ -208,11 +232,27 @@ internal fun LyricsBottomBar(
+                     overflow = TextOverflow.Ellipsis,
+                     modifier = Modifier.fillMaxWidth(),
+                 )
+-                LyricsDockTime(
+-                    seekPositionProvider = seekPositionProvider,
+-                    durationMs = durationMs,
+-                    fontSize = (size.value * 0.23f).sp,
+-                )
++                if (player != null) {
++                    // New player UI: the title of the next track
++                    val nextSize = (size.value * 0.23f).sp
++                    Text(
++                        text = player.nextTitle,
++                        style = MaterialTheme.typography.bodySmall,
++                        fontSize = nextSize,
++                        lineHeight = nextSize * 1.2f,
++                        color = MaterialTheme.colorScheme.onSurfaceVariant,
++                        textAlign = TextAlign.Center,
++                        maxLines = 1,
++                        overflow = TextOverflow.Ellipsis,
++                        modifier = Modifier.fillMaxWidth(),
++                    )
++                } else {
++                    LyricsDockTime(
++                        seekPositionProvider = seekPositionProvider,
++                        durationMs = durationMs,
++                        fontSize = (size.value * 0.23f).sp,
++                    )
++                }
+             }
+ 
+             Box(
+@@ -221,12 +261,22 @@ internal fun LyricsBottomBar(
+                         .size(inner)
+                         .clip(CircleShape)
+                         .background(innerFill)
+-                        .clickable(role = Role.Button, onClick = onPlayPauseClick),
++                        .clickable(role = Role.Button, onClick = player?.onQueueClick ?: onPlayPauseClick),
+                 contentAlignment = Alignment.Center,
+             ) {
+                 Icon(
+-                    imageVector = if (isPlaying) Icons.Rounded.Pause else Icons.Rounded.PlayArrow,
+-                    contentDescription = stringResource(if (isPlaying) R.string.pause else R.string.play),
++                    imageVector =
++                        when {
++                            player != null -> Icons.AutoMirrored.Filled.PlaylistPlay
++                            isPlaying -> Icons.Rounded.Pause
++                            else -> Icons.Rounded.PlayArrow
++                        },
++                    contentDescription =
++                        if (player != null) {
++                            stringResource(R.string.player_ui_queue)
++                        } else {
++                            stringResource(if (isPlaying) R.string.pause else R.string.play)
++                        },
+                     tint = onSurface,
+                     modifier = Modifier.size(inner / 2),
+                 )
+@@ -235,8 +285,25 @@ internal fun LyricsBottomBar(
+ 
+         Spacer(modifier = Modifier.width(s.dockGapRight.dp))
+ 
+-        // Right: translation
+-        DockCircleButton(
++        // Right: translation (new player UI: repeat)
++        if (player != null) {
++            DockCircleButton(
++                size = size,
++                fill = fill,
++                glass = glass,
++                on = player.playMode == PlayMode.LIST,
++                available = true,
++                description = stringResource(R.string.player_ui_repeat),
++                onClick = player.onRepeatClick,
++            ) { tint ->
++                Icon(
++                    imageVector = if (player.playMode == PlayMode.LIST) Icons.Rounded.RepeatOne else Icons.Rounded.Repeat,
++                    contentDescription = null,
++                    tint = tint,
++                    modifier = Modifier.size(size * 0.46f),
++                )
++            }
++        } else DockCircleButton(
+             size = size,
+             fill = fill,
+             glass = glass,
+@@ -259,6 +326,15 @@ internal fun LyricsBottomBar(
+     }
+ }
+ 
++/** New player UI: what the bottom bar shows (and does) instead of the lyrics buttons. */
++internal class PlayerDockState(
++    val nextTitle: String,
++    val playMode: PlayMode,
++    val onMixClick: () -> Unit,
++    val onRepeatClick: () -> Unit,
++    val onQueueClick: () -> Unit,
++)
++
+ /**
+  * Round button. The circle never changes; only the icon / text does:
+  * on = full strength, off = dimmed, not available = faded more (and tapping does nothing).
+diff --git a/app/src/main/java/me/spica27/spicamusic/ui/player/MiniLyric.kt b/app/src/main/java/me/spica27/spicamusic/ui/player/MiniLyric.kt
+index e6f7bfa..2e91aa8 100644
+--- a/app/src/main/java/me/spica27/spicamusic/ui/player/MiniLyric.kt
++++ b/app/src/main/java/me/spica27/spicamusic/ui/player/MiniLyric.kt
+@@ -19,6 +19,10 @@ import androidx.compose.runtime.withFrameNanos
+ import androidx.compose.ui.Alignment
+ import androidx.compose.ui.Modifier
+ import androidx.compose.ui.draw.clip
++import androidx.compose.ui.graphics.Color
++import androidx.compose.ui.graphics.takeOrElse
++import androidx.compose.ui.text.TextStyle
++import androidx.compose.ui.unit.Dp
+ import androidx.compose.ui.res.stringResource
+ import androidx.compose.ui.text.style.TextAlign
+ import androidx.compose.ui.text.style.TextOverflow
+@@ -50,6 +54,11 @@ private const val LOADING_PLACEHOLDER = "· · ·"
+ fun MiniLyric(
+     onClick: () -> Unit,
+     modifier: Modifier = Modifier,
++    /** The new player UI shows the line bigger, bold and left aligned. */
++    textStyle: TextStyle = MaterialTheme.typography.bodyMedium,
++    textAlign: TextAlign = TextAlign.Center,
++    textColor: Color = Color.Unspecified,
++    horizontalPadding: Dp = Spacing.Medium,
+ ) {
+     // Activity 作用域共享实例：与全屏歌词模式同源，
+     // 全屏歌词内切换歌词源 / 调整偏移量后 mini 歌词同步生效
+@@ -124,9 +133,9 @@ fun MiniLyric(
+             modifier
+                 .clip(Shapes.MediumCornerBasedShape)
+                 .clickable(onClickLabel = stringResource(R.string.tab_lrc)) { onClick.invoke() }
+-                .padding(horizontal = Spacing.Medium, vertical = Spacing.Small)
++                .padding(horizontal = horizontalPadding, vertical = Spacing.Small)
+                 .heightIn(min = 20.dp),
+-        contentAlignment = Alignment.Center,
++        contentAlignment = if (textAlign == TextAlign.Start) Alignment.CenterStart else Alignment.Center,
+     ) {
+         AnimatedContent(
+             targetState = displayText,
+@@ -139,16 +148,16 @@ fun MiniLyric(
+             val isPlaceholder = line == null || line == LOADING_PLACEHOLDER
+             Text(
+                 text = line ?: stringResource(if (uiState.lyricsSuppressed) R.string.lyrics_no_match else R.string.no_lyrics),
+-                style = MaterialTheme.typography.bodyMedium,
++                style = textStyle,
+                 color =
+                     if (isPlaceholder) {
+                         MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.9f)
+                     } else {
+-                        MaterialTheme.colorScheme.onSurfaceVariant
++                        textColor.takeOrElse { MaterialTheme.colorScheme.onSurfaceVariant }
+                     },
+                 maxLines = 1,
+                 overflow = TextOverflow.Ellipsis,
+-                textAlign = TextAlign.Center,
++                textAlign = textAlign,
+                 modifier = Modifier.fillMaxWidth(),
+             )
+         }
+diff --git a/app/src/main/java/me/spica27/spicamusic/ui/player/NewPlayerSurface.kt b/app/src/main/java/me/spica27/spicamusic/ui/player/NewPlayerSurface.kt
+new file mode 100644
+index 0000000..d51841a
+--- /dev/null
++++ b/app/src/main/java/me/spica27/spicamusic/ui/player/NewPlayerSurface.kt
+@@ -0,0 +1,322 @@
++package me.spica27.spicamusic.ui.player
++
++import androidx.compose.foundation.layout.Arrangement
++import androidx.compose.foundation.layout.Box
++import androidx.compose.foundation.layout.BoxWithConstraints
++import androidx.compose.foundation.layout.Column
++import androidx.compose.foundation.layout.Row
++import androidx.compose.foundation.layout.fillMaxSize
++import androidx.compose.foundation.layout.fillMaxWidth
++import androidx.compose.foundation.layout.height
++import androidx.compose.foundation.layout.offset
++import androidx.compose.foundation.layout.padding
++import androidx.compose.foundation.layout.requiredSize
++import androidx.compose.foundation.layout.size
++import androidx.compose.foundation.layout.width
++import androidx.compose.material.icons.Icons
++import androidx.compose.material.icons.rounded.FastForward
++import androidx.compose.material.icons.rounded.FastRewind
++import androidx.compose.material.icons.rounded.Pause
++import androidx.compose.material.icons.rounded.PlayArrow
++import androidx.compose.material3.Icon
++import androidx.compose.material3.IconButton
++import androidx.compose.material3.MaterialTheme
++import androidx.compose.material3.Text
++import androidx.compose.runtime.Composable
++import androidx.compose.runtime.getValue
++import androidx.compose.runtime.mutableIntStateOf
++import androidx.compose.runtime.remember
++import androidx.compose.runtime.setValue
++import androidx.compose.ui.Alignment
++import androidx.compose.ui.Modifier
++import androidx.compose.ui.draw.clipToBounds
++import androidx.compose.ui.graphics.graphicsLayer
++import androidx.compose.ui.platform.LocalDensity
++import androidx.compose.ui.res.stringResource
++import androidx.compose.ui.text.font.FontWeight
++import androidx.compose.ui.text.style.TextAlign
++import androidx.compose.ui.text.style.TextOverflow
++import androidx.compose.ui.unit.Dp
++import androidx.compose.ui.unit.dp
++import androidx.compose.ui.unit.sp
++import androidx.lifecycle.compose.collectAsStateWithLifecycle
++import dev.chrisbanes.haze.HazeState
++import dev.chrisbanes.haze.hazeSource
++import me.spica27.spicamusic.R
++import me.spica27.spicamusic.artwork.MusicArtwork
++import me.spica27.spicamusic.artwork.artwork
++import me.spica27.spicamusic.player.api.PlayMode
++import me.spica27.spicamusic.ui.widget.AudioCover
++import me.spica27.spicamusic.ui.widget.rememberLyricsEdgePadding
++import org.koin.compose.viewmodel.koinActivityViewModel
++
++private val NewPlayerControlButtonSize = 72.dp
++private val NewPlayerControlIconSize = 58.dp
++
++/**
++ * New player UI (settings: "New player UI"). It shares the top bar and the bottom bar with the lyrics page:
++ *
++ * - Top bar: playlist name (or "Now playing") and the play time instead of the artist line.
++ * - Album art: a full width square without rounded corners. A flipped copy fills the space above it (behind
++ *   the top bar) and below it, so the existing top bar / bottom bar blur settings blur the cover.
++ * - Under the art: song title and artist, the current lyric line, and the previous / pause / next buttons.
++ * - Bottom bar: mix | next track pill (next cover, "Next track", next title, queue button) | repeat.
++ */
++@Composable
++internal fun NewPlayerSurface(
++    playerViewModel: PlayerViewModel,
++    hazeState: HazeState,
++    title: String,
++    artist: String,
++    artwork: MusicArtwork?,
++    isLike: Boolean,
++    onLikeClick: () -> Unit,
++    isSeeking: Boolean,
++    seekPositionProvider: () -> Float,
++    durationMs: Long,
++    onSeekChange: (Float) -> Unit,
++    onSeekFinished: () -> Unit,
++    progressAnimationsEnabled: Boolean,
++    isPlaying: Boolean,
++    onPlayPauseClick: () -> Unit,
++    onPreviousClick: () -> Unit,
++    onNextClick: () -> Unit,
++    onQueueClick: () -> Unit,
++    onLyricsClick: () -> Unit,
++    modifier: Modifier = Modifier,
++    /** A swipe on the album art opens the lyrics, like on the original player page. */
++    coverSwipeModifier: Modifier = Modifier,
++) {
++    val styleViewModel: LyricsStyleViewModel = koinActivityViewModel()
++    val style by styleViewModel.style.collectAsStateWithLifecycle()
++    val playMode by playerViewModel.playMode.collectAsStateWithLifecycle()
++    val queue by playerViewModel.currentPlaylist.collectAsStateWithLifecycle()
++    val queueIndex by playerViewModel.currentMediaItemIndex.collectAsStateWithLifecycle()
++    val source by PlaybackSourceHolder.source.collectAsStateWithLifecycle()
++
++    // Playlist name only while the queue is still that playlist; otherwise "Now playing".
++    val playlistName =
++        remember(source, queue) {
++            source?.takeIf { it.matches(queue.map { item -> item.mediaId }) }?.name
++        }
++    val headerTitle = playlistName ?: stringResource(R.string.player_ui_now_playing)
++
++    // The next track of the queue (wraps to the first one).
++    val nextItem =
++        remember(queue, queueIndex) {
++            if (queue.isEmpty()) null else queue[(queueIndex + 1).mod(queue.size)]
++        }
++    val nextTitle = nextItem?.mediaMetadata?.title?.toString() ?: stringResource(R.string.unknown_song)
++    val nextArtwork = nextItem?.mediaMetadata?.artwork()
++
++    // Same blur switches as the lyrics page (the existing top bar / bottom bar blur settings).
++    val blurBehind = style.enhanceHeader && style.headerBlurEnabled
++    val dockSpread = style.enhanceHeader && style.dockBlurEnabled && style.dockBlurAmount > 0 && style.dockSpreadBlur
++
++    val density = LocalDensity.current
++    var barHeightPx by remember { mutableIntStateOf(0) }
++    var dockHeightPx by remember { mutableIntStateOf(0) }
++    val barHeight = with(density) { barHeightPx.toDp() }
++    val dockHeight = with(density) { dockHeightPx.toDp() }
++    val edge = rememberLyricsEdgePadding()
++
++    BoxWithConstraints(modifier = modifier.fillMaxSize()) {
++        val artSize = maxWidth
++        val belowArt = (maxHeight - barHeight - artSize).coerceAtLeast(0.dp)
++        val flipBottomHeight = belowArt * (style.playerUiFlipEnd / 100f)
++
++        // Album art block. It is a blur source, so the top bar / bottom bar blur settings apply to it.
++        Column(modifier = Modifier.fillMaxSize().hazeSource(hazeState, zIndex = 1f)) {
++            FlippedCover(artwork = artwork, size = artSize, height = barHeight, atTop = true)
++            Box(modifier = Modifier.size(artSize).then(coverSwipeModifier)) {
++                AudioCover(artwork = artwork, modifier = Modifier.fillMaxSize())
++            }
++            FlippedCover(artwork = artwork, size = artSize, height = flipBottomHeight, atTop = false)
++        }
++
++        // Song info, lyric line and buttons. The bottom bar is not moved: this area ends above it.
++        Column(
++            modifier =
++                Modifier
++                    .fillMaxSize()
++                    .padding(top = barHeight + artSize, bottom = dockHeight),
++        ) {
++            val scale = style.playerUiInfoSize / 100f
++            Column(
++                modifier =
++                    Modifier
++                        .fillMaxWidth()
++                        .offset(y = style.playerUiInfoPosition.dp)
++                        .padding(start = edge, end = edge, top = 12.dp),
++            ) {
++                Text(
++                    text = title,
++                    fontSize = (26f * scale).sp,
++                    lineHeight = (32f * scale).sp,
++                    fontWeight = FontWeight.Bold,
++                    color = MaterialTheme.colorScheme.onSurface,
++                    maxLines = 1,
++                    overflow = TextOverflow.Ellipsis,
++                )
++                Text(
++                    text = artist,
++                    fontSize = (17f * scale).sp,
++                    lineHeight = (22f * scale).sp,
++                    color = MaterialTheme.colorScheme.onSurfaceVariant,
++                    maxLines = 1,
++                    overflow = TextOverflow.Ellipsis,
++                )
++            }
++
++            Column(
++                modifier = Modifier.weight(1f).fillMaxWidth(),
++                verticalArrangement = Arrangement.SpaceEvenly,
++            ) {
++                // Only the current lyric line. A tap opens the lyrics page.
++                MiniLyric(
++                    onClick = onLyricsClick,
++                    textStyle = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold, fontSize = 20.sp),
++                    textAlign = TextAlign.Start,
++                    textColor = MaterialTheme.colorScheme.onSurface,
++                    horizontalPadding = edge,
++                    modifier = Modifier.fillMaxWidth(),
++                )
++
++                Row(
++                    modifier = Modifier.fillMaxWidth().padding(horizontal = edge),
++                    horizontalArrangement = Arrangement.SpaceBetween,
++                    verticalAlignment = Alignment.CenterVertically,
++                ) {
++                    IconButton(onClick = onPreviousClick, modifier = Modifier.size(NewPlayerControlButtonSize)) {
++                        Icon(
++                            imageVector = Icons.Rounded.FastRewind,
++                            contentDescription = stringResource(R.string.previous_track),
++                            tint = MaterialTheme.colorScheme.onSurface,
++                            modifier = Modifier.size(NewPlayerControlIconSize),
++                        )
++                    }
++                    IconButton(onClick = onPlayPauseClick, modifier = Modifier.size(NewPlayerControlButtonSize)) {
++                        Icon(
++                            imageVector = if (isPlaying) Icons.Rounded.Pause else Icons.Rounded.PlayArrow,
++                            contentDescription = stringResource(if (isPlaying) R.string.pause else R.string.play),
++                            tint = MaterialTheme.colorScheme.onSurface,
++                            modifier = Modifier.size(NewPlayerControlIconSize),
++                        )
++                    }
++                    IconButton(onClick = onNextClick, modifier = Modifier.size(NewPlayerControlButtonSize)) {
++                        Icon(
++                            imageVector = Icons.Rounded.FastForward,
++                            contentDescription = stringResource(R.string.next_track),
++                            tint = MaterialTheme.colorScheme.onSurface,
++                            modifier = Modifier.size(NewPlayerControlIconSize),
++                        )
++                    }
++                }
++            }
++        }
++
++        // Top bar blur layer (same as the lyrics page), then the shared top bar.
++        if (blurBehind && style.headerBlurAmount > 0) {
++            LyricsHeaderBlurLayer(
++                hazeState = hazeState,
++                blurRadius = style.headerBlurAmount.dp,
++                barHeight = barHeight,
++                fade = if (style.headerSoftEdge) style.headerEdgeFade.dp else 0.dp,
++                optimizeQuality = if (style.headerBlurOptimize) style.headerBlurQuality else null,
++                modifier = Modifier.align(Alignment.TopCenter),
++            )
++        }
++
++        FullscreenLyricsHeader(
++            title = title,
++            artist = artist,
++            artwork = artwork,
++            isLike = isLike,
++            onLikeClick = onLikeClick,
++            album = null,
++            releaseYear = null,
++            isSeeking = isSeeking,
++            seekPositionProvider = seekPositionProvider,
++            durationMs = durationMs,
++            onSeekChange = onSeekChange,
++            onSeekFinished = onSeekFinished,
++            progressAnimationsEnabled = progressAnimationsEnabled,
++            onBarHeightChange = { barHeightPx = it },
++            modifier = Modifier.align(Alignment.TopCenter),
++            titleOverride = headerTitle,
++            timeAsInfo = true,
++            verticalPaddingOverride = style.playerUiTopPadding.dp,
++        )
++
++        // Bottom bar "spread" blur layer (same as the lyrics page), then the shared bottom bar.
++        if (dockSpread) {
++            LyricsHeaderBlurLayer(
++                hazeState = hazeState,
++                blurRadius = style.dockBlurAmount.dp,
++                barHeight = dockHeight,
++                fade = if (style.dockSoftEdge) style.dockEdgeFade.dp else 0.dp,
++                fadeOnTop = true,
++                optimizeQuality = if (style.dockBlurOptimize) style.dockBlurQuality else null,
++                modifier = Modifier.align(Alignment.BottomCenter),
++            )
++        }
++
++        LyricsBottomBar(
++            artist = stringResource(R.string.player_ui_next_track),
++            artwork = nextArtwork,
++            isPlaying = isPlaying,
++            onPlayPauseClick = onPlayPauseClick,
++            seekPositionProvider = seekPositionProvider,
++            durationMs = durationMs,
++            hazeState = hazeState,
++            onHeightChange = { dockHeightPx = it },
++            modifier = Modifier.align(Alignment.BottomCenter),
++            player =
++                PlayerDockState(
++                    nextTitle = nextTitle,
++                    playMode = playMode,
++                    onMixClick = {
++                        playerViewModel.setPlayMode(
++                            if (playMode == PlayMode.SHUFFLE) PlayMode.LOOP else PlayMode.SHUFFLE,
++                        )
++                    },
++                    onRepeatClick = {
++                        playerViewModel.setPlayMode(
++                            if (playMode == PlayMode.LIST) PlayMode.LOOP else PlayMode.LIST,
++                        )
++                    },
++                    onQueueClick = onQueueClick,
++                ),
++        )
++    }
++}
++
++/**
++ * A flipped copy of the album art: [atTop] = the mirror image above the art (its bottom edge touches the art),
++ * otherwise the mirror image below it (its top edge touches the art). Plain copy: no blur and no shadow,
++ * the blur comes from the existing top bar / bottom bar blur settings.
++ */
++@Composable
++private fun FlippedCover(
++    artwork: MusicArtwork?,
++    size: Dp,
++    height: Dp,
++    atTop: Boolean,
++) {
++    Box(
++        modifier =
++            Modifier
++                .width(size)
++                .height(height)
++                .clipToBounds(),
++    ) {
++        AudioCover(
++            artwork = artwork,
++            modifier =
++                Modifier
++                    .align(if (atTop) Alignment.BottomCenter else Alignment.TopCenter)
++                    .requiredSize(size, size)
++                    .graphicsLayer { scaleY = -1f },
++        )
++    }
++}
+diff --git a/app/src/main/java/me/spica27/spicamusic/ui/player/PlaybackSourceHolder.kt b/app/src/main/java/me/spica27/spicamusic/ui/player/PlaybackSourceHolder.kt
+new file mode 100644
+index 0000000..0b7badf
+--- /dev/null
++++ b/app/src/main/java/me/spica27/spicamusic/ui/player/PlaybackSourceHolder.kt
+@@ -0,0 +1,29 @@
++package me.spica27.spicamusic.ui.player
++
++import kotlinx.coroutines.flow.MutableStateFlow
++import kotlinx.coroutines.flow.StateFlow
++import kotlinx.coroutines.flow.asStateFlow
++
++/**
++ * Remembers the playlist the current queue was started from, so the new player UI can show its name.
++ * The name is only shown while the queue still holds the same songs (see [PlaybackSource.matches]).
++ */
++object PlaybackSourceHolder {
++    private val _source = MutableStateFlow<PlaybackSource?>(null)
++    val source: StateFlow<PlaybackSource?> = _source.asStateFlow()
++
++    fun set(
++        name: String?,
++        mediaIds: List<String>,
++    ) {
++        _source.value = if (name.isNullOrBlank()) null else PlaybackSource(name, mediaIds.toSet())
++    }
++}
++
++data class PlaybackSource(
++    val name: String,
++    val mediaIds: Set<String>,
++) {
++    /** true when the queue holds exactly the songs of this playlist. */
++    fun matches(queueMediaIds: Collection<String>): Boolean = queueMediaIds.size == mediaIds.size && queueMediaIds.toSet() == mediaIds
++}
+diff --git a/app/src/main/java/me/spica27/spicamusic/ui/playlistdetail/PlaylistDetailViewModel.kt b/app/src/main/java/me/spica27/spicamusic/ui/playlistdetail/PlaylistDetailViewModel.kt
+index cd3c7bd..6ebc5c4 100644
+--- a/app/src/main/java/me/spica27/spicamusic/ui/playlistdetail/PlaylistDetailViewModel.kt
++++ b/app/src/main/java/me/spica27/spicamusic/ui/playlistdetail/PlaylistDetailViewModel.kt
+@@ -29,6 +29,7 @@ import me.spica27.spicamusic.feature.library.domain.PlaylistUseCases
+ import me.spica27.spicamusic.feature.library.domain.SongUseCases
+ import me.spica27.spicamusic.feature.player.domain.PlayerUseCases
+ import me.spica27.spicamusic.player.api.PlayerAction
++import me.spica27.spicamusic.ui.player.PlaybackSourceHolder
+ import timber.log.Timber
+ 
+ /**
+@@ -235,6 +236,7 @@ class PlaylistDetailViewModel(
+                         start = true,
+                     ),
+                 )
++                PlaybackSourceHolder.set(playlist.value?.playlistName, ids.map { it.toString() })
+                 Timber.d("开始播放歌单")
+             } catch (e: Exception) {
+                 Timber.e(e, "播放歌单失败")
+@@ -261,6 +263,7 @@ class PlaylistDetailViewModel(
+                         start = true,
+                     ),
+                 )
++                PlaybackSourceHolder.set(playlist.value?.playlistName, ids.map { it.toString() })
+                 Timber.d("播放歌曲: ${song.displayName}")
+             } catch (e: Exception) {
+                 Timber.e(e, "播放歌曲失败")
+diff --git a/app/src/main/java/me/spica27/spicamusic/ui/settings/SettingsScene.kt b/app/src/main/java/me/spica27/spicamusic/ui/settings/SettingsScene.kt
+index 30b0a80..97e4238 100644
+--- a/app/src/main/java/me/spica27/spicamusic/ui/settings/SettingsScene.kt
++++ b/app/src/main/java/me/spica27/spicamusic/ui/settings/SettingsScene.kt
+@@ -105,6 +105,7 @@ import me.spica27.spicamusic.ui.navigation.IgnoredSongsRoute
+ import me.spica27.spicamusic.ui.navigation.LocalBackStack
+ import me.spica27.spicamusic.ui.navigation.SleepTimerRoute
+ import me.spica27.spicamusic.ui.player.LocalPlayerViewModel
++import me.spica27.spicamusic.ui.player.LyricsStyleViewModel
+ import me.spica27.spicamusic.ui.player.formatSleepTimerRemaining
+ import me.spica27.spicamusic.ui.theme.EaseOutEmphasized
+ import me.spica27.spicamusic.ui.theme.LayoutTokens
+@@ -121,6 +122,7 @@ import me.spica27.spicamusic.ui.widget.VerseMeshSettings
+ import me.spica27.spicamusic.ui.widget.VerseThemeMode
+ import me.spica27.spicamusic.ui.widget.clickHighlight
+ import me.spica27.spicamusic.ui.widget.rememberIOSOverScrollEffect
++import org.koin.compose.viewmodel.koinActivityViewModel
+ import org.koin.compose.viewmodel.koinViewModel
+ 
+ /**
+@@ -149,6 +151,9 @@ fun SettingsScreen() {
+     val coverTapValue by viewModel.dynamicCoverType.collectAsStateWithLifecycle()
+     val progressWaveformValue by viewModel.progressBarStyle.collectAsStateWithLifecycle()
+     val colorStyleValue by viewModel.themeColorStyle.collectAsStateWithLifecycle()
++    // New player UI switch (stored with the lyrics / player style settings)
++    val playerStyleViewModel: LyricsStyleViewModel = koinActivityViewModel()
++    val playerStyle by playerStyleViewModel.style.collectAsStateWithLifecycle()
+     val playerViewModel = LocalPlayerViewModel.current
+     val sleepTimer by playerViewModel.sleepTimer.collectAsStateWithLifecycle()
+ 
+@@ -375,6 +380,14 @@ fun SettingsScreen() {
+                         onExpandChange = { expandedRowKey = it },
+                         onValueChange = viewModel::setProgressBarStyle,
+                     )
++                    SettingsItemDivider()
++                    SwitchRow(
++                        title = stringResource(R.string.player_ui_new_title),
++                        summary = stringResource(R.string.player_ui_new_subtitle),
++                        icon = Icons.Default.Layers,
++                        checked = playerStyle.newPlayerUi,
++                        onCheckedChange = { v -> playerStyleViewModel.update { it.copy(newPlayerUi = v) } },
++                    )
+                 }
+             }
+ 
+diff --git a/app/src/main/java/me/spica27/spicamusic/ui/widget/FloatingLyricsToolbar.kt b/app/src/main/java/me/spica27/spicamusic/ui/widget/FloatingLyricsToolbar.kt
+index 928b415..dced11e 100644
+--- a/app/src/main/java/me/spica27/spicamusic/ui/widget/FloatingLyricsToolbar.kt
++++ b/app/src/main/java/me/spica27/spicamusic/ui/widget/FloatingLyricsToolbar.kt
+@@ -120,6 +120,8 @@ fun LyricsToolbarMenuContent(
+     onOpenLyricsSettings: () -> Unit,
+     onOpenLyricsSwitcher: () -> Unit,
+     modifier: Modifier = Modifier,
++    /** Opens the player UI settings. null = the entry is not shown. */
++    onOpenPlayerUiSettings: (() -> Unit)? = null,
+ ) {
+     Column(
+         modifier = modifier,
+@@ -139,6 +141,11 @@ fun LyricsToolbarMenuContent(
+ 
+         // 切换歌词来源按钮（常驻：无内嵌/在线时用户仍可进入选择本地文件）
+         SwitchLyricsButton(onClick = onOpenLyricsSwitcher)
++
++        // Player UI settings, right below "Toggle lyrics"
++        if (onOpenPlayerUiSettings != null) {
++            PlayerUiSettingsButton(onClick = onOpenPlayerUiSettings)
++        }
+     }
+ }
+ 
+@@ -250,6 +257,33 @@ private fun SwitchLyricsButton(
+     }
+ }
+ 
++/**
++ * Player UI settings button (below "Toggle lyrics").
++ */
++@Composable
++private fun PlayerUiSettingsButton(
++    onClick: () -> Unit,
++    modifier: Modifier = Modifier,
++) {
++    LyricsPill(
++        modifier = modifier,
++        onClick = onClick,
++        shape = Shapes.ExtraLargeCornerBasedShape,
++    ) {
++        Icon(
++            imageVector = Icons.Rounded.Tune,
++            contentDescription = null,
++            tint = MaterialTheme.colorScheme.onSurface,
++            modifier = Modifier.size(18.dp),
++        )
++        Text(
++            text = stringResource(R.string.player_ui_settings),
++            style = LyricsControlDefaults.pillLabelTextStyle,
++            color = MaterialTheme.colorScheme.onSurface,
++        )
++    }
++}
++
+ /**
+  * 工具栏小按钮
+  */
+diff --git a/app/src/main/java/me/spica27/spicamusic/ui/widget/PlayerUiSettingsSheet.kt b/app/src/main/java/me/spica27/spicamusic/ui/widget/PlayerUiSettingsSheet.kt
+new file mode 100644
+index 0000000..e541487
+--- /dev/null
++++ b/app/src/main/java/me/spica27/spicamusic/ui/widget/PlayerUiSettingsSheet.kt
+@@ -0,0 +1,95 @@
++package me.spica27.spicamusic.ui.widget
++
++import androidx.compose.foundation.layout.Column
++import androidx.compose.foundation.layout.fillMaxWidth
++import androidx.compose.foundation.layout.navigationBarsPadding
++import androidx.compose.foundation.layout.padding
++import androidx.compose.foundation.rememberScrollState
++import androidx.compose.foundation.verticalScroll
++import androidx.compose.material3.ExperimentalMaterial3Api
++import androidx.compose.material3.ModalBottomSheet
++import androidx.compose.material3.rememberModalBottomSheetState
++import androidx.compose.runtime.Composable
++import androidx.compose.ui.Modifier
++import androidx.compose.ui.res.stringResource
++import androidx.compose.ui.unit.dp
++import me.spica27.spicamusic.R
++import me.spica27.spicamusic.core.preferences.LyricsStyleSettings
++
++/**
++ * Settings sheet of the new player UI (opened from the three-dots menu, below "Toggle lyrics").
++ *
++ * The blur of the top bar and the bottom bar uses the existing lyrics header and bottom bar settings,
++ * and the bottom bar padding is the existing bottom bar setting, so they are not repeated here.
++ */
++@OptIn(ExperimentalMaterial3Api::class)
++@Composable
++fun PlayerUiSettingsSheet(
++    settings: LyricsStyleSettings,
++    onUpdate: ((LyricsStyleSettings) -> LyricsStyleSettings) -> Unit,
++    onDismiss: () -> Unit,
++) {
++    ModalBottomSheet(
++        onDismissRequest = onDismiss,
++        sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
++    ) {
++        Column(
++            modifier =
++                Modifier
++                    .fillMaxWidth()
++                    .verticalScroll(rememberScrollState())
++                    .padding(horizontal = 24.dp)
++                    .navigationBarsPadding()
++                    .padding(bottom = 24.dp),
++        ) {
++            LyricsSettingsSection(stringResource(R.string.player_ui_settings))
++
++            LyricsSettingsToggle(
++                label = stringResource(R.string.player_ui_new_title),
++                description = stringResource(R.string.player_ui_new_subtitle),
++                checked = settings.newPlayerUi,
++                onCheckedChange = { v -> onUpdate { it.copy(newPlayerUi = v) } },
++            )
++
++            val dp: (Int) -> String = { "$it dp" }
++            val percent: (Int) -> String = { "$it%" }
++
++            LyricsSettingsSlider(
++                label = stringResource(R.string.player_ui_set_top_padding),
++                description = "",
++                value = settings.playerUiTopPadding,
++                range = LyricsStyleSettings.PLAYER_UI_TOP_PADDING_RANGE,
++                step = 1,
++                valueText = dp,
++                onValueChange = { v -> onUpdate { it.copy(playerUiTopPadding = v) } },
++            )
++            LyricsSettingsSlider(
++                label = stringResource(R.string.player_ui_set_info_position),
++                description = "",
++                value = settings.playerUiInfoPosition,
++                range = LyricsStyleSettings.PLAYER_UI_INFO_POSITION_RANGE,
++                step = 1,
++                valueText = dp,
++                onValueChange = { v -> onUpdate { it.copy(playerUiInfoPosition = v) } },
++            )
++            LyricsSettingsSlider(
++                label = stringResource(R.string.player_ui_set_info_size),
++                description = "",
++                value = settings.playerUiInfoSize,
++                range = LyricsStyleSettings.PLAYER_UI_INFO_SIZE_RANGE,
++                step = 1,
++                valueText = percent,
++                onValueChange = { v -> onUpdate { it.copy(playerUiInfoSize = v) } },
++            )
++            LyricsSettingsSlider(
++                label = stringResource(R.string.player_ui_set_flip_end),
++                description = "",
++                value = settings.playerUiFlipEnd,
++                range = LyricsStyleSettings.PLAYER_UI_FLIP_END_RANGE,
++                step = 1,
++                valueText = percent,
++                onValueChange = { v -> onUpdate { it.copy(playerUiFlipEnd = v) } },
++            )
++        }
++    }
++}
+diff --git a/app/src/main/res/values-zh-rTW/strings.xml b/app/src/main/res/values-zh-rTW/strings.xml
+index b8cb88c..d0e9ac5 100644
+--- a/app/src/main/res/values-zh-rTW/strings.xml
++++ b/app/src/main/res/values-zh-rTW/strings.xml
+@@ -1218,4 +1218,16 @@
+   <string name="glass_mode_lens">折射透鏡</string>
+   <string name="glass_saturation">色彩增強</string>
+   <string name="glass_saturation_desc">透出背景的飽和度（僅磨砂）</string>
++  <string name="player_ui_new_title">新播放器介面</string>
++  <string name="player_ui_new_subtitle">播放頁使用與歌詞頁相同風格的頂欄和底欄</string>
++  <string name="player_ui_settings">播放器介面設定</string>
++  <string name="player_ui_set_top_padding">頂欄邊距</string>
++  <string name="player_ui_set_info_position">標題與歌手位置</string>
++  <string name="player_ui_set_info_size">標題與歌手大小</string>
++  <string name="player_ui_set_flip_end">翻轉封面結束位置</string>
++  <string name="player_ui_now_playing">正在播放</string>
++  <string name="player_ui_next_track">下一首</string>
++  <string name="player_ui_mix">隨機</string>
++  <string name="player_ui_repeat">循環</string>
++  <string name="player_ui_queue">播放佇列</string>
+ </resources>
+diff --git a/app/src/main/res/values-zh/strings.xml b/app/src/main/res/values-zh/strings.xml
+index ddba4f6..1b65ac8 100644
+--- a/app/src/main/res/values-zh/strings.xml
++++ b/app/src/main/res/values-zh/strings.xml
+@@ -1219,4 +1219,16 @@
+   <string name="glass_mode_lens">折射透镜</string>
+   <string name="glass_saturation">色彩增强</string>
+   <string name="glass_saturation_desc">透出背景的饱和度（仅磨砂）</string>
++  <string name="player_ui_new_title">新播放器界面</string>
++  <string name="player_ui_new_subtitle">播放页使用与歌词页相同风格的顶栏和底栏</string>
++  <string name="player_ui_settings">播放器界面设置</string>
++  <string name="player_ui_set_top_padding">顶栏边距</string>
++  <string name="player_ui_set_info_position">标题与歌手位置</string>
++  <string name="player_ui_set_info_size">标题与歌手大小</string>
++  <string name="player_ui_set_flip_end">翻转封面结束位置</string>
++  <string name="player_ui_now_playing">正在播放</string>
++  <string name="player_ui_next_track">下一首</string>
++  <string name="player_ui_mix">随机</string>
++  <string name="player_ui_repeat">循环</string>
++  <string name="player_ui_queue">播放队列</string>
+ </resources>
+diff --git a/app/src/main/res/values/strings.xml b/app/src/main/res/values/strings.xml
+index 7f673ce..d1eb45a 100644
+--- a/app/src/main/res/values/strings.xml
++++ b/app/src/main/res/values/strings.xml
+@@ -1219,4 +1219,16 @@
+   <string name="glass_mode_lens">Refraction lens</string>
+   <string name="glass_saturation">Color boost</string>
+   <string name="glass_saturation_desc">Saturation of what shows through (frosted only)</string>
++  <string name="player_ui_new_title">New player UI</string>
++  <string name="player_ui_new_subtitle">The player page uses the lyrics-style top and bottom bars</string>
++  <string name="player_ui_settings">Player UI settings</string>
++  <string name="player_ui_set_top_padding">Top bar padding</string>
++  <string name="player_ui_set_info_position">Title and artist position</string>
++  <string name="player_ui_set_info_size">Title and artist size</string>
++  <string name="player_ui_set_flip_end">Flipped cover end position</string>
++  <string name="player_ui_now_playing">Now playing</string>
++  <string name="player_ui_next_track">Next track</string>
++  <string name="player_ui_mix">Mix</string>
++  <string name="player_ui_repeat">Repeat</string>
++  <string name="player_ui_queue">Queue</string>
+ </resources>
+diff --git a/core-preferences/src/main/java/me/spica27/spicamusic/core/preferences/LyricsStyleSettings.kt b/core-preferences/src/main/java/me/spica27/spicamusic/core/preferences/LyricsStyleSettings.kt
+index 5ffaffa..8a33374 100644
+--- a/core-preferences/src/main/java/me/spica27/spicamusic/core/preferences/LyricsStyleSettings.kt
++++ b/core-preferences/src/main/java/me/spica27/spicamusic/core/preferences/LyricsStyleSettings.kt
+@@ -306,6 +306,17 @@ data class LyricsStyleSettings(
+     val kineticFontCount: Int = 2,
+     /** Ids of the chosen fonts, comma separated, in order. */
+     val kineticFonts: String = "sans,serif,mono,cursive",
++    // ---- New player UI (the player page uses the lyrics-style top and bottom bars) ----
++    /** On: the player page is the new player UI. Off: the original player page. */
++    val newPlayerUi: Boolean = false,
++    /** Space above and below the top bar row, in dp. */
++    val playerUiTopPadding: Int = 12,
++    /** Size of the song title and artist under the album art, in percent. */
++    val playerUiInfoSize: Int = 100,
++    /** Moves the song title and artist up (negative) or down (positive), in dp. */
++    val playerUiInfoPosition: Int = 0,
++    /** How far the flipped album art under the cover reaches down, in percent of the free space. */
++    val playerUiFlipEnd: Int = 100,
+ ) {
+     /** Returns a copy with every value forced into its allowed range. */
+     fun sanitized(): LyricsStyleSettings =
+@@ -382,6 +393,10 @@ data class LyricsStyleSettings(
+             kineticGlowIntensity = kineticGlowIntensity.coerceIn(KINETIC_GLOW_INTENSITY_RANGE),
+             kineticFontCount = kineticFontCount.coerceIn(KINETIC_FONT_COUNT_RANGE),
+             kineticStyles = kineticStyles.ifEmpty { setOf(KineticStyle.Auto) },
++            playerUiTopPadding = playerUiTopPadding.coerceIn(PLAYER_UI_TOP_PADDING_RANGE),
++            playerUiInfoSize = playerUiInfoSize.coerceIn(PLAYER_UI_INFO_SIZE_RANGE),
++            playerUiInfoPosition = playerUiInfoPosition.coerceIn(PLAYER_UI_INFO_POSITION_RANGE),
++            playerUiFlipEnd = playerUiFlipEnd.coerceIn(PLAYER_UI_FLIP_END_RANGE),
+         )
+ 
+     companion object {
+@@ -447,6 +462,10 @@ data class LyricsStyleSettings(
+         val KINETIC_BG_FRAME_RANGE = 0..360
+         val KINETIC_GLOW_INTENSITY_RANGE = 20..200
+         val KINETIC_FONT_COUNT_RANGE = 2..4
++        val PLAYER_UI_TOP_PADDING_RANGE = 0..40
++        val PLAYER_UI_INFO_SIZE_RANGE = 70..140
++        val PLAYER_UI_INFO_POSITION_RANGE = -30..60
++        val PLAYER_UI_FLIP_END_RANGE = 0..100
+         const val BG_REVEAL_STYLE_CLASSIC = 0
+         const val BG_REVEAL_STYLE_FLIP = 1
+     }
+diff --git a/core-preferences/src/main/java/me/spica27/spicamusic/core/preferences/PreferencesManager.kt b/core-preferences/src/main/java/me/spica27/spicamusic/core/preferences/PreferencesManager.kt
+index c2546a1..53add1d 100644
+--- a/core-preferences/src/main/java/me/spica27/spicamusic/core/preferences/PreferencesManager.kt
++++ b/core-preferences/src/main/java/me/spica27/spicamusic/core/preferences/PreferencesManager.kt
+@@ -187,6 +187,11 @@ class PreferencesManager(
+         val LYRIC_KINETIC_FONT_MIX = booleanPreferencesKey("lyric_kinetic_font_mix")
+         val LYRIC_KINETIC_FONT_COUNT = intPreferencesKey("lyric_kinetic_font_count")
+         val LYRIC_KINETIC_FONTS = stringPreferencesKey("lyric_kinetic_fonts")
++        val PLAYER_UI_NEW = booleanPreferencesKey("player_ui_new")
++        val PLAYER_UI_TOP_PADDING = intPreferencesKey("player_ui_top_padding")
++        val PLAYER_UI_INFO_SIZE = intPreferencesKey("player_ui_info_size")
++        val PLAYER_UI_INFO_POSITION = intPreferencesKey("player_ui_info_position")
++        val PLAYER_UI_FLIP_END = intPreferencesKey("player_ui_flip_end")
+     }
+ 
+ 
+@@ -318,6 +323,11 @@ class PreferencesManager(
+                     kineticFontMix = p[Keys.LYRIC_KINETIC_FONT_MIX] ?: d.kineticFontMix,
+                     kineticFontCount = p[Keys.LYRIC_KINETIC_FONT_COUNT] ?: d.kineticFontCount,
+                     kineticFonts = p[Keys.LYRIC_KINETIC_FONTS] ?: d.kineticFonts,
++                    newPlayerUi = p[Keys.PLAYER_UI_NEW] ?: d.newPlayerUi,
++                    playerUiTopPadding = p[Keys.PLAYER_UI_TOP_PADDING] ?: d.playerUiTopPadding,
++                    playerUiInfoSize = p[Keys.PLAYER_UI_INFO_SIZE] ?: d.playerUiInfoSize,
++                    playerUiInfoPosition = p[Keys.PLAYER_UI_INFO_POSITION] ?: d.playerUiInfoPosition,
++                    playerUiFlipEnd = p[Keys.PLAYER_UI_FLIP_END] ?: d.playerUiFlipEnd,
+                 ).sanitized()
+             }.distinctUntilChanged()
+ 
+@@ -449,6 +459,11 @@ class PreferencesManager(
+                     kineticFontMix = p[Keys.LYRIC_KINETIC_FONT_MIX] ?: d.kineticFontMix,
+                     kineticFontCount = p[Keys.LYRIC_KINETIC_FONT_COUNT] ?: d.kineticFontCount,
+                     kineticFonts = p[Keys.LYRIC_KINETIC_FONTS] ?: d.kineticFonts,
++                    newPlayerUi = p[Keys.PLAYER_UI_NEW] ?: d.newPlayerUi,
++                    playerUiTopPadding = p[Keys.PLAYER_UI_TOP_PADDING] ?: d.playerUiTopPadding,
++                    playerUiInfoSize = p[Keys.PLAYER_UI_INFO_SIZE] ?: d.playerUiInfoSize,
++                    playerUiInfoPosition = p[Keys.PLAYER_UI_INFO_POSITION] ?: d.playerUiInfoPosition,
++                    playerUiFlipEnd = p[Keys.PLAYER_UI_FLIP_END] ?: d.playerUiFlipEnd,
+                 )
+             val n = transform(current).sanitized()
+             p[Keys.LYRIC_FONT_STYLE] = n.fontStyle
+@@ -571,6 +586,11 @@ class PreferencesManager(
+             p[Keys.LYRIC_KINETIC_FONT_MIX] = n.kineticFontMix
+             p[Keys.LYRIC_KINETIC_FONT_COUNT] = n.kineticFontCount
+             p[Keys.LYRIC_KINETIC_FONTS] = n.kineticFonts
++            p[Keys.PLAYER_UI_NEW] = n.newPlayerUi
++            p[Keys.PLAYER_UI_TOP_PADDING] = n.playerUiTopPadding
++            p[Keys.PLAYER_UI_INFO_SIZE] = n.playerUiInfoSize
++            p[Keys.PLAYER_UI_INFO_POSITION] = n.playerUiInfoPosition
++            p[Keys.PLAYER_UI_FLIP_END] = n.playerUiFlipEnd
+         }
+     }
+ 
