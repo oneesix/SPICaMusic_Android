@@ -15,6 +15,11 @@ enum class MusicTopBarSetting {
     Width,
     Height,
     LabelMode,
+    Blur,
+    BlurAmount,
+    BlurPosition,
+    SoftEdge,
+    EdgeFade,
 }
 
 /**
@@ -22,6 +27,8 @@ enum class MusicTopBarSetting {
  * - Horizontal：0（左）~100（右），Top：距状态栏的偏移 dp，Width：占可用宽度的百分比。
  * - Height：0 或小于 44 表示自动（44 dp）。
  * - LabelMode 复用底栏的标签显示方式（图标+文字 / 仅图标 / 仅文字）。
+ * - Blur：顶栏后面的渐进模糊（1 开 / 0 关）；BlurAmount 模糊半径 dp；BlurPosition 模糊下沿相对顶栏下沿的偏移 dp（可为负）；
+ *   SoftEdge 1 时模糊在下沿渐隐，EdgeFade 为渐隐高度 dp。
  */
 @Immutable
 data class MusicTopBarCustomization(
@@ -30,6 +37,11 @@ data class MusicTopBarCustomization(
     val width: Int = 92,
     val height: Int = 0,
     val labelMode: Int = BottomBarLabelMode.IconAndText,
+    val blur: Int = 1,
+    val blurAmount: Int = 12,
+    val blurPosition: Int = 8,
+    val softEdge: Int = 1,
+    val edgeFade: Int = 24,
 ) {
     fun valueOf(setting: MusicTopBarSetting): Int =
         when (setting) {
@@ -38,6 +50,11 @@ data class MusicTopBarCustomization(
             MusicTopBarSetting.Width -> width
             MusicTopBarSetting.Height -> height
             MusicTopBarSetting.LabelMode -> labelMode
+            MusicTopBarSetting.Blur -> blur
+            MusicTopBarSetting.BlurAmount -> blurAmount
+            MusicTopBarSetting.BlurPosition -> blurPosition
+            MusicTopBarSetting.SoftEdge -> softEdge
+            MusicTopBarSetting.EdgeFade -> edgeFade
         }
 
     companion object {
@@ -48,6 +65,11 @@ data class MusicTopBarCustomization(
                 width = values[2],
                 height = values[3],
                 labelMode = values[4],
+                blur = values[5],
+                blurAmount = values[6],
+                blurPosition = values[7],
+                softEdge = values[8],
+                edgeFade = values[9],
             )
     }
 }
@@ -59,6 +81,11 @@ internal fun MusicTopBarSetting.preferenceKey() =
         MusicTopBarSetting.Width -> PreferencesManager.Keys.MUSIC_TOP_BAR_W
         MusicTopBarSetting.Height -> PreferencesManager.Keys.MUSIC_TOP_BAR_HEIGHT
         MusicTopBarSetting.LabelMode -> PreferencesManager.Keys.MUSIC_TOP_BAR_LABEL_MODE
+        MusicTopBarSetting.Blur -> PreferencesManager.Keys.MUSIC_TOP_BAR_BLUR
+        MusicTopBarSetting.BlurAmount -> PreferencesManager.Keys.MUSIC_TOP_BAR_BLUR_AMOUNT
+        MusicTopBarSetting.BlurPosition -> PreferencesManager.Keys.MUSIC_TOP_BAR_BLUR_POSITION
+        MusicTopBarSetting.SoftEdge -> PreferencesManager.Keys.MUSIC_TOP_BAR_SOFT_EDGE
+        MusicTopBarSetting.EdgeFade -> PreferencesManager.Keys.MUSIC_TOP_BAR_EDGE_FADE
     }
 
 internal fun MusicTopBarSetting.defaultValue(): Int = MusicTopBarCustomization().valueOf(this)

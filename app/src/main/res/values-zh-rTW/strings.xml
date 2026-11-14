@@ -1222,4 +1222,12 @@
   <string name="mtb_subtitle">移動、調整大小並自訂音樂頁的懸浮頂欄。</string>
   <string name="mtb_top">頂部偏移</string>
   <string name="mtb_reset">重設頂欄</string>
+  <string name="mtb_blur">頂部模糊</string>
+  <string name="mtb_blur_sub">列表在模糊的頂欄後滾動。關閉則只顯示一條細線。</string>
+  <string name="mtb_blur_amount">模糊強度</string>
+  <string name="mtb_blur_position">模糊位置</string>
+  <string name="mtb_blur_position_sub">模糊延伸到頂欄下方的距離</string>
+  <string name="mtb_blur_soft">柔和邊緣</string>
+  <string name="mtb_blur_soft_sub">模糊在頂欄下方漸隱，而不是硬邊</string>
+  <string name="mtb_blur_fade">漸隱高度</string>
 </resources>

@@ -14,6 +14,7 @@ import me.spica27.spicamusic.ui.home.player_bar.BottomBarLabelMode
 import me.spica27.spicamusic.ui.widget.LyricsSettingsChips
 import me.spica27.spicamusic.ui.widget.LyricsSettingsResetButton
 import me.spica27.spicamusic.ui.widget.LyricsSettingsSlider
+import me.spica27.spicamusic.ui.widget.LyricsSettingsToggle
 
 /** 音乐页悬浮顶栏自定义：位置、尺寸、标签内容；玻璃效果沿用设置页的液态玻璃开关。 */
 @Composable
@@ -82,6 +83,49 @@ internal fun MusicTopBarSettingsContent(
             },
             onSelect = { onInt(MusicTopBarSetting.LabelMode, it) },
         )
+        LyricsSettingsToggle(
+            label = stringResource(R.string.mtb_blur),
+            description = stringResource(R.string.mtb_blur_sub),
+            checked = custom.blur == 1,
+            onCheckedChange = { onInt(MusicTopBarSetting.Blur, if (it) 1 else 0) },
+        )
+        if (custom.blur == 1) {
+            LyricsSettingsSlider(
+                label = stringResource(R.string.mtb_blur_amount),
+                description = "",
+                value = custom.blurAmount,
+                range = 0..40,
+                step = 1,
+                valueText = { "$it dp" },
+                onValueChange = { onInt(MusicTopBarSetting.BlurAmount, it) },
+            )
+            LyricsSettingsSlider(
+                label = stringResource(R.string.mtb_blur_position),
+                description = stringResource(R.string.mtb_blur_position_sub),
+                value = custom.blurPosition,
+                range = -50..120,
+                step = 1,
+                valueText = { "$it dp" },
+                onValueChange = { onInt(MusicTopBarSetting.BlurPosition, it) },
+            )
+            LyricsSettingsToggle(
+                label = stringResource(R.string.mtb_blur_soft),
+                description = stringResource(R.string.mtb_blur_soft_sub),
+                checked = custom.softEdge == 1,
+                onCheckedChange = { onInt(MusicTopBarSetting.SoftEdge, if (it) 1 else 0) },
+            )
+            if (custom.softEdge == 1) {
+                LyricsSettingsSlider(
+                    label = stringResource(R.string.mtb_blur_fade),
+                    description = "",
+                    value = custom.edgeFade,
+                    range = 0..80,
+                    step = 1,
+                    valueText = { "$it dp" },
+                    onValueChange = { onInt(MusicTopBarSetting.EdgeFade, it) },
+                )
+            }
+        }
         LyricsSettingsResetButton(
             text = stringResource(R.string.mtb_reset),
             onClick = onReset,

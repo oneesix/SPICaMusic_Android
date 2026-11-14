@@ -1223,4 +1223,12 @@
   <string name="mtb_subtitle">移动、调整大小并自定义音乐页的悬浮顶栏。</string>
   <string name="mtb_top">顶部偏移</string>
   <string name="mtb_reset">重置顶栏</string>
+  <string name="mtb_blur">顶部模糊</string>
+  <string name="mtb_blur_sub">列表在模糊的顶栏后滚动。关闭则只显示一条细线。</string>
+  <string name="mtb_blur_amount">模糊强度</string>
+  <string name="mtb_blur_position">模糊位置</string>
+  <string name="mtb_blur_position_sub">模糊延伸到顶栏下方的距离</string>
+  <string name="mtb_blur_soft">柔和边缘</string>
+  <string name="mtb_blur_soft_sub">模糊在顶栏下方渐隐，而不是硬边</string>
+  <string name="mtb_blur_fade">渐隐高度</string>
 </resources>

@@ -27,6 +27,14 @@ import androidx.compose.animation.scaleOut
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
 import androidx.compose.animation.togetherWith
+import dev.chrisbanes.haze.hazeSource
+import dev.chrisbanes.haze.blur.hazeBlur
+import dev.chrisbanes.haze.blur.HazeColorEffect
+import dev.chrisbanes.haze.blur.HazeBlurStyle
+import dev.chrisbanes.haze.HazeProgressive
+import dev.chrisbanes.haze.HazePerformanceMode
+import dev.chrisbanes.haze.HazeInput
+import dev.chrisbanes.haze.ExperimentalHazeApi
 import me.spica27.spicamusic.ui.home.player_bar.BottomBarAppearance
 import me.spica27.spicamusic.common.entity.BottomBarLayout
 import androidx.compose.foundation.layout.windowInsetsPadding
@@ -477,7 +485,7 @@ fun MusicPage(bottomContentPadding: Dp = 0.dp) {
         modifier =
             Modifier
                 .fillMaxSize()
-                .liquidGlassSource(glassHazeState)
+                .hazeSource(glassHazeState)
                 .liquidGlassV2Source()
                 .background(MaterialTheme.colorScheme.background),
     ) {
@@ -677,6 +685,8 @@ fun MusicPage(bottomContentPadding: Dp = 0.dp) {
         }
 
         } // 列表图层结束
+
+        MusicTopBlur(hazeState = glassHazeState, custom = barCustom)
 
         MusicFloatingBar(
             selectedTab = selectedTab,
@@ -881,6 +891,84 @@ private fun MusicSegmentedTabs(
     }
 }
 
+/**
+ * 顶栏后面的渐进模糊（和歌词页的顶栏模糊同一思路）：列表在模糊带后面滚动，
+ * 软边开启时模糊在下沿渐隐。模糊带不含自己，只采样下面的列表。
+ */
+@OptIn(ExperimentalHazeApi::class)
+@Composable
+private fun MusicTopBlur(
+    hazeState: HazeState,
+    custom: MusicTopBarCustomization,
+    modifier: Modifier = Modifier,
+) {
+    val colors = MaterialTheme.colorScheme
+    val statusBarTop = WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
+    val background = colors.background
+    val solidHeight =
+        (statusBarTop + custom.top.dp + maxOf(custom.height, 44).dp + custom.blurPosition.dp).coerceAtLeast(0.dp)
+    val blurOn = custom.blur == 1 && custom.blurAmount > 0
+    val soft = custom.softEdge == 1 && custom.edgeFade > 0
+    Box(modifier = modifier.fillMaxWidth()) {
+        if (blurOn) {
+            val amount = custom.blurAmount
+            val hardStyle =
+                remember(background, amount) {
+                    HazeBlurStyle {
+                        blurRadius(amount.dp)
+                        noiseFactor(0f)
+                        backgroundColor(background.copy(alpha = 0.16f))
+                        colorEffects(listOf(HazeColorEffect.tint(background.copy(alpha = 0.4f))))
+                        fallbackColorEffect(HazeColorEffect.tint(background.copy(alpha = 0.85f)))
+                    }
+                }
+            Box(
+                modifier =
+                    Modifier
+                        .fillMaxWidth()
+                        .height(solidHeight)
+                        .hazeBlur(
+                            input = HazeInput.Sources(hazeState),
+                            style = hardStyle,
+                            performanceMode = HazePerformanceMode.Balanced,
+                        ),
+            )
+            if (soft) {
+                val fadeStyle =
+                    remember(background, amount) {
+                        HazeBlurStyle {
+                            blurRadius(amount.dp)
+                            noiseFactor(0f)
+                            backgroundColor(background.copy(alpha = 0.16f))
+                            colorEffects(listOf(HazeColorEffect.tint(background.copy(alpha = 0.4f))))
+                            fallbackColorEffect(HazeColorEffect.tint(background.copy(alpha = 0.85f)))
+                            progressive(HazeProgressive.verticalGradient(startIntensity = 1f, endIntensity = 0f))
+                        }
+                    }
+                Box(
+                    modifier =
+                        Modifier
+                            .offset(y = solidHeight)
+                            .fillMaxWidth()
+                            .height(custom.edgeFade.dp)
+                            .hazeBlur(
+                                input = HazeInput.Sources(hazeState),
+                                style = fadeStyle,
+                                performanceMode = HazePerformanceMode.Balanced,
+                            ),
+                )
+            }
+        }
+        // 没有软边（或模糊关闭）时，用一条细线把顶栏和列表分开。
+        if (!blurOn || !soft) {
+            HorizontalDivider(
+                modifier = Modifier.offset(y = solidHeight),
+                color = colors.outlineVariant.copy(alpha = 0.14f),
+            )
+        }
+    }
+}
+
 private enum class BarPanel { None, Sort, Search }
 
 private val BarGap = 10.dp
@@ -891,8 +979,8 @@ private val MenuGap = 8.dp
 
 /**
  * 悬浮顶栏：左侧分段（歌曲 / 专辑 / 歌手），右侧独立的圆形按钮。
- * 圆形按钮在列表顶部是排序键，滚离顶部后变成搜索键；点击后它自己展开成排序菜单（在顶栏下方）
- * 或搜索栏（铺满顶栏）。玻璃材质复用底栏的 playerBarSurface，所以跟随设置页的液态玻璃开关与调节。
+ * 圆形按钮在列表顶部是排序键，滚离顶部后变成搜索键；点击后它自己展开成排序菜单（在顶栏下方），
+ * 或融进左边的分段，分段向右铺满变成搜索栏。玻璃材质复用底栏的 playerBarSurface，所以跟随设置页的液态玻璃开关与调节。
  */
 @Composable
 private fun MusicFloatingBar(
@@ -935,7 +1023,7 @@ private fun MusicFloatingBar(
     }
 
     val morphSpec: AnimationSpec<Float> =
-        if (reducedMotion) snap() else spring(dampingRatio = 0.82f, stiffness = Spring.StiffnessMediumLow)
+        if (reducedMotion) snap() else spring(dampingRatio = 0.82f, stiffness = 520f)
     val sortP by animateFloatAsState(
         targetValue = if (panel == BarPanel.Sort) 1f else 0f,
         animationSpec = morphSpec,
@@ -987,25 +1075,84 @@ private fun MusicFloatingBar(
             )
         }
 
-        // 分段：排序菜单展开时圆形按钮让出位置，分段向右铺满；搜索展开时被搜索栏盖住。
-        val pillWidth = lerp(barWidth - barHeight - BarGap, barWidth, sortC)
-        if (searchP < 0.99f) {
-            MusicSegmentedTabs(
-                selectedTab = selectedTab,
-                onSelect = onSelectTab,
-                labelMode = custom.labelMode,
-                modifier =
-                    Modifier
-                        .offset(x = barLeft, y = barTop)
-                        .size(pillWidth, barHeight)
-                        .graphicsLayer { alpha = 1f - searchC }
-                        .playerBarSurface(hazeState, container, glassEnabled, RoundedCornerShape(percent = 50), false),
-            )
+        // 同一个玻璃分段：排序菜单或搜索展开时向右铺满；搜索时分段文字淡出、输入框淡入，圆形按钮融进去。
+        val pillWidth = lerp(barWidth - barHeight - BarGap, barWidth, maxOf(sortC, searchC))
+        Box(
+            modifier =
+                Modifier
+                    .offset(x = barLeft, y = barTop)
+                    .size(pillWidth, barHeight)
+                    .playerBarSurface(hazeState, container, glassEnabled, RoundedCornerShape(percent = 50), false),
+        ) {
+            if (searchP < 0.99f) {
+                MusicSegmentedTabs(
+                    selectedTab = selectedTab,
+                    onSelect = onSelectTab,
+                    labelMode = custom.labelMode,
+                    modifier =
+                        Modifier
+                            .fillMaxSize()
+                            .graphicsLayer { alpha = 1f - searchC },
+                )
+            }
+            if (searchP > 0.01f) {
+                Row(
+                    modifier =
+                        Modifier
+                            .fillMaxSize()
+                            .padding(start = 18.dp, end = 4.dp)
+                            .graphicsLayer { alpha = ((searchC - 0.5f) / 0.5f).coerceIn(0f, 1f) },
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Search,
+                        contentDescription = null,
+                        tint = colors.onSurfaceVariant,
+                        modifier = Modifier.size(20.dp),
+                    )
+                    Spacer(Modifier.width(Spacing.Small))
+                    AnimatedCursorTextField(
+                        value = query,
+                        onValueChange = onQueryChange,
+                        modifier = Modifier.weight(1f),
+                        textStyle =
+                            MaterialTheme.typography.bodyMedium.copy(
+                                color = colors.onSurface,
+                            ),
+                        cursorColor = colors.primary,
+                        keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
+                        onImeAction = { close() },
+                        focusRequester = focusRequester,
+                        placeholder = {
+                            Text(
+                                text = searchHint,
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = colors.onSurfaceVariant.copy(alpha = 0.7f),
+                                maxLines = 1,
+                            )
+                        },
+                    )
+                    IconButton(
+                        onClick = {
+                            onQueryChange("")
+                            close()
+                        },
+                        modifier = Modifier.size(40.dp),
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Clear,
+                            contentDescription = null,
+                            tint = colors.onSurfaceVariant,
+                            modifier = Modifier.size(18.dp),
+                        )
+                    }
+                }
+            }
         }
 
-        // 同一个玻璃面板：收起时是圆形按钮，排序时长成菜单，搜索时向左铺满顶栏。
+        // 圆形按钮：收起时是圆形，排序时长成菜单；搜索时淡出并融进左边的分段。
         val panelWidth =
-            (barHeight + (menuWidth - barHeight) * sortP + (barWidth - barHeight) * searchP).coerceAtLeast(barHeight)
+            (barHeight + (menuWidth - barHeight) * sortP).coerceAtLeast(barHeight)
         val panelHeight = barHeight + (menuHeight - barHeight) * sortP
         val panelTop = barTop + (barHeight + MenuGap) * sortP
         val panelLeft = barRight - panelWidth
@@ -1015,7 +1162,13 @@ private fun MusicFloatingBar(
                 Modifier
                     .offset(x = panelLeft, y = panelTop)
                     .size(panelWidth, panelHeight)
-                    .playerBarSurface(hazeState, container, glassEnabled, panelShape, false),
+                    .graphicsLayer {
+                        val melt = 1f - 0.4f * searchC
+                        alpha = 1f - searchC
+                        scaleX = melt
+                        scaleY = melt
+                        translationX = -16.dp.toPx() * searchC
+                    }.playerBarSurface(hazeState, container, glassEnabled, panelShape, false),
         ) {
             Box(
                 modifier =
@@ -1123,61 +1276,6 @@ private fun MusicFloatingBar(
                     }
                 }
 
-                if (searchP > 0.01f) {
-                    Row(
-                        modifier =
-                            Modifier
-                                .width(barWidth)
-                                .height(barHeight)
-                                .align(Alignment.TopEnd)
-                                .padding(start = 18.dp, end = 4.dp)
-                                .graphicsLayer { alpha = ((searchC - 0.5f) / 0.5f).coerceIn(0f, 1f) },
-                        verticalAlignment = Alignment.CenterVertically,
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.Search,
-                            contentDescription = null,
-                            tint = colors.onSurfaceVariant,
-                            modifier = Modifier.size(20.dp),
-                        )
-                        Spacer(Modifier.width(Spacing.Small))
-                        AnimatedCursorTextField(
-                            value = query,
-                            onValueChange = onQueryChange,
-                            modifier = Modifier.weight(1f),
-                            textStyle =
-                                MaterialTheme.typography.bodyMedium.copy(
-                                    color = colors.onSurface,
-                                ),
-                            cursorColor = colors.primary,
-                            keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
-                            onImeAction = { close() },
-                            focusRequester = focusRequester,
-                            placeholder = {
-                                Text(
-                                    text = searchHint,
-                                    style = MaterialTheme.typography.bodyMedium,
-                                    color = colors.onSurfaceVariant.copy(alpha = 0.7f),
-                                    maxLines = 1,
-                                )
-                            },
-                        )
-                        IconButton(
-                            onClick = {
-                                onQueryChange("")
-                                close()
-                            },
-                            modifier = Modifier.size(40.dp),
-                        ) {
-                            Icon(
-                                imageVector = Icons.Default.Clear,
-                                contentDescription = null,
-                                tint = colors.onSurfaceVariant,
-                                modifier = Modifier.size(18.dp),
-                            )
-                        }
-                    }
-                }
             }
         }
     }

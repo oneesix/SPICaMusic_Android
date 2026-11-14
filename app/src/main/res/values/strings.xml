@@ -1223,4 +1223,12 @@
   <string name="mtb_subtitle">Move, resize and restyle the floating bar on the Music tab.</string>
   <string name="mtb_top">Top offset</string>
   <string name="mtb_reset">Reset top bar</string>
+  <string name="mtb_blur">Top blur</string>
+  <string name="mtb_blur_sub">The list scrolls behind a blurred header. Off: a thin line.</string>
+  <string name="mtb_blur_amount">Blur amount</string>
+  <string name="mtb_blur_position">Blur position</string>
+  <string name="mtb_blur_position_sub">How far the blur reaches below the bar</string>
+  <string name="mtb_blur_soft">Soft edge</string>
+  <string name="mtb_blur_soft_sub">The blur fades out below the bar instead of a hard edge</string>
+  <string name="mtb_blur_fade">Edge fade height</string>
 </resources>
