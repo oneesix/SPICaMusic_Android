@@ -1,6 +1,7 @@
 package me.spica27.spicamusic.ui.widget
 
 import android.net.Uri
+import androidx.compose.material3.ColorScheme
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.Immutable
@@ -77,6 +78,26 @@ fun rememberDynamicPlayerColors(
     }
 }
 
+/** The Material colour roles that Color player UI recolours (text, icons, buttons); surfaces stay as they are. */
+internal fun ColorScheme.withDynamicColors(colors: DynamicPlayerColors): ColorScheme =
+    copy(
+        primary = colors.fg,
+        onPrimary = colors.onFg,
+        primaryContainer = colors.fg.copy(alpha = colors.fg.alpha * 0.26f),
+        onPrimaryContainer = colors.fg,
+        secondary = colors.fg,
+        onSecondary = colors.onFg,
+        secondaryContainer = colors.fg.copy(alpha = colors.fg.alpha * 0.26f),
+        onSecondaryContainer = colors.fg,
+        tertiary = colors.fg,
+        onTertiary = colors.onFg,
+        onSurface = colors.fg,
+        onSurfaceVariant = colors.fg2,
+        onBackground = colors.fg,
+        outline = colors.fg2,
+        outlineVariant = colors.fg.copy(alpha = colors.fg.alpha * 0.26f),
+    )
+
 /** Recolours the foreground roles of the Material theme (text, icons, buttons); surfaces stay as they are. */
 @Composable
 fun DynamicPlayerColorScope(
@@ -88,26 +109,7 @@ fun DynamicPlayerColorScope(
         return
     }
     val base = MaterialTheme.colorScheme
-    val scheme =
-        remember(base, colors) {
-            base.copy(
-                primary = colors.fg,
-                onPrimary = colors.onFg,
-                primaryContainer = colors.fg.copy(alpha = colors.fg.alpha * 0.26f),
-                onPrimaryContainer = colors.fg,
-                secondary = colors.fg,
-                onSecondary = colors.onFg,
-                secondaryContainer = colors.fg.copy(alpha = colors.fg.alpha * 0.26f),
-                onSecondaryContainer = colors.fg,
-                tertiary = colors.fg,
-                onTertiary = colors.onFg,
-                onSurface = colors.fg,
-                onSurfaceVariant = colors.fg2,
-                onBackground = colors.fg,
-                outline = colors.fg2,
-                outlineVariant = colors.fg.copy(alpha = colors.fg.alpha * 0.26f),
-            )
-        }
+    val scheme = remember(base, colors) { base.withDynamicColors(colors) }
     MaterialTheme(
         colorScheme = scheme,
         typography = MaterialTheme.typography,
