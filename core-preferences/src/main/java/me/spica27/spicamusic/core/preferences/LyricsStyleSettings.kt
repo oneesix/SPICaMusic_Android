@@ -133,6 +133,8 @@ data class LyricsStyleSettings(
     val dynamicLyricsEnabled: Boolean = false,
     /** Also tint the player background with the album colour (needs [dynamicLyricsEnabled]). */
     val dynamicBackgroundEnabled: Boolean = false,
+    /** How strongly the background colour moves toward the album colour, in percent (22 = the old look). */
+    val dynamicBackgroundStrength: Int = 22,
     /** "auto" follows the app theme, "dark" or "light" forces the tone. */
     val dynamicLyricsMode: String = "auto",
     /** Opacity of the lyrics colour in percent. */
@@ -327,6 +329,7 @@ data class LyricsStyleSettings(
             stretchDurationMs = stretchDurationMs.coerceIn(STRETCH_DURATION_RANGE),
             lightSweepSoftness = lightSweepSoftness.coerceIn(LIGHT_SWEEP_SOFTNESS_RANGE),
             lyricsLightIntensity = lyricsLightIntensity.coerceIn(LYRICS_LIGHT_RANGE),
+            dynamicBackgroundStrength = dynamicBackgroundStrength.coerceIn(DYNAMIC_BG_STRENGTH_RANGE),
             dynamicLyricsOpacity = dynamicLyricsOpacity.coerceIn(DYNAMIC_OPACITY_RANGE),
             dynamicLyricsSaturation = dynamicLyricsSaturation.coerceIn(DYNAMIC_SATURATION_RANGE),
             dynamicLyricsContrast = dynamicLyricsContrast.coerceIn(DYNAMIC_CONTRAST_RANGE),
@@ -402,6 +405,7 @@ data class LyricsStyleSettings(
         val LIGHT_SWEEP_SOFTNESS_RANGE = 50..200
         val LYRICS_LIGHT_RANGE = 0..100
         val DYNAMIC_OPACITY_RANGE = 20..100
+        val DYNAMIC_BG_STRENGTH_RANGE = 5..60
         val DYNAMIC_SATURATION_RANGE = 0..200
         val DYNAMIC_CONTRAST_RANGE = 0..100
         val WORD_LIFT_RANGE = 0..80

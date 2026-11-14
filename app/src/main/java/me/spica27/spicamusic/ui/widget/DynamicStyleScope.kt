@@ -9,13 +9,12 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.drawWithContent
 import me.spica27.spicamusic.core.preferences.LyricsStyleSettings
 
 /**
  * 颜色风格“动态”：复用歌词设置里“播放器界面配色”的引擎和全部选项，
  * 让整个应用的前景色（文字、图标、按钮、进度条）跟随当前专辑封面。
- * 背景着色开启时，在内容上方叠一层不拦截触摸的封面色。
+ * 背景着色开启时，直接把页面和卡片的背景色向封面色偏移（不再在内容上方叠色，封面图和弹窗内容不受影响）。
  *
  * 组合结构必须保持固定：开关动态风格时只改变颜色，不能让页面内容换位置，
  * 否则导航页面的状态会被重复注册而崩溃（Key ... was used multiple times）。
@@ -29,7 +28,16 @@ fun DynamicStyleScope(
 ) {
     val colors = rememberDynamicPlayerColors(settings.copy(dynamicLyricsEnabled = enabled), artworkUri)
     val base = MaterialTheme.colorScheme
-    val scheme = remember(base, colors) { if (colors == null) base else base.withDynamicColors(colors) }
+    val scheme =
+        remember(base, colors) {
+            if (colors == null) {
+                base
+            } else {
+                val colored = base.withDynamicColors(colors)
+                // Background colour on: change the surface colours themselves instead of painting over the app.
+                colors.backgroundTint?.let { colored.withDynamicBackground(it) } ?: colored
+            }
+        }
     // MaterialTheme 会把点击反馈重置为水波纹，这里还原应用自己的点击反馈。
     val indication = LocalIndication.current
     MaterialTheme(
@@ -38,15 +46,8 @@ fun DynamicStyleScope(
         shapes = MaterialTheme.shapes,
     ) {
         CompositionLocalProvider(LocalIndication provides indication) {
-            Box(
-                modifier =
-                    Modifier
-                        .fillMaxSize()
-                        .drawWithContent {
-                            drawContent()
-                            colors?.backgroundTint?.let { drawRect(it) }
-                        },
-            ) {
+            // Keep this Box: the composition structure must stay the same whether the style is on or off.
+            Box(modifier = Modifier.fillMaxSize()) {
                 content()
             }
         }

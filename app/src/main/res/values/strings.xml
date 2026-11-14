@@ -1044,6 +1044,8 @@
   <string name="lyr_set_dyn_contrast_desc">Lighter on dark, darker on light</string>
   <string name="lyr_set_dyn_bg">Color background</string>
   <string name="lyr_set_dyn_bg_desc">Also tint the background with the album colour</string>
+  <string name="lyr_set_dyn_bg_strength">Background strength</string>
+  <string name="lyr_set_dyn_bg_strength_desc">How far the background color moves toward the album color</string>
   <string name="lyr_set_section_kinetic">Kinetic lyrics</string>
   <string name="lyr_set_kinetic">Kinetic effect</string>
   <string name="lyr_set_kinetic_desc">Animated words with a flowing glass background</string>

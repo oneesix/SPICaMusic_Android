@@ -1439,6 +1439,17 @@ private fun DynamicStyleControls(
             checked = settings.dynamicBackgroundEnabled,
             onCheckedChange = { v -> onUpdate { it.copy(dynamicBackgroundEnabled = v) } },
         )
+        if (settings.dynamicBackgroundEnabled) {
+            LyricsSettingsSlider(
+                label = stringResource(R.string.lyr_set_dyn_bg_strength),
+                description = stringResource(R.string.lyr_set_dyn_bg_strength_desc),
+                value = settings.dynamicBackgroundStrength,
+                range = LyricsStyleSettings.DYNAMIC_BG_STRENGTH_RANGE,
+                step = 1,
+                valueText = { "$it%" },
+                onValueChange = { v -> onUpdate { it.copy(dynamicBackgroundStrength = v) } },
+            )
+        }
         LyricsSettingsChips(
             label = stringResource(R.string.lyr_set_dyn_mode),
             description = stringResource(R.string.lyr_set_dyn_mode_desc),

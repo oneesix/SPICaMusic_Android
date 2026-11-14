@@ -7,6 +7,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.remember
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.compositeOver
 import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.graphics.toArgb
 import androidx.core.graphics.ColorUtils
@@ -38,6 +39,7 @@ fun rememberDynamicPlayerColors(
     return remember(
         enabled,
         settings.dynamicBackgroundEnabled,
+        settings.dynamicBackgroundStrength,
         settings.dynamicLyricsMode,
         settings.dynamicLyricsOpacity,
         settings.dynamicLyricsSaturation,
@@ -64,7 +66,7 @@ fun rememberDynamicPlayerColors(
             val opacity = settings.dynamicLyricsOpacity / 100f
             val tint =
                 if (settings.dynamicBackgroundEnabled) {
-                    Color(ColorUtils.HSLToColor(floatArrayOf(hsl[0], saturation, 0.5f))).copy(alpha = 0.22f * opacity)
+                    Color(ColorUtils.HSLToColor(floatArrayOf(hsl[0], saturation, 0.5f))).copy(alpha = settings.dynamicBackgroundStrength / 100f * opacity)
                 } else {
                     null
                 }
@@ -96,6 +98,24 @@ internal fun ColorScheme.withDynamicColors(colors: DynamicPlayerColors): ColorSc
         onBackground = colors.fg,
         outline = colors.fg2,
         outlineVariant = colors.fg.copy(alpha = colors.fg.alpha * 0.26f),
+    )
+
+/**
+ * Moves the page and surface colours toward the album colour (a real background colour change).
+ * Nothing is drawn on top, so album art, dialogs content, text and icons keep their own colours.
+ */
+internal fun ColorScheme.withDynamicBackground(tint: Color): ColorScheme =
+    copy(
+        background = tint.compositeOver(background),
+        surface = tint.compositeOver(surface),
+        surfaceVariant = tint.compositeOver(surfaceVariant),
+        surfaceDim = tint.compositeOver(surfaceDim),
+        surfaceBright = tint.compositeOver(surfaceBright),
+        surfaceContainerLowest = tint.compositeOver(surfaceContainerLowest),
+        surfaceContainerLow = tint.compositeOver(surfaceContainerLow),
+        surfaceContainer = tint.compositeOver(surfaceContainer),
+        surfaceContainerHigh = tint.compositeOver(surfaceContainerHigh),
+        surfaceContainerHighest = tint.compositeOver(surfaceContainerHighest),
     )
 
 /** Recolours the foreground roles of the Material theme (text, icons, buttons); surfaces stay as they are. */

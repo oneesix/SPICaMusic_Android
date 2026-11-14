@@ -1043,6 +1043,8 @@
   <string name="lyr_set_dyn_contrast_desc">深色下更亮，淺色下更暗</string>
   <string name="lyr_set_dyn_bg">背景著色</string>
   <string name="lyr_set_dyn_bg_desc">同時用封面顏色為背景著色</string>
+  <string name="lyr_set_dyn_bg_strength">背景強度</string>
+  <string name="lyr_set_dyn_bg_strength_desc">背景色向封面色偏移的程度</string>
   <string name="lyr_set_section_kinetic">動態歌詞</string>
   <string name="lyr_set_kinetic">動態效果</string>
   <string name="lyr_set_kinetic_desc">文字動畫配流動玻璃背景</string>
