@@ -1,0 +1,94 @@
+diff --git a/app/src/main/java/me/spica27/spicamusic/ui/player/FullscreenLyricsSurface.kt b/app/src/main/java/me/spica27/spicamusic/ui/player/FullscreenLyricsSurface.kt
+index fa7976a..93bf26d 100644
+--- a/app/src/main/java/me/spica27/spicamusic/ui/player/FullscreenLyricsSurface.kt
++++ b/app/src/main/java/me/spica27/spicamusic/ui/player/FullscreenLyricsSurface.kt
+@@ -50,7 +50,6 @@ import com.kyant.backdrop.backdrops.LayerBackdrop
+ import com.kyant.backdrop.backdrops.layerBackdrop
+ import com.kyant.backdrop.backdrops.rememberCombinedBackdrop
+ import com.kyant.backdrop.backdrops.rememberLayerBackdrop
+-import me.spica27.spicamusic.ui.glass.LocalGlassV2Backdrop
+ import me.spica27.spicamusic.ui.glass.LocalLiquidGlassConfig
+ import me.spica27.spicamusic.ui.glass.LocalLiquidGlassV2Config
+ import me.spica27.spicamusic.ui.widget.LyricsControlDefaults
+@@ -189,7 +188,7 @@ internal fun FullscreenLyricsSurface(
+             )
+         }
+ 
+-        CompositionLocalProvider(LocalGlassV2Backdrop provides (if (glassV2) glassBackdrop else LocalGlassV2Backdrop.current)) {
++        CompositionLocalProvider(LocalLyricsGlassBackdrop provides (if (glassV2) glassBackdrop else null)) {
+         FullscreenLyricsHeader(
+             hazeState = hazeState,
+             title = title,
+@@ -225,7 +224,7 @@ internal fun FullscreenLyricsSurface(
+ 
+         // Bottom bar: transliteration button | pill (cover, artist + time, play/pause) | translation button
+         if (style.enhanceHeader) {
+-            CompositionLocalProvider(LocalGlassV2Backdrop provides (if (glassV2) glassBackdrop else LocalGlassV2Backdrop.current)) {
++            CompositionLocalProvider(LocalLyricsGlassBackdrop provides (if (glassV2) glassBackdrop else null)) {
+             LyricsBottomBar(
+                 artist = artist,
+                 artwork = artwork,
+diff --git a/app/src/main/java/me/spica27/spicamusic/ui/player/LyricsGlass.kt b/app/src/main/java/me/spica27/spicamusic/ui/player/LyricsGlass.kt
+index 2393a68..b3857f4 100644
+--- a/app/src/main/java/me/spica27/spicamusic/ui/player/LyricsGlass.kt
++++ b/app/src/main/java/me/spica27/spicamusic/ui/player/LyricsGlass.kt
+@@ -3,22 +3,18 @@ package me.spica27.spicamusic.ui.player
+ import android.os.Build
+ import androidx.compose.foundation.shape.RoundedCornerShape
+ import androidx.compose.runtime.Composable
++import androidx.compose.runtime.staticCompositionLocalOf
+ import androidx.compose.ui.Modifier
+ import androidx.compose.ui.graphics.Color
++import com.kyant.backdrop.Backdrop
+ import dev.chrisbanes.haze.HazeState
+-import me.spica27.spicamusic.ui.glass.LocalGlassV2Backdrop
+ import me.spica27.spicamusic.ui.glass.LocalLiquidGlassConfig
+ import me.spica27.spicamusic.ui.glass.LocalLiquidGlassV2Config
++import me.spica27.spicamusic.ui.glass.liquidGlassV2Surface
+ import me.spica27.spicamusic.ui.home.player_bar.playerBarSurface
+ 
+-/** true when the app's liquid glass (V2 or V1) can be drawn on the lyrics bars. */
+-@Composable
+-internal fun lyricsGlassAvailable(hazeState: HazeState?): Boolean {
+-    if (Build.VERSION.SDK_INT < Build.VERSION_CODES.S) return false
+-    val v2 = LocalLiquidGlassV2Config.current.enabled && LocalGlassV2Backdrop.current != null
+-    val v1 = LocalLiquidGlassConfig.current.enabled && hazeState != null
+-    return v2 || v1
+-}
++/** Liquid glass V2 only: what the lyrics bars see behind them (player background + lyrics). */
++internal val LocalLyricsGlassBackdrop = staticCompositionLocalOf<Backdrop?> { null }
+ 
+ /**
+  * Glass surface for the lyrics bars. It is the same engine and the same settings as the home bars
+@@ -30,15 +26,26 @@ internal fun lyricsGlassSurfaceOrNull(
+     hazeState: HazeState?,
+     shape: RoundedCornerShape,
+     containerColor: Color,
+-): Modifier? =
+-    if (lyricsGlassAvailable(hazeState)) {
+-        Modifier.playerBarSurface(
++): Modifier? {
++    if (Build.VERSION.SDK_INT < Build.VERSION_CODES.S) return null
++    val v2Config = LocalLiquidGlassV2Config.current
++    if (v2Config.enabled) {
++        val backdrop = LocalLyricsGlassBackdrop.current ?: return null
++        return Modifier.liquidGlassV2Surface(
++            backdrop = backdrop,
++            tuning = v2Config.tuning,
++            shape = shape,
++            surfaceColor = containerColor,
++        )
++    }
++    if (LocalLiquidGlassConfig.current.enabled && hazeState != null) {
++        return Modifier.playerBarSurface(
+             hazeState = hazeState,
+             containerColor = containerColor,
+             glassEnabled = true,
+             shape = shape,
+             expandLayerBounds = false,
+         )
+-    } else {
+-        null
+     }
++    return null
++}
