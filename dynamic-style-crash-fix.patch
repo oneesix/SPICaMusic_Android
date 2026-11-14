@@ -1,0 +1,134 @@
+diff --git a/app/src/main/java/me/spica27/spicamusic/ui/widget/DynamicPlayerColor.kt b/app/src/main/java/me/spica27/spicamusic/ui/widget/DynamicPlayerColor.kt
+index 6440ead..6965d43 100644
+--- a/app/src/main/java/me/spica27/spicamusic/ui/widget/DynamicPlayerColor.kt
++++ b/app/src/main/java/me/spica27/spicamusic/ui/widget/DynamicPlayerColor.kt
+@@ -1,6 +1,7 @@
+ package me.spica27.spicamusic.ui.widget
+ 
+ import android.net.Uri
++import androidx.compose.material3.ColorScheme
+ import androidx.compose.material3.MaterialTheme
+ import androidx.compose.runtime.Composable
+ import androidx.compose.runtime.Immutable
+@@ -77,6 +78,26 @@ fun rememberDynamicPlayerColors(
+     }
+ }
+ 
++/** The Material colour roles that Color player UI recolours (text, icons, buttons); surfaces stay as they are. */
++internal fun ColorScheme.withDynamicColors(colors: DynamicPlayerColors): ColorScheme =
++    copy(
++        primary = colors.fg,
++        onPrimary = colors.onFg,
++        primaryContainer = colors.fg.copy(alpha = colors.fg.alpha * 0.26f),
++        onPrimaryContainer = colors.fg,
++        secondary = colors.fg,
++        onSecondary = colors.onFg,
++        secondaryContainer = colors.fg.copy(alpha = colors.fg.alpha * 0.26f),
++        onSecondaryContainer = colors.fg,
++        tertiary = colors.fg,
++        onTertiary = colors.onFg,
++        onSurface = colors.fg,
++        onSurfaceVariant = colors.fg2,
++        onBackground = colors.fg,
++        outline = colors.fg2,
++        outlineVariant = colors.fg.copy(alpha = colors.fg.alpha * 0.26f),
++    )
++
+ /** Recolours the foreground roles of the Material theme (text, icons, buttons); surfaces stay as they are. */
+ @Composable
+ fun DynamicPlayerColorScope(
+@@ -88,26 +109,7 @@ fun DynamicPlayerColorScope(
+         return
+     }
+     val base = MaterialTheme.colorScheme
+-    val scheme =
+-        remember(base, colors) {
+-            base.copy(
+-                primary = colors.fg,
+-                onPrimary = colors.onFg,
+-                primaryContainer = colors.fg.copy(alpha = colors.fg.alpha * 0.26f),
+-                onPrimaryContainer = colors.fg,
+-                secondary = colors.fg,
+-                onSecondary = colors.onFg,
+-                secondaryContainer = colors.fg.copy(alpha = colors.fg.alpha * 0.26f),
+-                onSecondaryContainer = colors.fg,
+-                tertiary = colors.fg,
+-                onTertiary = colors.onFg,
+-                onSurface = colors.fg,
+-                onSurfaceVariant = colors.fg2,
+-                onBackground = colors.fg,
+-                outline = colors.fg2,
+-                outlineVariant = colors.fg.copy(alpha = colors.fg.alpha * 0.26f),
+-            )
+-        }
++    val scheme = remember(base, colors) { base.withDynamicColors(colors) }
+     MaterialTheme(
+         colorScheme = scheme,
+         typography = MaterialTheme.typography,
+diff --git a/app/src/main/java/me/spica27/spicamusic/ui/widget/DynamicStyleScope.kt b/app/src/main/java/me/spica27/spicamusic/ui/widget/DynamicStyleScope.kt
+index 6cd2722..df88d25 100644
+--- a/app/src/main/java/me/spica27/spicamusic/ui/widget/DynamicStyleScope.kt
++++ b/app/src/main/java/me/spica27/spicamusic/ui/widget/DynamicStyleScope.kt
+@@ -1,9 +1,13 @@
+ package me.spica27.spicamusic.ui.widget
+ 
+ import android.net.Uri
++import androidx.compose.foundation.LocalIndication
+ import androidx.compose.foundation.layout.Box
+ import androidx.compose.foundation.layout.fillMaxSize
++import androidx.compose.material3.MaterialTheme
+ import androidx.compose.runtime.Composable
++import androidx.compose.runtime.CompositionLocalProvider
++import androidx.compose.runtime.remember
+ import androidx.compose.ui.Modifier
+ import androidx.compose.ui.draw.drawWithContent
+ import me.spica27.spicamusic.core.preferences.LyricsStyleSettings
+@@ -12,6 +16,9 @@ import me.spica27.spicamusic.core.preferences.LyricsStyleSettings
+  * 颜色风格“动态”：复用歌词设置里“播放器界面配色”的引擎和全部选项，
+  * 让整个应用的前景色（文字、图标、按钮、进度条）跟随当前专辑封面。
+  * 背景着色开启时，在内容上方叠一层不拦截触摸的封面色。
++ *
++ * 组合结构必须保持固定：开关动态风格时只改变颜色，不能让页面内容换位置，
++ * 否则导航页面的状态会被重复注册而崩溃（Key ... was used multiple times）。
+  */
+ @Composable
+ fun DynamicStyleScope(
+@@ -21,17 +28,27 @@ fun DynamicStyleScope(
+     content: @Composable () -> Unit,
+ ) {
+     val colors = rememberDynamicPlayerColors(settings.copy(dynamicLyricsEnabled = enabled), artworkUri)
+-    DynamicPlayerColorScope(colors = colors) {
+-        Box(
+-            modifier =
+-                Modifier
+-                    .fillMaxSize()
+-                    .drawWithContent {
+-                        drawContent()
+-                        colors?.backgroundTint?.let { drawRect(it) }
+-                    },
+-        ) {
+-            content()
++    val base = MaterialTheme.colorScheme
++    val scheme = remember(base, colors) { if (colors == null) base else base.withDynamicColors(colors) }
++    // MaterialTheme 会把点击反馈重置为水波纹，这里还原应用自己的点击反馈。
++    val indication = LocalIndication.current
++    MaterialTheme(
++        colorScheme = scheme,
++        typography = MaterialTheme.typography,
++        shapes = MaterialTheme.shapes,
++    ) {
++        CompositionLocalProvider(LocalIndication provides indication) {
++            Box(
++                modifier =
++                    Modifier
++                        .fillMaxSize()
++                        .drawWithContent {
++                            drawContent()
++                            colors?.backgroundTint?.let { drawRect(it) }
++                        },
++            ) {
++                content()
++            }
+         }
+     }
+ }
