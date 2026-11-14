@@ -1,0 +1,384 @@
+diff --git a/app/src/main/java/me/spica27/spicamusic/ui/player/ExpandedPlayerScreen.kt b/app/src/main/java/me/spica27/spicamusic/ui/player/ExpandedPlayerScreen.kt
+index 98c8111..4b09257 100644
+--- a/app/src/main/java/me/spica27/spicamusic/ui/player/ExpandedPlayerScreen.kt
++++ b/app/src/main/java/me/spica27/spicamusic/ui/player/ExpandedPlayerScreen.kt
+@@ -120,7 +120,10 @@ import me.spica27.spicamusic.feature.library.domain.SongUseCases
+ import me.spica27.spicamusic.player.api.PlayMode
+ import me.spica27.spicamusic.player.api.SleepTimerState
+ import me.spica27.spicamusic.ui.dialog.artistRouteFor
++import com.kyant.backdrop.backdrops.layerBackdrop
++import com.kyant.backdrop.backdrops.rememberLayerBackdrop
+ import me.spica27.spicamusic.ui.glass.LocalLiquidGlassConfig
++import me.spica27.spicamusic.ui.glass.LocalLiquidGlassV2Config
+ import me.spica27.spicamusic.ui.navigation.LocalBackStack
+ import me.spica27.spicamusic.ui.navigation.Route
+ import me.spica27.spicamusic.ui.navigation.SleepTimerRoute
+@@ -494,6 +497,8 @@ fun ExpandedPlayerScreen(
+     val dynamicStyle by dynamicStyleViewModel.style.collectAsStateWithLifecycle()
+     val dynamicColors = rememberDynamicPlayerColors(dynamicStyle, currentMediaItem?.mediaMetadata?.artworkUri)
+     val hazeState = rememberHazeState()
++    val playerBgBackdrop = rememberLayerBackdrop()
++    val lyricsGlassV2 = LocalLiquidGlassV2Config.current.enabled
+     val lyricsScrimAlpha =
+         animateFloatAsState(
+             targetValue = if (playerSurface == PlayerSurface.Lyrics) 1f else 0f,
+@@ -511,54 +516,62 @@ fun ExpandedPlayerScreen(
+                     }.background(MaterialTheme.colorScheme.surface)
+                     .fillMaxSize(),
+         ) {
+-            if (isVerseFlow) {
+-                // 与 HTML 完全一致的渐变背景（歌词页额外显示漂移的 mesh）
+-                VerseFlowBackground(
+-                    theme = verseTheme,
+-                    showMesh = playerSurface == PlayerSurface.Lyrics,
+-                    mesh = verseMesh,
+-                    meshAnimated = animationsEnabled && isAppInForeground,
+-                    modifier =
+-                        Modifier
+-                            .fillMaxSize()
+-                            .hazeSource(hazeState),
+-                )
+-            } else {
+-                // 仅在页面可见且应用在前台时启用动态背景。
+-                FluidMusicBackground(
+-                    modifier =
+-                        Modifier
+-                            .fillMaxSize()
+-                            // 队列顶栏在关闭玻璃时仍需采样动态背景，用于渐变模糊。
+-                            .hazeSource(hazeState),
+-                    coverColor = coverColor,
+-                    isDarkMode = MaterialTheme.colorScheme.surface.luminance() < 0.5f,
+-                    coverUri = { currentMediaItem?.mediaMetadata?.artworkUri },
+-                    enabled = animationsEnabled && isAppInForeground,
+-                )
++            // Liquid glass V2 samples this layer (player background) for the lyrics bars.
++            Box(
++                modifier =
++                    Modifier
++                        .fillMaxSize()
++                        .then(if (lyricsGlassV2) Modifier.layerBackdrop(playerBgBackdrop) else Modifier),
++            ) {
++                if (isVerseFlow) {
++                    // 与 HTML 完全一致的渐变背景（歌词页额外显示漂移的 mesh）
++                    VerseFlowBackground(
++                        theme = verseTheme,
++                        showMesh = playerSurface == PlayerSurface.Lyrics,
++                        mesh = verseMesh,
++                        meshAnimated = animationsEnabled && isAppInForeground,
++                        modifier =
++                            Modifier
++                                .fillMaxSize()
++                                .hazeSource(hazeState),
++                    )
++                } else {
++                    // 仅在页面可见且应用在前台时启用动态背景。
++                    FluidMusicBackground(
++                        modifier =
++                            Modifier
++                                .fillMaxSize()
++                                // 队列顶栏在关闭玻璃时仍需采样动态背景，用于渐变模糊。
++                                .hazeSource(hazeState),
++                        coverColor = coverColor,
++                        isDarkMode = MaterialTheme.colorScheme.surface.luminance() < 0.5f,
++                        coverUri = { currentMediaItem?.mediaMetadata?.artworkUri },
++                        enabled = animationsEnabled && isAppInForeground,
++                    )
+ 
+-                // Color player UI > Color background: an album-colour tint on top of the animated background.
+-                dynamicColors?.backgroundTint?.let { tint ->
++                    // Color player UI > Color background: an album-colour tint on top of the animated background.
++                    dynamicColors?.backgroundTint?.let { tint ->
++                        Box(
++                            modifier =
++                                Modifier
++                                    .fillMaxSize()
++                                    .hazeSource(hazeState, zIndex = 0.3f)
++                                    .background(tint),
++                        )
++                    }
++
++                    // 歌词模式只压暗同一份动态背景，不创建第二个背景实例。
+                     Box(
+                         modifier =
+                             Modifier
+                                 .fillMaxSize()
+-                                .hazeSource(hazeState, zIndex = 0.3f)
+-                                .background(tint),
++                                // The source must wrap the dimming (alpha + colour) so the blurred header
++                                // is dimmed exactly like the rest of the lyrics page.
++                                .hazeSource(hazeState, zIndex = 0.5f)
++                                .graphicsLayer { alpha = lyricsScrimAlpha.value }
++                                .background(lyricsScrimColor),
+                     )
+                 }
+-
+-                // 歌词模式只压暗同一份动态背景，不创建第二个背景实例。
+-                Box(
+-                    modifier =
+-                        Modifier
+-                            .fillMaxSize()
+-                            // The source must wrap the dimming (alpha + colour) so the blurred header
+-                            // is dimmed exactly like the rest of the lyrics page.
+-                            .hazeSource(hazeState, zIndex = 0.5f)
+-                            .graphicsLayer { alpha = lyricsScrimAlpha.value }
+-                            .background(lyricsScrimColor),
+-                )
+             }
+ 
+             // Player and lyrics are two layers of one container. A single progress value slides them side by side:
+@@ -733,6 +746,7 @@ fun ExpandedPlayerScreen(
+                             isLike = songLikeState,
+                             onLikeClick = { viewModel.toggleLikeCurrentSong() },
+                             hazeState = hazeState,
++                            backgroundBackdrop = playerBgBackdrop,
+                             album = currentMediaItem?.mediaMetadata?.albumTitle?.toString(),
+                             releaseYear = currentMediaItem?.mediaMetadata?.releaseYear,
+                             isSeeking = isSeekingState,
+diff --git a/app/src/main/java/me/spica27/spicamusic/ui/player/FullscreenLyricsSurface.kt b/app/src/main/java/me/spica27/spicamusic/ui/player/FullscreenLyricsSurface.kt
+index 58273e8..fa7976a 100644
+--- a/app/src/main/java/me/spica27/spicamusic/ui/player/FullscreenLyricsSurface.kt
++++ b/app/src/main/java/me/spica27/spicamusic/ui/player/FullscreenLyricsSurface.kt
+@@ -43,6 +43,17 @@ import androidx.compose.ui.draw.drawWithContent
+ import androidx.compose.ui.graphics.BlendMode
+ import androidx.compose.ui.graphics.Brush
+ import androidx.compose.ui.graphics.Color
++import androidx.compose.foundation.shape.CircleShape
++import androidx.compose.runtime.CompositionLocalProvider
++import com.kyant.backdrop.Backdrop
++import com.kyant.backdrop.backdrops.LayerBackdrop
++import com.kyant.backdrop.backdrops.layerBackdrop
++import com.kyant.backdrop.backdrops.rememberCombinedBackdrop
++import com.kyant.backdrop.backdrops.rememberLayerBackdrop
++import me.spica27.spicamusic.ui.glass.LocalGlassV2Backdrop
++import me.spica27.spicamusic.ui.glass.LocalLiquidGlassConfig
++import me.spica27.spicamusic.ui.glass.LocalLiquidGlassV2Config
++import me.spica27.spicamusic.ui.widget.LyricsControlDefaults
+ import androidx.compose.ui.graphics.CompositingStrategy
+ import androidx.compose.ui.graphics.graphicsLayer
+ import androidx.compose.ui.layout.onSizeChanged
+@@ -116,9 +127,18 @@ internal fun FullscreenLyricsSurface(
+     modifier: Modifier = Modifier,
+     /** Extra modifier on the top bar (a swipe there goes back to the player). */
+     headerModifier: Modifier = Modifier,
++    /** Liquid glass V2: the player background layer, so the glass bars can see it behind the lyrics. */
++    backgroundBackdrop: LayerBackdrop? = null,
+ ) {
+     val styleViewModel: LyricsStyleViewModel = koinActivityViewModel()
+     val style by styleViewModel.style.collectAsStateWithLifecycle()
++    // Liquid glass (the app's glass settings) on the top bar buttons and the bottom bar.
++    val glassV2 = LocalLiquidGlassV2Config.current.enabled && style.enhanceHeader
++    val lyricsBackdrop = rememberLayerBackdrop()
++    val glassBackdrop: Backdrop =
++        if (backgroundBackdrop != null) rememberCombinedBackdrop(backgroundBackdrop, lyricsBackdrop) else lyricsBackdrop
++    // Glass V1 samples the lyrics through Haze, so the lyrics must be a Haze source then.
++    val glassV1 = style.enhanceHeader && !glassV2 && LocalLiquidGlassConfig.current.enabled
+     // Enhance header: blur ON  -> lyrics scroll behind the blurred header.
+     //                 blur OFF -> lyrics start below the header; the line separates them.
+     val blurBehind = style.enhanceHeader && style.headerBlurEnabled
+@@ -147,7 +167,8 @@ internal fun FullscreenLyricsSurface(
+                     )
+                     // zIndex 1: drawn above the background source (zIndex 0) that shares this state, so the
+                     // blurred header shows background + lyrics together and hides the sharp lyrics below it.
+-                    .then(if (blurBehind || dockBlur) Modifier.hazeSource(hazeState, zIndex = 1f) else Modifier),
++                    .then(if (blurBehind || dockBlur || glassV1) Modifier.hazeSource(hazeState, zIndex = 1f) else Modifier)
++                    .then(if (glassV2) Modifier.layerBackdrop(lyricsBackdrop) else Modifier),
+             toolbarBottomInset = LyricsToolbarBottomInset,
+             // 工具栏已移到顶栏右侧（三点按钮）
+             showToolbar = false,
+@@ -168,7 +189,9 @@ internal fun FullscreenLyricsSurface(
+             )
+         }
+ 
++        CompositionLocalProvider(LocalGlassV2Backdrop provides (if (glassV2) glassBackdrop else LocalGlassV2Backdrop.current)) {
+         FullscreenLyricsHeader(
++            hazeState = hazeState,
+             title = title,
+             artist = artist,
+             artwork = artwork,
+@@ -185,6 +208,7 @@ internal fun FullscreenLyricsSurface(
+             onBarHeightChange = { barHeightPx = it },
+             modifier = Modifier.align(Alignment.TopCenter).then(headerModifier),
+         )
++        }
+ 
+         // Bottom bar, "spread" blur: one blur layer behind the whole bar that fades out above it.
+         if (dockSpread) {
+@@ -201,6 +225,7 @@ internal fun FullscreenLyricsSurface(
+ 
+         // Bottom bar: transliteration button | pill (cover, artist + time, play/pause) | translation button
+         if (style.enhanceHeader) {
++            CompositionLocalProvider(LocalGlassV2Backdrop provides (if (glassV2) glassBackdrop else LocalGlassV2Backdrop.current)) {
+             LyricsBottomBar(
+                 artist = artist,
+                 artwork = artwork,
+@@ -212,12 +237,14 @@ internal fun FullscreenLyricsSurface(
+                 onHeightChange = { dockHeightPx = it },
+                 modifier = Modifier.align(Alignment.BottomCenter),
+             )
++            }
+         }
+     }
+ }
+ 
+ @Composable
+ private fun FullscreenLyricsHeader(
++    hazeState: HazeState,
+     title: String,
+     artist: String,
+     artwork: MusicArtwork?,
+@@ -272,9 +299,16 @@ private fun FullscreenLyricsHeader(
+             }
+         }
+ 
++    // Liquid glass on (enhanced header only): the like and dots buttons use the app's glass.
++    val liquid = if (enhanced) lyricsGlassSurfaceOrNull(hazeState, CircleShape, MaterialTheme.colorScheme.surface) else null
++    val buttonModifier = liquid ?: Modifier
++    val buttonColor = if (liquid != null) Color.Transparent else LyricsControlDefaults.surfaceColor
++
+     val likeButton: @Composable () -> Unit = {
+         LyricsCircleButton(
+             onClick = onLikeClick,
++            modifier = buttonModifier,
++            containerColor = buttonColor,
+             size = buttonSize,
+         ) {
+             Icon(
+@@ -289,6 +323,8 @@ private fun FullscreenLyricsHeader(
+     val dotsButton: @Composable () -> Unit = {
+         LyricsCircleButton(
+             onClick = { menuExpanded = !menuExpanded },
++            modifier = buttonModifier,
++            containerColor = buttonColor,
+             size = buttonSize,
+         ) {
+             Icon(
+diff --git a/app/src/main/java/me/spica27/spicamusic/ui/player/LyricsBottomBar.kt b/app/src/main/java/me/spica27/spicamusic/ui/player/LyricsBottomBar.kt
+index 13cf1b0..d5b20f6 100644
+--- a/app/src/main/java/me/spica27/spicamusic/ui/player/LyricsBottomBar.kt
++++ b/app/src/main/java/me/spica27/spicamusic/ui/player/LyricsBottomBar.kt
+@@ -128,6 +128,9 @@ internal fun LyricsBottomBar(
+             Modifier
+         }
+ 
++    // Liquid glass on: the buttons and the pill use the app's glass (same settings as the home bars).
++    val liquid = lyricsGlassSurfaceOrNull(hazeState, CircleShape, surface)
++
+     Row(
+         modifier =
+             modifier
+@@ -142,6 +145,7 @@ internal fun LyricsBottomBar(
+             size = size,
+             fill = fill,
+             glass = glass,
++            liquid = liquid,
+             on = s.showTransliteration && hasTransliteration,
+             available = hasTransliteration,
+             description = stringResource(R.string.lyr_dock_transliteration),
+@@ -168,10 +172,16 @@ internal fun LyricsBottomBar(
+                 Modifier
+                     .weight(1f)
+                     .height(size)
+-                    .clip(CircleShape)
+-                    .then(glass)
+-                    .background(fill)
+-                    .padding(pad),
++                    .then(
++                        if (liquid != null) {
++                            liquid
++                        } else {
++                            Modifier
++                                .clip(CircleShape)
++                                .then(glass)
++                                .background(fill)
++                        },
++                    ).padding(pad),
+             verticalAlignment = Alignment.CenterVertically,
+         ) {
+             Box(
+@@ -240,6 +250,7 @@ internal fun LyricsBottomBar(
+             size = size,
+             fill = fill,
+             glass = glass,
++            liquid = liquid,
+             on = s.showTranslation && hasTranslation,
+             available = hasTranslation,
+             description = stringResource(R.string.lyr_dock_translation),
+@@ -268,6 +279,7 @@ private fun DockCircleButton(
+     size: Dp,
+     fill: Color,
+     glass: Modifier,
++    liquid: Modifier?,
+     on: Boolean,
+     available: Boolean,
+     description: String,
+@@ -285,10 +297,16 @@ private fun DockCircleButton(
+         modifier =
+             Modifier
+                 .size(size)
+-                .clip(CircleShape)
+-                .then(glass)
+-                .background(fill)
+-                .clickable(role = Role.Button, onClickLabel = description, onClick = onClick),
++                .then(
++                    if (liquid != null) {
++                        liquid
++                    } else {
++                        Modifier
++                            .clip(CircleShape)
++                            .then(glass)
++                            .background(fill)
++                    },
++                ).clickable(role = Role.Button, onClickLabel = description, onClick = onClick),
+         contentAlignment = Alignment.Center,
+     ) {
+         content(tint)
+diff --git a/app/src/main/java/me/spica27/spicamusic/ui/player/LyricsGlass.kt b/app/src/main/java/me/spica27/spicamusic/ui/player/LyricsGlass.kt
+new file mode 100644
+index 0000000..2393a68
+--- /dev/null
++++ b/app/src/main/java/me/spica27/spicamusic/ui/player/LyricsGlass.kt
+@@ -0,0 +1,44 @@
++package me.spica27.spicamusic.ui.player
++
++import android.os.Build
++import androidx.compose.foundation.shape.RoundedCornerShape
++import androidx.compose.runtime.Composable
++import androidx.compose.ui.Modifier
++import androidx.compose.ui.graphics.Color
++import dev.chrisbanes.haze.HazeState
++import me.spica27.spicamusic.ui.glass.LocalGlassV2Backdrop
++import me.spica27.spicamusic.ui.glass.LocalLiquidGlassConfig
++import me.spica27.spicamusic.ui.glass.LocalLiquidGlassV2Config
++import me.spica27.spicamusic.ui.home.player_bar.playerBarSurface
++
++/** true when the app's liquid glass (V2 or V1) can be drawn on the lyrics bars. */
++@Composable
++internal fun lyricsGlassAvailable(hazeState: HazeState?): Boolean {
++    if (Build.VERSION.SDK_INT < Build.VERSION_CODES.S) return false
++    val v2 = LocalLiquidGlassV2Config.current.enabled && LocalGlassV2Backdrop.current != null
++    val v1 = LocalLiquidGlassConfig.current.enabled && hazeState != null
++    return v2 || v1
++}
++
++/**
++ * Glass surface for the lyrics bars. It is the same engine and the same settings as the home bars
++ * (V2 first, then V1), so the Liquid glass settings apply here too.
++ * Returns null when liquid glass is off, so the caller keeps its normal look.
++ */
++@Composable
++internal fun lyricsGlassSurfaceOrNull(
++    hazeState: HazeState?,
++    shape: RoundedCornerShape,
++    containerColor: Color,
++): Modifier? =
++    if (lyricsGlassAvailable(hazeState)) {
++        Modifier.playerBarSurface(
++            hazeState = hazeState,
++            containerColor = containerColor,
++            glassEnabled = true,
++            shape = shape,
++            expandLayerBounds = false,
++        )
++    } else {
++        null
++    }
