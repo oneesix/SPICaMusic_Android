@@ -1219,4 +1219,8 @@
   <string name="glass_mode_lens">Refraction lens</string>
   <string name="glass_saturation">Color boost</string>
   <string name="glass_saturation_desc">Saturation of what shows through (frosted only)</string>
+  <string name="mtb_title">Music top bar</string>
+  <string name="mtb_subtitle">Move, resize and restyle the floating bar on the Music tab.</string>
+  <string name="mtb_top">Top offset</string>
+  <string name="mtb_reset">Reset top bar</string>
 </resources>

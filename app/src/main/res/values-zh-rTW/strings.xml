@@ -1218,4 +1218,8 @@
   <string name="glass_mode_lens">折射透鏡</string>
   <string name="glass_saturation">色彩增強</string>
   <string name="glass_saturation_desc">透出背景的飽和度（僅磨砂）</string>
+  <string name="mtb_title">音樂頁頂欄</string>
+  <string name="mtb_subtitle">移動、調整大小並自訂音樂頁的懸浮頂欄。</string>
+  <string name="mtb_top">頂部偏移</string>
+  <string name="mtb_reset">重設頂欄</string>
 </resources>

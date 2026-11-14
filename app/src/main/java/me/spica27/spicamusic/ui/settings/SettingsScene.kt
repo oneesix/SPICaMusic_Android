@@ -139,6 +139,7 @@ fun SettingsScreen() {
     val liquidGlassV2Tuning by viewModel.liquidGlassV2Tuning.collectAsStateWithLifecycle()
     val bottomBarCustomization by viewModel.bottomBarCustomization.collectAsStateWithLifecycle()
     val bottomBarLayout by viewModel.bottomBarLayout.collectAsStateWithLifecycle()
+    val musicTopBarCustomization by viewModel.musicTopBarCustomization.collectAsStateWithLifecycle()
     val keepScreenOn by viewModel.keepScreenOn.collectAsStateWithLifecycle()
     val backgroundValue by viewModel.dynamicSpectrumBackground.collectAsStateWithLifecycle()
     val verseMode by viewModel.verseThemeMode.collectAsStateWithLifecycle()
@@ -296,6 +297,20 @@ fun SettingsScreen() {
                         onInt = viewModel::setBottomBarInt,
                         onText = viewModel::setBottomBarText,
                         onReset = viewModel::resetBottomBarCustomization,
+                    )
+                }
+            }
+
+            item(key = "settings_music_top_bar") {
+                SettingsSectionCard(
+                    title = stringResource(R.string.mtb_title),
+                    subtitle = stringResource(R.string.mtb_subtitle),
+                    modifier = Modifier.padding(horizontal = LayoutTokens.MusicHeaderHorizontalPadding),
+                ) {
+                    MusicTopBarSettingsContent(
+                        custom = musicTopBarCustomization,
+                        onInt = viewModel::setMusicTopBarInt,
+                        onReset = viewModel::resetMusicTopBar,
                     )
                 }
             }

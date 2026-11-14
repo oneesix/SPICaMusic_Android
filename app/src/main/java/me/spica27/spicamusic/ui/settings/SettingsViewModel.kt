@@ -18,6 +18,10 @@ import me.spica27.spicamusic.ui.glass.LiquidGlassSetting
 import me.spica27.spicamusic.ui.glass.LiquidGlassTuning
 import me.spica27.spicamusic.ui.glass.LiquidGlassV2Setting
 import me.spica27.spicamusic.ui.glass.LiquidGlassV2Tuning
+import me.spica27.spicamusic.ui.home.page.MusicTopBarCustomization
+import me.spica27.spicamusic.ui.home.page.MusicTopBarSetting
+import me.spica27.spicamusic.ui.home.page.defaultValue
+import me.spica27.spicamusic.ui.home.page.preferenceKey
 import me.spica27.spicamusic.ui.home.player_bar.BottomBarCustomization
 import me.spica27.spicamusic.ui.home.player_bar.BottomBarSetting
 import me.spica27.spicamusic.ui.widget.VerseMeshSettings
@@ -139,6 +143,30 @@ class SettingsViewModel(
     fun resetBottomBarCustomization() {
         viewModelScope.launch {
             settingsUseCases.resetBottomBarCustomization()
+        }
+    }
+
+    // 音乐页悬浮顶栏自定义：位置、尺寸、标签内容。
+    val musicTopBarCustomization =
+        combine(
+            MusicTopBarSetting.entries.map { setting ->
+                settingsUseCases.getInt(setting.preferenceKey(), setting.defaultValue())
+            },
+        ) { values -> MusicTopBarCustomization.from(values.toList()) }
+            .stateIn(viewModelScope, SharingStarted.Eagerly, MusicTopBarCustomization())
+
+    fun setMusicTopBarInt(
+        setting: MusicTopBarSetting,
+        value: Int,
+    ) {
+        viewModelScope.launch {
+            settingsUseCases.setInt(setting.preferenceKey(), value)
+        }
+    }
+
+    fun resetMusicTopBar() {
+        viewModelScope.launch {
+            MusicTopBarSetting.entries.forEach { settingsUseCases.setInt(it.preferenceKey(), it.defaultValue()) }
         }
     }
 
