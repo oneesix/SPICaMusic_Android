@@ -105,6 +105,7 @@ import me.spica27.spicamusic.ui.navigation.IgnoredSongsRoute
 import me.spica27.spicamusic.ui.navigation.LocalBackStack
 import me.spica27.spicamusic.ui.navigation.SleepTimerRoute
 import me.spica27.spicamusic.ui.player.LocalPlayerViewModel
+import me.spica27.spicamusic.ui.player.LyricsStyleViewModel
 import me.spica27.spicamusic.ui.player.formatSleepTimerRemaining
 import me.spica27.spicamusic.ui.theme.EaseOutEmphasized
 import me.spica27.spicamusic.ui.theme.LayoutTokens
@@ -121,6 +122,7 @@ import me.spica27.spicamusic.ui.widget.VerseMeshSettings
 import me.spica27.spicamusic.ui.widget.VerseThemeMode
 import me.spica27.spicamusic.ui.widget.clickHighlight
 import me.spica27.spicamusic.ui.widget.rememberIOSOverScrollEffect
+import org.koin.compose.viewmodel.koinActivityViewModel
 import org.koin.compose.viewmodel.koinViewModel
 
 /**
@@ -149,6 +151,9 @@ fun SettingsScreen() {
     val coverTapValue by viewModel.dynamicCoverType.collectAsStateWithLifecycle()
     val progressWaveformValue by viewModel.progressBarStyle.collectAsStateWithLifecycle()
     val colorStyleValue by viewModel.themeColorStyle.collectAsStateWithLifecycle()
+    // New player UI switch (stored with the lyrics / player style settings)
+    val playerStyleViewModel: LyricsStyleViewModel = koinActivityViewModel()
+    val playerStyle by playerStyleViewModel.style.collectAsStateWithLifecycle()
     val playerViewModel = LocalPlayerViewModel.current
     val sleepTimer by playerViewModel.sleepTimer.collectAsStateWithLifecycle()
 
@@ -374,6 +379,14 @@ fun SettingsScreen() {
                         expandedKey = expandedRowKey,
                         onExpandChange = { expandedRowKey = it },
                         onValueChange = viewModel::setProgressBarStyle,
+                    )
+                    SettingsItemDivider()
+                    SwitchRow(
+                        title = stringResource(R.string.player_ui_new_title),
+                        summary = stringResource(R.string.player_ui_new_subtitle),
+                        icon = Icons.Default.Layers,
+                        checked = playerStyle.newPlayerUi,
+                        onCheckedChange = { v -> playerStyleViewModel.update { it.copy(newPlayerUi = v) } },
                     )
                 }
             }

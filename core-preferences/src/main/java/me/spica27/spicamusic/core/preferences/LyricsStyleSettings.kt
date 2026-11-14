@@ -306,6 +306,17 @@ data class LyricsStyleSettings(
     val kineticFontCount: Int = 2,
     /** Ids of the chosen fonts, comma separated, in order. */
     val kineticFonts: String = "sans,serif,mono,cursive",
+    // ---- New player UI (the player page uses the lyrics-style top and bottom bars) ----
+    /** On: the player page is the new player UI. Off: the original player page. */
+    val newPlayerUi: Boolean = false,
+    /** Space above and below the top bar row, in dp. */
+    val playerUiTopPadding: Int = 12,
+    /** Size of the song title and artist under the album art, in percent. */
+    val playerUiInfoSize: Int = 100,
+    /** Moves the song title and artist up (negative) or down (positive), in dp. */
+    val playerUiInfoPosition: Int = 0,
+    /** How far the flipped album art under the cover reaches down, in percent of the free space. */
+    val playerUiFlipEnd: Int = 100,
 ) {
     /** Returns a copy with every value forced into its allowed range. */
     fun sanitized(): LyricsStyleSettings =
@@ -382,6 +393,10 @@ data class LyricsStyleSettings(
             kineticGlowIntensity = kineticGlowIntensity.coerceIn(KINETIC_GLOW_INTENSITY_RANGE),
             kineticFontCount = kineticFontCount.coerceIn(KINETIC_FONT_COUNT_RANGE),
             kineticStyles = kineticStyles.ifEmpty { setOf(KineticStyle.Auto) },
+            playerUiTopPadding = playerUiTopPadding.coerceIn(PLAYER_UI_TOP_PADDING_RANGE),
+            playerUiInfoSize = playerUiInfoSize.coerceIn(PLAYER_UI_INFO_SIZE_RANGE),
+            playerUiInfoPosition = playerUiInfoPosition.coerceIn(PLAYER_UI_INFO_POSITION_RANGE),
+            playerUiFlipEnd = playerUiFlipEnd.coerceIn(PLAYER_UI_FLIP_END_RANGE),
         )
 
     companion object {
@@ -447,6 +462,10 @@ data class LyricsStyleSettings(
         val KINETIC_BG_FRAME_RANGE = 0..360
         val KINETIC_GLOW_INTENSITY_RANGE = 20..200
         val KINETIC_FONT_COUNT_RANGE = 2..4
+        val PLAYER_UI_TOP_PADDING_RANGE = 0..40
+        val PLAYER_UI_INFO_SIZE_RANGE = 70..140
+        val PLAYER_UI_INFO_POSITION_RANGE = -30..60
+        val PLAYER_UI_FLIP_END_RANGE = 0..100
         const val BG_REVEAL_STYLE_CLASSIC = 0
         const val BG_REVEAL_STYLE_FLIP = 1
     }

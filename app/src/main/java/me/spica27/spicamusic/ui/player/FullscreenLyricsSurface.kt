@@ -73,6 +73,7 @@ import me.spica27.spicamusic.ui.theme.Spacing
 import me.spica27.spicamusic.ui.widget.AudioCover
 import me.spica27.spicamusic.ui.widget.LyricsCircleButton
 import me.spica27.spicamusic.ui.widget.LyricsSettingsSheet
+import me.spica27.spicamusic.ui.widget.PlayerUiSettingsSheet
 import me.spica27.spicamusic.ui.widget.LyricsToolbarMenuContent
 import me.spica27.spicamusic.ui.widget.audio_seekbar.GlowParticleSeekBar
 import me.spica27.spicamusic.ui.widget.rememberLyricsEdgePadding
@@ -217,7 +218,7 @@ internal fun FullscreenLyricsSurface(
 }
 
 @Composable
-private fun FullscreenLyricsHeader(
+internal fun FullscreenLyricsHeader(
     title: String,
     artist: String,
     artwork: MusicArtwork?,
@@ -235,7 +236,14 @@ private fun FullscreenLyricsHeader(
     progressAnimationsEnabled: Boolean,
     onBarHeightChange: (Int) -> Unit,
     modifier: Modifier = Modifier,
+    /** New player UI: shown instead of the song title (the playlist name or "Now playing"). */
+    titleOverride: String? = null,
+    /** New player UI: the info line shows the play time ("01:22 / 03:44") instead of artist, album and year. */
+    timeAsInfo: Boolean = false,
+    /** New player UI: one padding value above and below the header row. null = the lyrics defaults. */
+    verticalPaddingOverride: Dp? = null,
 ) {
+    val shownTitle = titleOverride ?: title
     // 与歌词文字的左边距一致，左右对称
     val edge = rememberLyricsEdgePadding()
 
@@ -247,6 +255,7 @@ private fun FullscreenLyricsHeader(
     val backStack = LocalBackStack.current
     var menuExpanded by remember { mutableStateOf(false) }
     var showLyricsSettings by remember { mutableStateOf(false) }
+    var showPlayerUiSettings by remember { mutableStateOf(false) }
 
     // Enhance header off = the original header (default sizes, no line, no blur).
     val enhanced = styleSettings.enhanceHeader
@@ -321,7 +330,12 @@ private fun FullscreenLyricsHeader(
                     modifier =
                         Modifier
                             .fillMaxWidth()
-                            .padding(start = edge, end = edge, top = Spacing.Medium, bottom = bottomPadding),
+                            .padding(
+                                start = edge,
+                                end = edge,
+                                top = verticalPaddingOverride ?: Spacing.Medium,
+                                bottom = verticalPaddingOverride ?: bottomPadding,
+                            ),
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(Spacing.Medium),
                 ) {
@@ -331,7 +345,7 @@ private fun FullscreenLyricsHeader(
                         horizontalAlignment = Alignment.CenterHorizontally,
                     ) {
                         Text(
-                            text = title,
+                            text = shownTitle,
                             style = MaterialTheme.typography.titleLarge,
                             fontSize = titleSize,
                             lineHeight = titleSize * 1.25f,
@@ -351,17 +365,26 @@ private fun FullscreenLyricsHeader(
                             transitionSpec = { fadeIn(tween(160)) togetherWith fadeOut(tween(120)) },
                             label = "lyrics_info_or_seeking",
                         ) { seeking ->
-                            Text(
-                                text = if (seeking) stringResource(R.string.lyrics_seeking) else infoLine,
-                                style = MaterialTheme.typography.bodyMedium,
-                                fontSize = artistSize,
-                                lineHeight = artistSize * 1.3f,
-                                textAlign = TextAlign.Center,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis,
-                                modifier = Modifier.fillMaxWidth(),
-                            )
+                            if (timeAsInfo) {
+                                HeaderTimeText(
+                                    seekPositionProvider = seekPositionProvider,
+                                    durationMs = durationMs,
+                                    fontSize = artistSize,
+                                    textAlign = TextAlign.Center,
+                                )
+                            } else {
+                                Text(
+                                    text = if (seeking) stringResource(R.string.lyrics_seeking) else infoLine,
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    fontSize = artistSize,
+                                    lineHeight = artistSize * 1.3f,
+                                    textAlign = TextAlign.Center,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis,
+                                    modifier = Modifier.fillMaxWidth(),
+                                )
+                            }
                         }
                     }
                     dotsButton()
@@ -381,7 +404,12 @@ private fun FullscreenLyricsHeader(
                     modifier =
                         Modifier
                             .fillMaxWidth()
-                            .padding(start = edge, end = edge, top = Spacing.Medium, bottom = bottomPadding),
+                            .padding(
+                                start = edge,
+                                end = edge,
+                                top = verticalPaddingOverride ?: Spacing.Medium,
+                                bottom = verticalPaddingOverride ?: bottomPadding,
+                            ),
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(Spacing.Medium),
                 ) {
@@ -412,7 +440,7 @@ private fun FullscreenLyricsHeader(
 
                     Column(modifier = Modifier.weight(1f)) {
                         Text(
-                            text = title,
+                            text = shownTitle,
                             style = MaterialTheme.typography.titleLarge,
                             fontSize = titleSize,
                             lineHeight = titleSize * 1.25f,
@@ -422,15 +450,24 @@ private fun FullscreenLyricsHeader(
                             overflow = TextOverflow.Ellipsis,
                         )
                         Spacer(modifier = Modifier.height(2.dp))
-                        Text(
-                            text = artist,
-                            style = MaterialTheme.typography.bodyMedium,
-                            fontSize = artistSize,
-                            lineHeight = artistSize * 1.3f,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis,
-                        )
+                        if (timeAsInfo) {
+                            HeaderTimeText(
+                                seekPositionProvider = seekPositionProvider,
+                                durationMs = durationMs,
+                                fontSize = artistSize,
+                                textAlign = TextAlign.Start,
+                            )
+                        } else {
+                            Text(
+                                text = artist,
+                                style = MaterialTheme.typography.bodyMedium,
+                                fontSize = artistSize,
+                                lineHeight = artistSize * 1.3f,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                            )
+                        }
                     }
 
                     Row(
@@ -468,8 +505,20 @@ private fun FullscreenLyricsHeader(
                     viewModel.openPanel()
                     backStack.add(LyricsSourceRoute)
                 },
+                onOpenPlayerUiSettings = {
+                    menuExpanded = false
+                    showPlayerUiSettings = true
+                },
             )
         }
+    }
+
+    if (showPlayerUiSettings) {
+        PlayerUiSettingsSheet(
+            settings = styleSettings,
+            onUpdate = styleViewModel::update,
+            onDismiss = { showPlayerUiSettings = false },
+        )
     }
 
     if (showLyricsSettings) {
@@ -505,6 +554,26 @@ private fun LyricsHeaderProgressBar(
     )
 }
 
+/** "01:22 / 03:44" in the info line of the new player UI top bar. Only this composable reads the position. */
+@Composable
+private fun HeaderTimeText(
+    seekPositionProvider: () -> Float,
+    durationMs: Long,
+    fontSize: TextUnit,
+    textAlign: TextAlign,
+) {
+    Text(
+        text = "${formatTime(seekPositionProvider().toLong())} / ${formatTime(durationMs)}",
+        style = MaterialTheme.typography.bodyMedium.copy(fontFeatureSettings = "tnum"),
+        fontSize = fontSize,
+        lineHeight = fontSize * 1.3f,
+        textAlign = textAlign,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+        maxLines = 1,
+        modifier = Modifier.fillMaxWidth(),
+    )
+}
+
 /** "1:23 / 3:45" shown in place of the title while the progress bar is dragged. */
 @Composable
 private fun LyricsSeekTimeText(
@@ -531,7 +600,7 @@ private fun LyricsSeekTimeText(
  */
 @OptIn(ExperimentalHazeApi::class)
 @Composable
-private fun LyricsHeaderBlurLayer(
+internal fun LyricsHeaderBlurLayer(
     hazeState: HazeState,
     blurRadius: Dp,
     barHeight: Dp,

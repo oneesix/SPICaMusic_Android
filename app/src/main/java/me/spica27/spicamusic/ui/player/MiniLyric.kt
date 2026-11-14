@@ -19,6 +19,10 @@ import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.takeOrElse
+import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
@@ -50,6 +54,11 @@ private const val LOADING_PLACEHOLDER = "· · ·"
 fun MiniLyric(
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
+    /** The new player UI shows the line bigger, bold and left aligned. */
+    textStyle: TextStyle = MaterialTheme.typography.bodyMedium,
+    textAlign: TextAlign = TextAlign.Center,
+    textColor: Color = Color.Unspecified,
+    horizontalPadding: Dp = Spacing.Medium,
 ) {
     // Activity 作用域共享实例：与全屏歌词模式同源，
     // 全屏歌词内切换歌词源 / 调整偏移量后 mini 歌词同步生效
@@ -124,9 +133,9 @@ fun MiniLyric(
             modifier
                 .clip(Shapes.MediumCornerBasedShape)
                 .clickable(onClickLabel = stringResource(R.string.tab_lrc)) { onClick.invoke() }
-                .padding(horizontal = Spacing.Medium, vertical = Spacing.Small)
+                .padding(horizontal = horizontalPadding, vertical = Spacing.Small)
                 .heightIn(min = 20.dp),
-        contentAlignment = Alignment.Center,
+        contentAlignment = if (textAlign == TextAlign.Start) Alignment.CenterStart else Alignment.Center,
     ) {
         AnimatedContent(
             targetState = displayText,
@@ -139,16 +148,16 @@ fun MiniLyric(
             val isPlaceholder = line == null || line == LOADING_PLACEHOLDER
             Text(
                 text = line ?: stringResource(if (uiState.lyricsSuppressed) R.string.lyrics_no_match else R.string.no_lyrics),
-                style = MaterialTheme.typography.bodyMedium,
+                style = textStyle,
                 color =
                     if (isPlaceholder) {
                         MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.9f)
                     } else {
-                        MaterialTheme.colorScheme.onSurfaceVariant
+                        textColor.takeOrElse { MaterialTheme.colorScheme.onSurfaceVariant }
                     },
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
-                textAlign = TextAlign.Center,
+                textAlign = textAlign,
                 modifier = Modifier.fillMaxWidth(),
             )
         }
