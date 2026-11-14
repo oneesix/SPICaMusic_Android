@@ -1,0 +1,22 @@
+diff --git a/app/src/main/java/me/spica27/spicamusic/ui/home/page/MusicPage.kt b/app/src/main/java/me/spica27/spicamusic/ui/home/page/MusicPage.kt
+index 123d820..e143baf 100644
+--- a/app/src/main/java/me/spica27/spicamusic/ui/home/page/MusicPage.kt
++++ b/app/src/main/java/me/spica27/spicamusic/ui/home/page/MusicPage.kt
+@@ -917,8 +917,6 @@ private fun MusicTopBlur(
+                     HazeBlurStyle {
+                         blurRadius(amount.dp)
+                         noiseFactor(0f)
+-                        backgroundColor(background.copy(alpha = 0.16f))
+-                        colorEffects(listOf(HazeColorEffect.tint(background.copy(alpha = 0.4f))))
+                         fallbackColorEffect(HazeColorEffect.tint(background.copy(alpha = 0.85f)))
+                     }
+                 }
+@@ -939,8 +937,6 @@ private fun MusicTopBlur(
+                         HazeBlurStyle {
+                             blurRadius(amount.dp)
+                             noiseFactor(0f)
+-                            backgroundColor(background.copy(alpha = 0.16f))
+-                            colorEffects(listOf(HazeColorEffect.tint(background.copy(alpha = 0.4f))))
+                             fallbackColorEffect(HazeColorEffect.tint(background.copy(alpha = 0.85f)))
+                             progressive(HazeProgressive.verticalGradient(startIntensity = 1f, endIntensity = 0f))
+                         }
