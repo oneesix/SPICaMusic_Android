@@ -187,11 +187,6 @@ class PreferencesManager(
         val LYRIC_KINETIC_FONT_MIX = booleanPreferencesKey("lyric_kinetic_font_mix")
         val LYRIC_KINETIC_FONT_COUNT = intPreferencesKey("lyric_kinetic_font_count")
         val LYRIC_KINETIC_FONTS = stringPreferencesKey("lyric_kinetic_fonts")
-        val PLAYER_UI_NEW = booleanPreferencesKey("player_ui_new")
-        val PLAYER_UI_TOP_PADDING = intPreferencesKey("player_ui_top_padding")
-        val PLAYER_UI_INFO_SIZE = intPreferencesKey("player_ui_info_size")
-        val PLAYER_UI_INFO_POSITION = intPreferencesKey("player_ui_info_position")
-        val PLAYER_UI_FLIP_END = intPreferencesKey("player_ui_flip_end")
     }
 
 
@@ -323,11 +318,6 @@ class PreferencesManager(
                     kineticFontMix = p[Keys.LYRIC_KINETIC_FONT_MIX] ?: d.kineticFontMix,
                     kineticFontCount = p[Keys.LYRIC_KINETIC_FONT_COUNT] ?: d.kineticFontCount,
                     kineticFonts = p[Keys.LYRIC_KINETIC_FONTS] ?: d.kineticFonts,
-                    newPlayerUi = p[Keys.PLAYER_UI_NEW] ?: d.newPlayerUi,
-                    playerUiTopPadding = p[Keys.PLAYER_UI_TOP_PADDING] ?: d.playerUiTopPadding,
-                    playerUiInfoSize = p[Keys.PLAYER_UI_INFO_SIZE] ?: d.playerUiInfoSize,
-                    playerUiInfoPosition = p[Keys.PLAYER_UI_INFO_POSITION] ?: d.playerUiInfoPosition,
-                    playerUiFlipEnd = p[Keys.PLAYER_UI_FLIP_END] ?: d.playerUiFlipEnd,
                 ).sanitized()
             }.distinctUntilChanged()
 
@@ -459,11 +449,6 @@ class PreferencesManager(
                     kineticFontMix = p[Keys.LYRIC_KINETIC_FONT_MIX] ?: d.kineticFontMix,
                     kineticFontCount = p[Keys.LYRIC_KINETIC_FONT_COUNT] ?: d.kineticFontCount,
                     kineticFonts = p[Keys.LYRIC_KINETIC_FONTS] ?: d.kineticFonts,
-                    newPlayerUi = p[Keys.PLAYER_UI_NEW] ?: d.newPlayerUi,
-                    playerUiTopPadding = p[Keys.PLAYER_UI_TOP_PADDING] ?: d.playerUiTopPadding,
-                    playerUiInfoSize = p[Keys.PLAYER_UI_INFO_SIZE] ?: d.playerUiInfoSize,
-                    playerUiInfoPosition = p[Keys.PLAYER_UI_INFO_POSITION] ?: d.playerUiInfoPosition,
-                    playerUiFlipEnd = p[Keys.PLAYER_UI_FLIP_END] ?: d.playerUiFlipEnd,
                 )
             val n = transform(current).sanitized()
             p[Keys.LYRIC_FONT_STYLE] = n.fontStyle
@@ -586,11 +571,6 @@ class PreferencesManager(
             p[Keys.LYRIC_KINETIC_FONT_MIX] = n.kineticFontMix
             p[Keys.LYRIC_KINETIC_FONT_COUNT] = n.kineticFontCount
             p[Keys.LYRIC_KINETIC_FONTS] = n.kineticFonts
-            p[Keys.PLAYER_UI_NEW] = n.newPlayerUi
-            p[Keys.PLAYER_UI_TOP_PADDING] = n.playerUiTopPadding
-            p[Keys.PLAYER_UI_INFO_SIZE] = n.playerUiInfoSize
-            p[Keys.PLAYER_UI_INFO_POSITION] = n.playerUiInfoPosition
-            p[Keys.PLAYER_UI_FLIP_END] = n.playerUiFlipEnd
         }
     }
 

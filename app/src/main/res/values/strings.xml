@@ -1219,16 +1219,4 @@
   <string name="glass_mode_lens">Refraction lens</string>
   <string name="glass_saturation">Color boost</string>
   <string name="glass_saturation_desc">Saturation of what shows through (frosted only)</string>
-  <string name="player_ui_new_title">New player UI</string>
-  <string name="player_ui_new_subtitle">The player page uses the lyrics-style top and bottom bars</string>
-  <string name="player_ui_settings">Player UI settings</string>
-  <string name="player_ui_set_top_padding">Top bar padding</string>
-  <string name="player_ui_set_info_position">Title and artist position</string>
-  <string name="player_ui_set_info_size">Title and artist size</string>
-  <string name="player_ui_set_flip_end">Flipped cover end position</string>
-  <string name="player_ui_now_playing">Now playing</string>
-  <string name="player_ui_next_track">Next track</string>
-  <string name="player_ui_mix">Mix</string>
-  <string name="player_ui_repeat">Repeat</string>
-  <string name="player_ui_queue">Queue</string>
 </resources>

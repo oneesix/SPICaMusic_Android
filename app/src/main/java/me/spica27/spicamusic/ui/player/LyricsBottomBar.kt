@@ -16,12 +16,8 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.PlaylistPlay
 import androidx.compose.material.icons.rounded.Pause
 import androidx.compose.material.icons.rounded.PlayArrow
-import androidx.compose.material.icons.rounded.Repeat
-import androidx.compose.material.icons.rounded.RepeatOne
-import androidx.compose.material.icons.rounded.Shuffle
 import androidx.compose.material.icons.rounded.Translate
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -54,7 +50,6 @@ import dev.chrisbanes.haze.blur.HazeColorEffect
 import dev.chrisbanes.haze.blur.hazeBlur
 import me.spica27.spicamusic.R
 import me.spica27.spicamusic.artwork.MusicArtwork
-import me.spica27.spicamusic.player.api.PlayMode
 import me.spica27.spicamusic.ui.widget.AudioCover
 import me.spica27.spicamusic.ui.widget.rememberLyricsEdgePadding
 import org.koin.compose.viewmodel.koinActivityViewModel
@@ -80,8 +75,6 @@ internal fun LyricsBottomBar(
     /** Height of the whole bar in px, so the "spread" blur layer can match it. */
     onHeightChange: (Int) -> Unit,
     modifier: Modifier = Modifier,
-    /** New player UI: mix | next track pill with queue button | repeat, instead of the lyrics buttons. */
-    player: PlayerDockState? = null,
 ) {
     val viewModel: LyricsViewModel = koinActivityViewModel()
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
@@ -144,25 +137,8 @@ internal fun LyricsBottomBar(
                 .padding(start = edge, end = edge, top = 10.dp, bottom = s.dockBottomPadding.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        // Left: transliteration (new player UI: mix)
-        if (player != null) {
-            DockCircleButton(
-                size = size,
-                fill = fill,
-                glass = glass,
-                on = player.playMode == PlayMode.SHUFFLE,
-                available = true,
-                description = stringResource(R.string.player_ui_mix),
-                onClick = player.onMixClick,
-            ) { tint ->
-                Icon(
-                    imageVector = Icons.Rounded.Shuffle,
-                    contentDescription = null,
-                    tint = tint,
-                    modifier = Modifier.size(size * 0.46f),
-                )
-            }
-        } else DockCircleButton(
+        // Left: transliteration
+        DockCircleButton(
             size = size,
             fill = fill,
             glass = glass,
@@ -232,27 +208,11 @@ internal fun LyricsBottomBar(
                     overflow = TextOverflow.Ellipsis,
                     modifier = Modifier.fillMaxWidth(),
                 )
-                if (player != null) {
-                    // New player UI: the title of the next track
-                    val nextSize = (size.value * 0.23f).sp
-                    Text(
-                        text = player.nextTitle,
-                        style = MaterialTheme.typography.bodySmall,
-                        fontSize = nextSize,
-                        lineHeight = nextSize * 1.2f,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        textAlign = TextAlign.Center,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                        modifier = Modifier.fillMaxWidth(),
-                    )
-                } else {
-                    LyricsDockTime(
-                        seekPositionProvider = seekPositionProvider,
-                        durationMs = durationMs,
-                        fontSize = (size.value * 0.23f).sp,
-                    )
-                }
+                LyricsDockTime(
+                    seekPositionProvider = seekPositionProvider,
+                    durationMs = durationMs,
+                    fontSize = (size.value * 0.23f).sp,
+                )
             }
 
             Box(
@@ -261,22 +221,12 @@ internal fun LyricsBottomBar(
                         .size(inner)
                         .clip(CircleShape)
                         .background(innerFill)
-                        .clickable(role = Role.Button, onClick = player?.onQueueClick ?: onPlayPauseClick),
+                        .clickable(role = Role.Button, onClick = onPlayPauseClick),
                 contentAlignment = Alignment.Center,
             ) {
                 Icon(
-                    imageVector =
-                        when {
-                            player != null -> Icons.AutoMirrored.Filled.PlaylistPlay
-                            isPlaying -> Icons.Rounded.Pause
-                            else -> Icons.Rounded.PlayArrow
-                        },
-                    contentDescription =
-                        if (player != null) {
-                            stringResource(R.string.player_ui_queue)
-                        } else {
-                            stringResource(if (isPlaying) R.string.pause else R.string.play)
-                        },
+                    imageVector = if (isPlaying) Icons.Rounded.Pause else Icons.Rounded.PlayArrow,
+                    contentDescription = stringResource(if (isPlaying) R.string.pause else R.string.play),
                     tint = onSurface,
                     modifier = Modifier.size(inner / 2),
                 )
@@ -285,25 +235,8 @@ internal fun LyricsBottomBar(
 
         Spacer(modifier = Modifier.width(s.dockGapRight.dp))
 
-        // Right: translation (new player UI: repeat)
-        if (player != null) {
-            DockCircleButton(
-                size = size,
-                fill = fill,
-                glass = glass,
-                on = player.playMode == PlayMode.LIST,
-                available = true,
-                description = stringResource(R.string.player_ui_repeat),
-                onClick = player.onRepeatClick,
-            ) { tint ->
-                Icon(
-                    imageVector = if (player.playMode == PlayMode.LIST) Icons.Rounded.RepeatOne else Icons.Rounded.Repeat,
-                    contentDescription = null,
-                    tint = tint,
-                    modifier = Modifier.size(size * 0.46f),
-                )
-            }
-        } else DockCircleButton(
+        // Right: translation
+        DockCircleButton(
             size = size,
             fill = fill,
             glass = glass,
@@ -325,15 +258,6 @@ internal fun LyricsBottomBar(
         }
     }
 }
-
-/** New player UI: what the bottom bar shows (and does) instead of the lyrics buttons. */
-internal class PlayerDockState(
-    val nextTitle: String,
-    val playMode: PlayMode,
-    val onMixClick: () -> Unit,
-    val onRepeatClick: () -> Unit,
-    val onQueueClick: () -> Unit,
-)
 
 /**
  * Round button. The circle never changes; only the icon / text does:

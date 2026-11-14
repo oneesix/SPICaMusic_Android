@@ -120,8 +120,6 @@ fun LyricsToolbarMenuContent(
     onOpenLyricsSettings: () -> Unit,
     onOpenLyricsSwitcher: () -> Unit,
     modifier: Modifier = Modifier,
-    /** Opens the player UI settings. null = the entry is not shown. */
-    onOpenPlayerUiSettings: (() -> Unit)? = null,
 ) {
     Column(
         modifier = modifier,
@@ -141,11 +139,6 @@ fun LyricsToolbarMenuContent(
 
         // 切换歌词来源按钮（常驻：无内嵌/在线时用户仍可进入选择本地文件）
         SwitchLyricsButton(onClick = onOpenLyricsSwitcher)
-
-        // Player UI settings, right below "Toggle lyrics"
-        if (onOpenPlayerUiSettings != null) {
-            PlayerUiSettingsButton(onClick = onOpenPlayerUiSettings)
-        }
     }
 }
 
@@ -251,33 +244,6 @@ private fun SwitchLyricsButton(
         )
         Text(
             text = stringResource(R.string.toggle_lyrics),
-            style = LyricsControlDefaults.pillLabelTextStyle,
-            color = MaterialTheme.colorScheme.onSurface,
-        )
-    }
-}
-
-/**
- * Player UI settings button (below "Toggle lyrics").
- */
-@Composable
-private fun PlayerUiSettingsButton(
-    onClick: () -> Unit,
-    modifier: Modifier = Modifier,
-) {
-    LyricsPill(
-        modifier = modifier,
-        onClick = onClick,
-        shape = Shapes.ExtraLargeCornerBasedShape,
-    ) {
-        Icon(
-            imageVector = Icons.Rounded.Tune,
-            contentDescription = null,
-            tint = MaterialTheme.colorScheme.onSurface,
-            modifier = Modifier.size(18.dp),
-        )
-        Text(
-            text = stringResource(R.string.player_ui_settings),
             style = LyricsControlDefaults.pillLabelTextStyle,
             color = MaterialTheme.colorScheme.onSurface,
         )

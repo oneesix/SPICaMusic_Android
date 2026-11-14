@@ -1219,16 +1219,4 @@
   <string name="glass_mode_lens">折射透镜</string>
   <string name="glass_saturation">色彩增强</string>
   <string name="glass_saturation_desc">透出背景的饱和度（仅磨砂）</string>
-  <string name="player_ui_new_title">新播放器界面</string>
-  <string name="player_ui_new_subtitle">播放页使用与歌词页相同风格的顶栏和底栏</string>
-  <string name="player_ui_settings">播放器界面设置</string>
-  <string name="player_ui_set_top_padding">顶栏边距</string>
-  <string name="player_ui_set_info_position">标题与歌手位置</string>
-  <string name="player_ui_set_info_size">标题与歌手大小</string>
-  <string name="player_ui_set_flip_end">翻转封面结束位置</string>
-  <string name="player_ui_now_playing">正在播放</string>
-  <string name="player_ui_next_track">下一首</string>
-  <string name="player_ui_mix">随机</string>
-  <string name="player_ui_repeat">循环</string>
-  <string name="player_ui_queue">播放队列</string>
 </resources>

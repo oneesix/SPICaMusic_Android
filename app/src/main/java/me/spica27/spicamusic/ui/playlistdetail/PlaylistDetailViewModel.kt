@@ -29,7 +29,6 @@ import me.spica27.spicamusic.feature.library.domain.PlaylistUseCases
 import me.spica27.spicamusic.feature.library.domain.SongUseCases
 import me.spica27.spicamusic.feature.player.domain.PlayerUseCases
 import me.spica27.spicamusic.player.api.PlayerAction
-import me.spica27.spicamusic.ui.player.PlaybackSourceHolder
 import timber.log.Timber
 
 /**
@@ -236,7 +235,6 @@ class PlaylistDetailViewModel(
                         start = true,
                     ),
                 )
-                PlaybackSourceHolder.set(playlist.value?.playlistName, ids.map { it.toString() })
                 Timber.d("开始播放歌单")
             } catch (e: Exception) {
                 Timber.e(e, "播放歌单失败")
@@ -263,7 +261,6 @@ class PlaylistDetailViewModel(
                         start = true,
                     ),
                 )
-                PlaybackSourceHolder.set(playlist.value?.playlistName, ids.map { it.toString() })
                 Timber.d("播放歌曲: ${song.displayName}")
             } catch (e: Exception) {
                 Timber.e(e, "播放歌曲失败")
