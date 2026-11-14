@@ -1,6 +1,5 @@
 package me.spica27.spicamusic.ui.home.player_bar
 
-import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -18,7 +17,6 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.PlaylistPlay
 import androidx.compose.material.icons.rounded.Pause
 import androidx.compose.material.icons.rounded.PlayArrow
 import androidx.compose.material3.Icon
@@ -94,20 +92,13 @@ internal fun MiniPlayerBar(
                     overflow = TextOverflow.Ellipsis,
                 )
             }
-            Row(horizontalArrangement = Arrangement.spacedBy(4.dp), verticalAlignment = Alignment.CenterVertically) {
-                IconButton(onClick = onOpenQueue, modifier = Modifier.size(48.dp)) {
-                    Icon(Icons.AutoMirrored.Filled.PlaylistPlay, stringResource(R.string.queue), tint = foreground)
-                }
-                IconButton(
-                    onClick = onPlayPause,
-                    modifier = Modifier.size(48.dp).clip(RoundedCornerShape(16.dp)).background(colors.primary),
-                ) {
-                    Icon(
-                        if (isPlaying) Icons.Rounded.Pause else Icons.Rounded.PlayArrow,
-                        stringResource(if (isPlaying) R.string.pause else R.string.play),
-                        tint = colors.onPrimary,
-                    )
-                }
+            // Queue button removed; play/pause is a plain icon without a background.
+            IconButton(onClick = onPlayPause, modifier = Modifier.size(48.dp)) {
+                Icon(
+                    if (isPlaying) Icons.Rounded.Pause else Icons.Rounded.PlayArrow,
+                    stringResource(if (isPlaying) R.string.pause else R.string.play),
+                    tint = foreground,
+                )
             }
         }
         Spacer(

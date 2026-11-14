@@ -146,6 +146,33 @@ internal fun BottomBarSettingsContent(
         if (custom.bubble == 1) {
             GeometrySlider(R.string.bb_bubble_size, BottomBarSetting.BubbleSize, custom.bubbleSize, 100..170, "%")
         }
+        LyricsSettingsToggle(
+            label = stringResource(R.string.bb_blur),
+            description = stringResource(R.string.bb_blur_sub),
+            checked = custom.blur == 1,
+            onCheckedChange = { onInt(BottomBarSetting.Blur, if (it) 1 else 0) },
+        )
+        if (custom.blur == 1) {
+            GeometrySlider(R.string.mtb_blur_amount, BottomBarSetting.BlurAmount, custom.blurAmount, 0..40, " dp")
+            LyricsSettingsSlider(
+                label = stringResource(R.string.mtb_blur_position),
+                description = stringResource(R.string.bb_blur_position_sub),
+                value = custom.blurPosition,
+                range = -180..120,
+                step = 1,
+                valueText = { "$it dp" },
+                onValueChange = { onInt(BottomBarSetting.BlurPosition, it) },
+            )
+            LyricsSettingsToggle(
+                label = stringResource(R.string.mtb_blur_soft),
+                description = stringResource(R.string.bb_blur_soft_sub),
+                checked = custom.softEdge == 1,
+                onCheckedChange = { onInt(BottomBarSetting.SoftEdge, if (it) 1 else 0) },
+            )
+            if (custom.softEdge == 1) {
+                GeometrySlider(R.string.mtb_blur_fade, BottomBarSetting.EdgeFade, custom.edgeFade, 0..80, " dp")
+            }
+        }
         LyricsSettingsResetButton(
             text = stringResource(R.string.bb_reset),
             onClick = {

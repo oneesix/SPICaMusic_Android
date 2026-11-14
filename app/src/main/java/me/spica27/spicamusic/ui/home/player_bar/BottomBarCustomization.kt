@@ -22,6 +22,11 @@ enum class BottomBarSetting {
     SearchTab,
     Bubble,
     BubbleSize,
+    Blur,
+    BlurAmount,
+    BlurPosition,
+    SoftEdge,
+    EdgeFade,
 }
 
 /** 标签显示方式。 */
@@ -51,6 +56,11 @@ data class BottomBarCustomization(
     val searchTab: Int = 1,
     val bubble: Int = 1,
     val bubbleSize: Int = 135,
+    val blur: Int = 1,
+    val blurAmount: Int = 16,
+    val blurPosition: Int = 8,
+    val softEdge: Int = 1,
+    val edgeFade: Int = 32,
     val icons: List<String> = DefaultIcons,
     val labels: List<String> = DefaultLabels,
 ) {
@@ -79,6 +89,11 @@ data class BottomBarCustomization(
             searchTab = ints[9],
             bubble = ints[10],
             bubbleSize = ints[11],
+            blur = ints[12],
+            blurAmount = ints[13],
+            blurPosition = ints[14],
+            softEdge = ints[15],
+            edgeFade = ints[16],
             icons = List(4) { texts[it * 2] },
             labels = List(4) { texts[it * 2 + 1] },
         )
@@ -98,6 +113,11 @@ data class BottomBarCustomization(
             searchTab,
             bubble,
             bubbleSize,
+            blur,
+            blurAmount,
+            blurPosition,
+            softEdge,
+            edgeFade,
         )
 }
 

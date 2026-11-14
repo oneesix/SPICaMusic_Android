@@ -14,6 +14,7 @@ import androidx.compose.foundation.gestures.Orientation
 import androidx.compose.foundation.gestures.draggable
 import androidx.compose.foundation.gestures.rememberDraggableState
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.WindowInsets
@@ -61,7 +62,16 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.LayoutDirection
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import dev.chrisbanes.haze.ExperimentalHazeApi
+import dev.chrisbanes.haze.HazeInput
+import dev.chrisbanes.haze.HazePerformanceMode
+import dev.chrisbanes.haze.HazeProgressive
+import dev.chrisbanes.haze.HazeState
+import dev.chrisbanes.haze.blur.HazeBlurStyle
+import dev.chrisbanes.haze.blur.HazeColorEffect
+import dev.chrisbanes.haze.blur.hazeBlur
 import me.spica27.spicamusic.R
 import me.spica27.spicamusic.common.entity.BottomBarLayout
 import me.spica27.spicamusic.ui.theme.EaseOutEmphasized
@@ -71,7 +81,7 @@ import kotlin.math.roundToInt
 private const val MiniPlayerFadeEnd = 0.3f
 private const val NavigationFadeEnd = 0.5f
 
-private enum class PlayerLayoutSlot { MiniPlayer, Navigation, Page, Player }
+private enum class PlayerLayoutSlot { MiniPlayer, Navigation, Page, Blur, Player }
 
 /** 尺寸不纳入状态观察，拖拽仅更新布局和绘制。 */
 private class PlayerLayoutMeasurements {
@@ -121,6 +131,7 @@ internal fun HomePlayerScaffold(
     active: Boolean = true,
     onMiniPlayerDragStart: () -> Unit = {},
     layout: BottomBarLayout = BottomBarLayout.Traditional,
+    blurHazeState: HazeState? = null,
     content: @Composable (PaddingValues) -> Unit,
 ) {
     val reducedMotion = LocalReducedMotion.current
@@ -130,6 +141,8 @@ internal fun HomePlayerScaffold(
     // 底栏自定义：左右/上下位置与宽高。
     val custom = LocalBottomBarCustomization.current
     val collapsedPlayerColor = appearance.miniPlayerContainerColor(colors)
+    // Bottom blur replaces the solid / fading tint behind the bar.
+    val blurOn = blurHazeState != null && custom.blur == 1 && custom.blurAmount > 0
     val density = LocalDensity.current
     val layoutDirection = LocalLayoutDirection.current
     val safeInsets = WindowInsets.safeDrawing
@@ -219,7 +232,7 @@ internal fun HomePlayerScaffold(
             }
         }
     val navigationSlot: @Composable () -> Unit =
-        remember(keyboardVisible, navigationBar, appearance, colors.surface, navigationBottomPadding, enter, exit, hiddenSemantics, custom) {
+        remember(keyboardVisible, navigationBar, appearance, colors.surface, navigationBottomPadding, enter, exit, hiddenSemantics, custom, blurOn) {
             {
                 Box(
                     hiddenSemantics.graphicsLayer {
@@ -233,7 +246,9 @@ internal fun HomePlayerScaffold(
                             Modifier
                                 .fillMaxWidth()
                                 .then(
-                                    if (appearance.isFloating) {
+                                    if (blurOn) {
+                                        Modifier
+                                    } else if (appearance.isFloating) {
                                         Modifier.drawBehind {
                                             // 悬浮栏下方渐隐至主题底色，衔接系统手势区。
                                             val fadeStart = (size.height - navigationBottomPadding - 24.dp.toPx()).coerceAtLeast(0f)
@@ -338,11 +353,30 @@ internal fun HomePlayerScaffold(
                     }
                 }
             }.single().measure(Constraints.fixed(width, height))
+        // Blur band behind the bar: solid part up to the bar top + position, then an optional soft fade above it.
+        val barHeight = mini.height + navigation.height
+        val blurSolid = if (blurOn) (barHeight + custom.blurPosition.dp.roundToPx().coerceAtLeast(-barHeight)).coerceAtLeast(0) else 0
+        val blurFade = if (blurOn && custom.softEdge == 1) custom.edgeFade.dp.roundToPx().coerceAtLeast(0) else 0
+        val blur =
+            if (blurHazeState != null && blurSolid + blurFade > 0) {
+                subcompose(PlayerLayoutSlot.Blur) {
+                    BottomBlurBand(
+                        hazeState = blurHazeState,
+                        amount = custom.blurAmount,
+                        solidHeight = blurSolid.toDp(),
+                        fadeHeight = blurFade.toDp(),
+                        alpha = { (1f - progress() / NavigationFadeEnd).coerceIn(0f, 1f) },
+                    )
+                }.single().measure(Constraints.fixed(width, blurSolid + blurFade))
+            } else {
+                null
+            }
         val player = subcompose(PlayerLayoutSlot.Player, playerSlot).single().measure(Constraints.fixed(width, height))
         layout(width, height) {
             val fraction = progress()
             val top = (measurements.travel * (1f - fraction)).roundToInt()
             page.placeRelative(0, 0)
+            blur?.placeRelative(0, height - blur.height)
             navigation.placeRelative(0, height - navigation.height)
             // 透明后置于播放器下层，避免拦截触摸。
             if (fraction < MiniPlayerFadeEnd) {
@@ -352,6 +386,62 @@ internal fun HomePlayerScaffold(
                 mini.placeRelative(0, top)
                 player.placeRelative(0, top)
             }
+        }
+    }
+}
+
+/** 底栏后面的渐进模糊：与音乐页顶栏同一思路，但向上渐隐；只采样下面的列表，不带色调。 */
+@OptIn(ExperimentalHazeApi::class)
+@Composable
+private fun BottomBlurBand(
+    hazeState: HazeState,
+    amount: Int,
+    solidHeight: Dp,
+    fadeHeight: Dp,
+    alpha: () -> Float,
+) {
+    val background = MaterialTheme.colorScheme.background
+    val hardStyle =
+        remember(background, amount) {
+            HazeBlurStyle {
+                blurRadius(amount.dp)
+                noiseFactor(0f)
+                fallbackColorEffect(HazeColorEffect.tint(background.copy(alpha = 0.85f)))
+            }
+        }
+    val fadeStyle =
+        remember(background, amount) {
+            HazeBlurStyle {
+                blurRadius(amount.dp)
+                noiseFactor(0f)
+                fallbackColorEffect(HazeColorEffect.tint(background.copy(alpha = 0.85f)))
+                progressive(HazeProgressive.verticalGradient(startIntensity = 0f, endIntensity = 1f))
+            }
+        }
+    Column(Modifier.fillMaxSize().graphicsLayer { this.alpha = alpha() }) {
+        if (fadeHeight > 0.dp) {
+            Box(
+                Modifier
+                    .fillMaxWidth()
+                    .height(fadeHeight)
+                    .hazeBlur(
+                        input = HazeInput.Sources(hazeState),
+                        style = fadeStyle,
+                        performanceMode = HazePerformanceMode.Balanced,
+                    ),
+            )
+        }
+        if (solidHeight > 0.dp) {
+            Box(
+                Modifier
+                    .fillMaxWidth()
+                    .height(solidHeight)
+                    .hazeBlur(
+                        input = HazeInput.Sources(hazeState),
+                        style = hardStyle,
+                        performanceMode = HazePerformanceMode.Balanced,
+                    ),
+            )
         }
     }
 }

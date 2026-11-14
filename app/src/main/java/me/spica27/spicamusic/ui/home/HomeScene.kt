@@ -25,6 +25,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.res.stringResource
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import dev.chrisbanes.haze.hazeSource
 import dev.chrisbanes.haze.rememberHazeState
 import me.spica27.spicamusic.R
 import me.spica27.spicamusic.artwork.artwork
@@ -67,6 +68,8 @@ fun HomeScreen() {
     val displayedMediaItem = mediaItem ?: lastMediaItem
     val glassEnabled = LocalLiquidGlassConfig.current.enabled
     val hazeState = rememberHazeState()
+    // Always-on source for the bottom bar blur (the glass source above only exists with Liquid Glass).
+    val bottomBlurState = rememberHazeState()
     val isPlaying by playerViewModel.isPlaying.collectAsStateWithLifecycle()
     val position = playerViewModel.currentPosition.collectAsStateWithLifecycle()
     val duration = playerViewModel.currentDuration.collectAsStateWithLifecycle()
@@ -83,6 +86,7 @@ fun HomeScreen() {
         playerAvailable = mediaItem != null,
         sheetState = sheetState,
         layout = bottomBarLayout,
+        blurHazeState = bottomBlurState,
         active = active,
         onMiniPlayerDragStart = { initialPlayerPage = DEFAULT_PAGE },
         navigationBar = {
@@ -131,7 +135,7 @@ fun HomeScreen() {
             )
         },
     ) { padding ->
-        Box(Modifier.fillMaxSize().liquidGlassSource(hazeState).liquidGlassV2Source()) {
+        Box(Modifier.fillMaxSize().hazeSource(bottomBlurState).liquidGlassSource(hazeState).liquidGlassV2Source()) {
             pageStateHolder.SaveableStateProvider(currentPage) {
                 when (currentPage) {
                     HomePage.Finder -> FinderPage(bottomContentPadding = padding.calculateBottomPadding())

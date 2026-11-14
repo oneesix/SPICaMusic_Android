@@ -698,6 +698,11 @@ class PreferencesManager(
             "search_tab",
             "bubble",
             "bubble_size",
+            "blur",
+            "blur_amount",
+            "blur_position",
+            "blur_soft",
+            "blur_fade",
         ).map { intPreferencesKey("bottom_bar_$it") }
 
     /** 文本项：每个标签依次存放 图标名、文字，共 4 个标签（发现、音乐、曲库、搜索）。 */

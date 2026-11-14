@@ -1212,6 +1212,10 @@
   <string name="bb_search_tab_sub">Adds a Search tab that opens the search screen.</string>
   <string name="bb_bubble">Bubble glass when held</string>
   <string name="bb_bubble_sub">Hold and drag the tab selector to get a magnified liquid glass bubble (Android 13+).</string>
+  <string name="bb_blur">Bottom blur</string>
+  <string name="bb_blur_sub">The list scrolls behind a blurred bottom bar. Off: the solid bar colour.</string>
+  <string name="bb_blur_position_sub">How far the blur reaches above the bar. Far left moves it to the very bottom.</string>
+  <string name="bb_blur_soft_sub">The blur fades out above the bar instead of a hard edge</string>
   <string name="bb_bubble_size">Bubble size</string>
   <string name="bb_reset">Reset bottom bar</string>
   <string name="bb_icon_missing">Icon not found; the default icon is used</string>

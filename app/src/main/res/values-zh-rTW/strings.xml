@@ -1211,6 +1211,10 @@
   <string name="bb_search_tab_sub">新增搜尋標籤，點擊開啟搜尋頁。</string>
   <string name="bb_bubble">長按氣泡玻璃</string>
   <string name="bb_bubble_sub">按住並拖動標籤選擇器，顯示放大的液態玻璃氣泡（Android 13+）。</string>
+  <string name="bb_blur">底欄模糊</string>
+  <string name="bb_blur_sub">列表在模糊的底欄後面捲動。關閉：使用底欄純色。</string>
+  <string name="bb_blur_position_sub">模糊向上延伸到底欄上方的距離。拖到最左則移到最底部。</string>
+  <string name="bb_blur_soft_sub">模糊在底欄上方漸隱，而不是硬邊</string>
   <string name="bb_bubble_size">氣泡大小</string>
   <string name="bb_reset">重置底部列</string>
   <string name="bb_icon_missing">找不到該圖示，已使用預設圖示</string>
