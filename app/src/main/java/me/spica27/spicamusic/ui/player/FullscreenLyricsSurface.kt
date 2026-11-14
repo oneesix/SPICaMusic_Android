@@ -50,7 +50,6 @@ import com.kyant.backdrop.backdrops.LayerBackdrop
 import com.kyant.backdrop.backdrops.layerBackdrop
 import com.kyant.backdrop.backdrops.rememberCombinedBackdrop
 import com.kyant.backdrop.backdrops.rememberLayerBackdrop
-import me.spica27.spicamusic.ui.glass.LocalGlassV2Backdrop
 import me.spica27.spicamusic.ui.glass.LocalLiquidGlassConfig
 import me.spica27.spicamusic.ui.glass.LocalLiquidGlassV2Config
 import me.spica27.spicamusic.ui.widget.LyricsControlDefaults
@@ -189,7 +188,7 @@ internal fun FullscreenLyricsSurface(
             )
         }
 
-        CompositionLocalProvider(LocalGlassV2Backdrop provides (if (glassV2) glassBackdrop else LocalGlassV2Backdrop.current)) {
+        CompositionLocalProvider(LocalLyricsGlassBackdrop provides (if (glassV2) glassBackdrop else null)) {
         FullscreenLyricsHeader(
             hazeState = hazeState,
             title = title,
@@ -225,7 +224,7 @@ internal fun FullscreenLyricsSurface(
 
         // Bottom bar: transliteration button | pill (cover, artist + time, play/pause) | translation button
         if (style.enhanceHeader) {
-            CompositionLocalProvider(LocalGlassV2Backdrop provides (if (glassV2) glassBackdrop else LocalGlassV2Backdrop.current)) {
+            CompositionLocalProvider(LocalLyricsGlassBackdrop provides (if (glassV2) glassBackdrop else null)) {
             LyricsBottomBar(
                 artist = artist,
                 artwork = artwork,
