@@ -18,6 +18,8 @@ import me.spica27.spicamusic.ui.glass.LiquidGlassSetting
 import me.spica27.spicamusic.ui.glass.LiquidGlassTuning
 import me.spica27.spicamusic.ui.glass.LiquidGlassV2Setting
 import me.spica27.spicamusic.ui.glass.LiquidGlassV2Tuning
+import me.spica27.spicamusic.ui.home.page.AlbumStyleSetting
+import me.spica27.spicamusic.ui.home.page.AlbumStyleTuning
 import me.spica27.spicamusic.ui.home.page.MusicTopBarCustomization
 import me.spica27.spicamusic.ui.home.page.MusicTopBarSetting
 import me.spica27.spicamusic.ui.home.page.defaultValue
@@ -218,6 +220,27 @@ class SettingsViewModel(
     fun setAlbumNewStyle(enabled: Boolean) {
         viewModelScope.launch {
             settingsUseCases.setBoolean(SettingsUseCases.Keys.ALBUM_NEW_STYLE, enabled)
+        }
+    }
+
+    val albumStyleTuning =
+        settingsUseCases
+            .getAlbumStyleTuning(AlbumStyleTuning.DefaultValues)
+            .map(AlbumStyleTuning::fromList)
+            .stateIn(viewModelScope, SharingStarted.Eagerly, AlbumStyleTuning())
+
+    fun setAlbumStyleTuning(
+        setting: AlbumStyleSetting,
+        value: Int,
+    ) {
+        viewModelScope.launch {
+            settingsUseCases.setAlbumStyleTuning(setting.ordinal, value)
+        }
+    }
+
+    fun resetAlbumStyleTuning() {
+        viewModelScope.launch {
+            settingsUseCases.resetAlbumStyleTuning()
         }
     }
 

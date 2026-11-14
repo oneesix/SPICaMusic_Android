@@ -683,6 +683,41 @@ class PreferencesManager(
         }
     }
 
+    /** 新专辑样式调节项，顺序固定，与 app 侧 AlbumStyleSetting 的 ordinal 一一对应。 */
+    private val albumStyleTuningKeys =
+        listOf(
+            "shadow_opacity",
+            "text_size",
+            "corner",
+            "text_padding",
+            "size",
+            "highlight_style",
+            "highlight_width",
+            "highlight_alpha",
+            "highlight_angle",
+            "highlight_falloff",
+        ).map { intPreferencesKey("album_style_$it") }
+
+    fun getAlbumStyleTuning(defaults: List<Int>): Flow<List<Int>> =
+        context.dataStore.data.map { preferences ->
+            albumStyleTuningKeys.mapIndexed { index, key -> preferences[key] ?: defaults[index] }
+        }.distinctUntilChanged()
+
+    suspend fun setAlbumStyleTuning(
+        index: Int,
+        value: Int,
+    ) {
+        context.dataStore.edit { preferences ->
+            preferences[albumStyleTuningKeys[index]] = value
+        }
+    }
+
+    suspend fun resetAlbumStyleTuning() {
+        context.dataStore.edit { preferences ->
+            albumStyleTuningKeys.forEach { preferences.remove(it) }
+        }
+    }
+
     /** 底栏自定义（位置、尺寸、标签内容）：数值项顺序与 app 侧 BottomBarSetting 的 ordinal 对应。 */
     private val bottomBarIntKeys =
         listOf(

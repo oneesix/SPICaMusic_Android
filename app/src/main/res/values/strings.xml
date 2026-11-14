@@ -1237,4 +1237,9 @@
   <string name="mtb_blur_soft">Soft edge</string>
   <string name="mtb_blur_soft_sub">The blur fades out below the bar instead of a hard edge</string>
   <string name="mtb_blur_fade">Edge fade height</string>
+  <string name="album_style_shadow_opacity">Shadow opacity</string>
+  <string name="album_style_text_size">Text size</string>
+  <string name="album_style_text_padding">Text padding</string>
+  <string name="album_style_size">Album size</string>
+  <string name="album_style_reset">Reset album style</string>
 </resources>

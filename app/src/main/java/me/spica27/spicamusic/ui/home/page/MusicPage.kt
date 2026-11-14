@@ -158,7 +158,9 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.LayoutDirection
+import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import kotlinx.coroutines.FlowPreview
 import kotlinx.coroutines.delay
@@ -436,6 +438,7 @@ fun MusicPage(bottomContentPadding: Dp = 0.dp) {
         preferencesManager
             .getBoolean(PreferencesManager.Keys.ALBUM_NEW_STYLE)
             .collectAsStateWithLifecycle(false)
+    val albumStyleTuning = rememberAlbumStyleTuning(preferencesManager)
     val glassEnabled = LocalLiquidGlassConfig.current.enabled
     val glassHazeState = rememberHazeState()
     val pageBackdrop = rememberLayerBackdrop()
@@ -619,6 +622,7 @@ fun MusicPage(bottomContentPadding: Dp = 0.dp) {
                             MusicAlbumCard(
                                 album = album,
                                 newStyle = albumNewStyle,
+                                tuning = albumStyleTuning,
                                 onClick = { backStack.add(AlbumDetailRoute(album)) },
                                 modifier =
                                     Modifier
@@ -1376,90 +1380,118 @@ private fun MusicSongRow(
 
 /**
  * 专辑卡：方形封面 + 标题 + 「歌手 · N 首」。
- * newStyle 开启时信息放进封面底部，渐变色取自封面主色。
+ * newStyle 开启时信息放进封面底部，渐变色取自封面主色；阴影、文字、圆角、边距、大小与高光由 tuning 调节。
  */
 @Composable
 private fun MusicAlbumCard(
     album: Album,
     newStyle: Boolean,
+    tuning: AlbumStyleTuning,
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val subtitle = "${album.artistDisplay()} · ${stringResource(R.string.songs_count_format, album.numberOfSongs)}"
-    Column(
-        modifier =
-            modifier
-                .padding(bottom = Spacing.Medium)
-                .clip(Shapes.ExtraLargeCornerBasedShape)
-                .clickHighlight(onClick = onClick),
-        verticalArrangement = Arrangement.spacedBy(Spacing.Small),
+    val shape = if (newStyle) RoundedCornerShape(tuning.cornerDp.dp) else Shapes.ExtraLargeCornerBasedShape
+    val sizeFraction = if (newStyle) (tuning.sizePercent / 100f).coerceIn(0.3f, 1f) else 1f
+    Box(
+        modifier = modifier.padding(bottom = Spacing.Medium),
+        contentAlignment = Alignment.TopCenter,
     ) {
-        Box(
+        Column(
             modifier =
                 Modifier
-                    .fillMaxWidth()
-                    .aspectRatio(1f)
-                    .clip(Shapes.ExtraLargeCornerBasedShape),
+                    .fillMaxWidth(sizeFraction)
+                    .clip(shape)
+                    .clickHighlight(onClick = onClick),
+            verticalArrangement = Arrangement.spacedBy(Spacing.Small),
         ) {
-            AudioCover(
-                artwork = album.artwork(),
-                modifier = Modifier.fillMaxSize(),
-            )
-            if (newStyle) {
-                val artColor = rememberAlbumArtColor(album.artwork())
-                val shade =
-                    androidx.compose.ui.graphics
-                        .lerp(artColor ?: Color.Black, Color.Black, 0.4f)
-                Column(
-                    modifier =
-                        Modifier
-                            .align(Alignment.BottomStart)
-                            .fillMaxWidth()
-                            .background(
-                                androidx.compose.ui.graphics.Brush.verticalGradient(
-                                    listOf(Color.Transparent, shade),
+            Box(
+                modifier =
+                    Modifier
+                        .fillMaxWidth()
+                        .aspectRatio(1f)
+                        .clip(shape)
+                        .then(if (newStyle) Modifier.albumHighlight(tuning, tuning.cornerDp) else Modifier),
+            ) {
+                AudioCover(
+                    artwork = album.artwork(),
+                    modifier = Modifier.fillMaxSize(),
+                )
+                if (newStyle) {
+                    val artColor = rememberAlbumArtColor(album.artwork())
+                    val shade =
+                        androidx.compose.ui.graphics
+                            .lerp(artColor ?: Color.Black, Color.Black, 0.4f)
+                    val textPad = tuning.textPaddingDp.dp
+                    val titleSize = tuning.textSizeSp.coerceIn(8, 30).sp
+                    val subtitleSize = (tuning.textSizeSp - 2).coerceAtLeast(8).sp
+                    Column(
+                        modifier =
+                            Modifier
+                                .align(Alignment.BottomStart)
+                                .fillMaxWidth()
+                                .background(
+                                    androidx.compose.ui.graphics.Brush.verticalGradient(
+                                        listOf(
+                                            Color.Transparent,
+                                            shade.copy(alpha = (tuning.shadowPercent / 100f).coerceIn(0f, 1f)),
+                                        ),
+                                    ),
+                                ).padding(
+                                    start = textPad,
+                                    end = textPad,
+                                    top = 28.dp,
+                                    bottom = (tuning.textPaddingDp - 2).coerceAtLeast(0).dp,
                                 ),
-                            ).padding(start = 12.dp, end = 12.dp, top = 28.dp, bottom = 10.dp),
+                        verticalArrangement = Arrangement.spacedBy(2.dp),
+                    ) {
+                        Text(
+                            text = album.title,
+                            style =
+                                MaterialTheme.typography.bodyMedium.copy(
+                                    fontSize = titleSize,
+                                    lineHeight = TextUnit.Unspecified,
+                                ),
+                            fontWeight = FontWeight.SemiBold,
+                            color = Color.White,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                        )
+                        Text(
+                            text = subtitle,
+                            style =
+                                MaterialTheme.typography.bodySmall.copy(
+                                    fontSize = subtitleSize,
+                                    lineHeight = TextUnit.Unspecified,
+                                ),
+                            color = Color.White.copy(alpha = 0.8f),
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                        )
+                    }
+                }
+            }
+            if (!newStyle) {
+                Column(
+                    modifier = Modifier.padding(bottom = Spacing.Small),
                     verticalArrangement = Arrangement.spacedBy(2.dp),
                 ) {
                     Text(
                         text = album.title,
                         style = MaterialTheme.typography.bodyMedium,
                         fontWeight = FontWeight.SemiBold,
-                        color = Color.White,
+                        color = MaterialTheme.colorScheme.onSurface,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
                     )
                     Text(
                         text = subtitle,
                         style = MaterialTheme.typography.bodySmall,
-                        color = Color.White.copy(alpha = 0.8f),
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
                     )
                 }
-            }
-        }
-        if (!newStyle) {
-            Column(
-                modifier = Modifier.padding(bottom = Spacing.Small),
-                verticalArrangement = Arrangement.spacedBy(2.dp),
-            ) {
-                Text(
-                    text = album.title,
-                    style = MaterialTheme.typography.bodyMedium,
-                    fontWeight = FontWeight.SemiBold,
-                    color = MaterialTheme.colorScheme.onSurface,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                )
-                Text(
-                    text = subtitle,
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                )
             }
         }
     }

@@ -100,6 +100,8 @@ import me.spica27.spicamusic.ui.glass.LiquidGlassV2Preview
 import me.spica27.spicamusic.ui.glass.LiquidGlassV2Setting
 import me.spica27.spicamusic.ui.glass.LiquidGlassV2Tuning
 import me.spica27.spicamusic.ui.glass.tenthsText
+import me.spica27.spicamusic.ui.home.page.AlbumStyleSetting
+import me.spica27.spicamusic.ui.home.page.AlbumStyleTuning
 import me.spica27.spicamusic.ui.navigation.AboutRoute
 import me.spica27.spicamusic.ui.navigation.AudioEffectsRoute
 import me.spica27.spicamusic.ui.navigation.IgnoredSongsRoute
@@ -143,6 +145,8 @@ fun SettingsScreen() {
     val musicTopBarCustomization by viewModel.musicTopBarCustomization.collectAsStateWithLifecycle()
     val keepScreenOn by viewModel.keepScreenOn.collectAsStateWithLifecycle()
     val albumNewStyle by viewModel.albumNewStyle.collectAsStateWithLifecycle()
+    val albumStyleTuning by viewModel.albumStyleTuning.collectAsStateWithLifecycle()
+    var albumStyleExpanded by rememberSaveable { mutableStateOf(false) }
     val backgroundValue by viewModel.dynamicSpectrumBackground.collectAsStateWithLifecycle()
     val verseMode by viewModel.verseThemeMode.collectAsStateWithLifecycle()
     val verseSaturation by viewModel.verseSaturation.collectAsStateWithLifecycle()
@@ -254,7 +258,16 @@ fun SettingsScreen() {
                         icon = Icons.Default.Album,
                         checked = albumNewStyle,
                         onCheckedChange = viewModel::setAlbumNewStyle,
+                        expanded = albumStyleExpanded,
+                        onExpandClick = { albumStyleExpanded = !albumStyleExpanded },
                     )
+                    AnimatedVisibility(visible = albumNewStyle && albumStyleExpanded) {
+                        AlbumStyleControls(
+                            tuning = albumStyleTuning,
+                            onChange = viewModel::setAlbumStyleTuning,
+                            onReset = viewModel::resetAlbumStyleTuning,
+                        )
+                    }
                     SettingsItemDivider()
                     SwitchRow(
                         title = stringResource(R.string.settings_dark_mode_title),
@@ -732,6 +745,8 @@ private fun SwitchRow(
     icon: ImageVector,
     checked: Boolean,
     onCheckedChange: (Boolean) -> Unit,
+    expanded: Boolean = false,
+    onExpandClick: (() -> Unit)? = null,
 ) {
     val iconScale by animateFloatAsState(
         targetValue = if (checked) 1.08f else 1f,
@@ -759,6 +774,29 @@ private fun SwitchRow(
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
+        }
+        if (checked && onExpandClick != null) {
+            val expandRotation by animateFloatAsState(
+                targetValue = if (expanded) 180f else 0f,
+                animationSpec = tween(durationMillis = 220, easing = EaseOutEmphasized),
+                label = "settings_switch_expand",
+            )
+            IconButton(
+                onClick = onExpandClick,
+                modifier = Modifier.size(36.dp),
+            ) {
+                Icon(
+                    imageVector = Icons.Default.ExpandMore,
+                    contentDescription =
+                        if (expanded) {
+                            stringResource(R.string.settings_collapse_options)
+                        } else {
+                            stringResource(R.string.settings_expand_options)
+                        },
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.graphicsLayer { rotationZ = expandRotation },
+                )
+            }
         }
         Switch(
             checked = checked,
@@ -1467,6 +1505,79 @@ private fun LiquidGlassV2Controls(
         GlassToggle(R.string.glass_v2_press, LiquidGlassV2Setting.Press, tuning.press)
         LyricsSettingsResetButton(
             text = stringResource(R.string.glass_v2_reset),
+            onClick = onReset,
+        )
+    }
+}
+
+/** 新专辑样式的调节项：阴影、文字、圆角、边距、大小与高光（高光选项与液态玻璃 V2 一致）。 */
+@Composable
+private fun AlbumStyleControls(
+    tuning: AlbumStyleTuning,
+    onChange: (AlbumStyleSetting, Int) -> Unit,
+    onReset: () -> Unit,
+) {
+    @Composable
+    fun StyleSlider(
+        label: Int,
+        setting: AlbumStyleSetting,
+        value: Int,
+        range: IntRange,
+        step: Int = 1,
+        text: (Int) -> String,
+    ) = LyricsSettingsSlider(
+        label = stringResource(label),
+        description = "",
+        value = value,
+        range = range,
+        step = step,
+        valueText = text,
+        onValueChange = { onChange(setting, it) },
+    )
+
+    Column(
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .padding(
+                    start = SettingsRowContentInset,
+                    end = Spacing.Large,
+                    top = Spacing.ExtraSmall,
+                    bottom = Spacing.Small,
+                ),
+    ) {
+        StyleSlider(R.string.album_style_shadow_opacity, AlbumStyleSetting.ShadowOpacity, tuning.shadowPercent, 0..100, 5) { "$it%" }
+        StyleSlider(R.string.album_style_text_size, AlbumStyleSetting.TextSize, tuning.textSizeSp, 10..20) { "$it sp" }
+        StyleSlider(R.string.glass_v2_corner, AlbumStyleSetting.Corner, tuning.cornerDp, 0..60, 2) { "$it dp" }
+        StyleSlider(R.string.album_style_text_padding, AlbumStyleSetting.TextPadding, tuning.textPaddingDp, 0..32) { "$it dp" }
+        StyleSlider(R.string.album_style_size, AlbumStyleSetting.Size, tuning.sizePercent, 50..100, 5) { "$it%" }
+        LyricsSettingsChips(
+            label = stringResource(R.string.glass_v2_highlight_style),
+            description = "",
+            options = listOf(0, 1, 2, 3),
+            selected = tuning.highlightStyle,
+            optionLabel = {
+                stringResource(
+                    when (it) {
+                        1 -> R.string.glass_v2_hl_default
+                        2 -> R.string.glass_v2_hl_ambient
+                        3 -> R.string.glass_v2_hl_plain
+                        else -> R.string.glass_v2_hl_off
+                    },
+                )
+            },
+            onSelect = { onChange(AlbumStyleSetting.HighlightStyle, it) },
+        )
+        if (tuning.highlightStyle != 0) {
+            StyleSlider(R.string.glass_v2_highlight_width, AlbumStyleSetting.HighlightWidth, tuning.highlightWidthTenths, 0..40) { "${it.tenthsText()} dp" }
+            StyleSlider(R.string.glass_v2_highlight_alpha, AlbumStyleSetting.HighlightAlpha, tuning.highlightAlphaPercent, 0..100, 5) { "$it%" }
+        }
+        if (tuning.highlightStyle == 1) {
+            StyleSlider(R.string.glass_v2_highlight_angle, AlbumStyleSetting.HighlightAngle, tuning.highlightAngle, 0..360, 5) { "$it°" }
+            StyleSlider(R.string.glass_v2_highlight_falloff, AlbumStyleSetting.HighlightFalloff, tuning.highlightFalloffTenths, 0..40) { it.tenthsText() }
+        }
+        LyricsSettingsResetButton(
+            text = stringResource(R.string.album_style_reset),
             onClick = onReset,
         )
     }

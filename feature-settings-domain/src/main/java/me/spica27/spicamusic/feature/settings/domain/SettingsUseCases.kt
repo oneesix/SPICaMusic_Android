@@ -74,6 +74,19 @@ class SettingsUseCases(
         preferencesManager.resetLiquidGlassV2Tuning()
     }
 
+    fun getAlbumStyleTuning(defaults: List<Int>): Flow<List<Int>> = preferencesManager.getAlbumStyleTuning(defaults)
+
+    suspend fun setAlbumStyleTuning(
+        index: Int,
+        value: Int,
+    ) {
+        preferencesManager.setAlbumStyleTuning(index, value)
+    }
+
+    suspend fun resetAlbumStyleTuning() {
+        preferencesManager.resetAlbumStyleTuning()
+    }
+
     fun getBottomBarCustomization(
         defaultInts: List<Int>,
         defaultTexts: List<String>,
