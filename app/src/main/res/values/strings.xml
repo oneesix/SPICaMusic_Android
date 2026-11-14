@@ -1244,4 +1244,8 @@
   <string name="album_style_text_padding">Text padding</string>
   <string name="album_style_size">Album size</string>
   <string name="album_style_reset">Reset album style</string>
+  <string name="blur_style">Blur style</string>
+  <string name="blur_style_sub">Normal: full-strength blur that fades out smoothly. Haze: blur gets weaker toward the edge.</string>
+  <string name="blur_style_normal">Normal</string>
+  <string name="blur_style_haze">Haze</string>
 </resources>

@@ -154,6 +154,14 @@ internal fun BottomBarSettingsContent(
         )
         if (custom.blur == 1) {
             GeometrySlider(R.string.mtb_blur_amount, BottomBarSetting.BlurAmount, custom.blurAmount, 0..40, " dp")
+            LyricsSettingsChips(
+                label = stringResource(R.string.blur_style),
+                description = stringResource(R.string.blur_style_sub),
+                options = listOf(0, 1),
+                selected = custom.blurStyle,
+                optionLabel = { stringResource(if (it == 1) R.string.blur_style_haze else R.string.blur_style_normal) },
+                onSelect = { onInt(BottomBarSetting.BlurStyle, it) },
+            )
             LyricsSettingsToggle(
                 label = stringResource(R.string.lyr_set_blur_optimize),
                 description = stringResource(R.string.lyr_set_blur_optimize_desc),

@@ -1244,4 +1244,8 @@
   <string name="album_style_text_padding">文字边距</string>
   <string name="album_style_size">专辑大小</string>
   <string name="album_style_reset">重置专辑样式</string>
+  <string name="blur_style">模糊样式</string>
+  <string name="blur_style_sub">普通：全强度模糊，平滑渐隐。Haze：模糊向边缘逐渐减弱。</string>
+  <string name="blur_style_normal">普通</string>
+  <string name="blur_style_haze">Haze</string>
 </resources>

@@ -29,6 +29,7 @@ enum class BottomBarSetting {
     EdgeFade,
     BlurOptimize,
     BlurQuality,
+    BlurStyle,
 }
 
 /** 标签显示方式。 */
@@ -66,6 +67,8 @@ data class BottomBarCustomization(
     /** 1 = render the blur at a lower resolution ([blurQuality] percent). 0 = normal blur. */
     val blurOptimize: Int = 0,
     val blurQuality: Int = 45,
+    /** 0 = normal blur (full strength, fades out with a mask). 1 = haze blur (progressive, weaker toward the edge). */
+    val blurStyle: Int = 0,
     val icons: List<String> = DefaultIcons,
     val labels: List<String> = DefaultLabels,
 ) {
@@ -101,6 +104,7 @@ data class BottomBarCustomization(
             edgeFade = ints[16],
             blurOptimize = ints[17],
             blurQuality = ints[18],
+            blurStyle = ints[19],
             icons = List(4) { texts[it * 2] },
             labels = List(4) { texts[it * 2 + 1] },
         )
@@ -127,6 +131,7 @@ data class BottomBarCustomization(
             edgeFade,
             blurOptimize,
             blurQuality,
+            blurStyle,
         )
 }
 

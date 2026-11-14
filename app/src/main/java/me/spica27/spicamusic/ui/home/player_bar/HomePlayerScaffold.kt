@@ -40,11 +40,15 @@ import androidx.compose.ui.BiasAlignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.RoundRect
 import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.BlendMode
 import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.CompositingStrategy
 import androidx.compose.ui.graphics.Outline
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.graphicsLayer
@@ -367,6 +371,7 @@ internal fun HomePlayerScaffold(
                         fadeHeight = blurFade.toDp(),
                         alpha = { (1f - progress() / NavigationFadeEnd).coerceIn(0f, 1f) },
                         optimizeQuality = if (custom.blurOptimize == 1) custom.blurQuality else null,
+                        haze = custom.blurStyle == 1,
                     )
                 }.single().measure(Constraints.fixed(width, blurSolid + blurFade))
             } else {
@@ -402,6 +407,8 @@ private fun BottomBlurBand(
     alpha: () -> Float,
     /** null = normal blur. A number (percent) = the blur is rendered at that lower resolution. */
     optimizeQuality: Int? = null,
+    /** true = haze style (progressive: blur gets weaker toward the edge). false = normal blur with an alpha mask. */
+    haze: Boolean = false,
 ) {
     val performanceMode =
         if (optimizeQuality != null) {
@@ -410,45 +417,61 @@ private fun BottomBlurBand(
             HazePerformanceMode.Balanced
         }
     val background = MaterialTheme.colorScheme.background
-    val hardStyle =
-        remember(background, amount) {
+    // One blur layer for the whole band (fade + solid): no seam between two blurs.
+    val total = fadeHeight + solidHeight
+    val solidFraction = if (total > 0.dp) (solidHeight / total).coerceIn(0f, 1f) else 1f
+    val useProgressive = haze && fadeHeight > 0.dp
+    val density = LocalDensity.current
+    val fadePx = with(density) { fadeHeight.toPx() }
+    val blurStyle =
+        remember(background, amount, useProgressive, fadePx) {
             HazeBlurStyle {
                 blurRadius(amount.dp)
                 noiseFactor(0f)
                 fallbackColorEffect(HazeColorEffect.tint(background.copy(alpha = 0.85f)))
+                if (useProgressive) {
+                    // The layer is anchored at the bottom: blur is 0 at its top and reaches full strength after the fade.
+                    progressive(
+                        HazeProgressive.verticalGradient(
+                            startY = 0f,
+                            startIntensity = 0f,
+                            endY = fadePx,
+                            endIntensity = 1f,
+                        ),
+                    )
+                }
             }
         }
-    val fadeStyle =
-        remember(background, amount) {
-            HazeBlurStyle {
-                blurRadius(amount.dp)
-                noiseFactor(0f)
-                fallbackColorEffect(HazeColorEffect.tint(background.copy(alpha = 0.85f)))
-                progressive(HazeProgressive.verticalGradient(startIntensity = 0f, endIntensity = 1f))
-            }
-        }
-    Column(Modifier.fillMaxSize().graphicsLayer { this.alpha = alpha() }) {
-        if (fadeHeight > 0.dp) {
+    if (total > 0.dp) {
+        Box(
+            Modifier
+                .fillMaxSize()
+                .graphicsLayer { this.alpha = alpha() },
+        ) {
             Box(
                 Modifier
+                    .align(Alignment.BottomCenter)
                     .fillMaxWidth()
-                    .height(fadeHeight)
-                    .hazeBlur(
+                    .height(total)
+                    .graphicsLayer { compositingStrategy = CompositingStrategy.Offscreen }
+                    .drawWithContent {
+                        drawContent()
+                        if (fadeHeight > 0.dp && !useProgressive) {
+                            drawRect(
+                                brush =
+                                    Brush.verticalGradient(
+                                        0f to Color.Transparent,
+                                        (1f - solidFraction) to Color.Black,
+                                        1f to Color.Black,
+                                    ),
+                                blendMode = BlendMode.DstIn,
+                            )
+                        }
+                    }.hazeBlur(
                         input = HazeInput.Sources(hazeState),
-                        style = fadeStyle,
+                        style = blurStyle,
                         performanceMode = performanceMode,
-                    ),
-            )
-        }
-        if (solidHeight > 0.dp) {
-            Box(
-                Modifier
-                    .fillMaxWidth()
-                    .height(solidHeight)
-                    .hazeBlur(
-                        input = HazeInput.Sources(hazeState),
-                        style = hardStyle,
-                        performanceMode = performanceMode,
+                        expandLayerBounds = false,
                     ),
             )
         }

@@ -99,6 +99,14 @@ internal fun MusicTopBarSettingsContent(
                 valueText = { "$it dp" },
                 onValueChange = { onInt(MusicTopBarSetting.BlurAmount, it) },
             )
+            LyricsSettingsChips(
+                label = stringResource(R.string.blur_style),
+                description = stringResource(R.string.blur_style_sub),
+                options = listOf(0, 1),
+                selected = custom.blurStyle,
+                optionLabel = { stringResource(if (it == 1) R.string.blur_style_haze else R.string.blur_style_normal) },
+                onSelect = { onInt(MusicTopBarSetting.BlurStyle, it) },
+            )
             LyricsSettingsToggle(
                 label = stringResource(R.string.lyr_set_blur_optimize),
                 description = stringResource(R.string.lyr_set_blur_optimize_desc),

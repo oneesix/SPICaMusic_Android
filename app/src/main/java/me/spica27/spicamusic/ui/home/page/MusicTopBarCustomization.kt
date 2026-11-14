@@ -22,6 +22,7 @@ enum class MusicTopBarSetting {
     EdgeFade,
     BlurOptimize,
     BlurQuality,
+    BlurStyle,
 }
 
 /**
@@ -47,6 +48,8 @@ data class MusicTopBarCustomization(
     /** 1 = render the blur at a lower resolution ([blurQuality] percent). 0 = normal blur. */
     val blurOptimize: Int = 0,
     val blurQuality: Int = 45,
+    /** 0 = normal blur (full strength, fades out with a mask). 1 = haze blur (progressive, weaker toward the edge). */
+    val blurStyle: Int = 0,
 ) {
     fun valueOf(setting: MusicTopBarSetting): Int =
         when (setting) {
@@ -62,6 +65,7 @@ data class MusicTopBarCustomization(
             MusicTopBarSetting.EdgeFade -> edgeFade
             MusicTopBarSetting.BlurOptimize -> blurOptimize
             MusicTopBarSetting.BlurQuality -> blurQuality
+            MusicTopBarSetting.BlurStyle -> blurStyle
         }
 
     companion object {
@@ -79,6 +83,7 @@ data class MusicTopBarCustomization(
                 edgeFade = values[9],
                 blurOptimize = values[10],
                 blurQuality = values[11],
+                blurStyle = values[12],
             )
     }
 }
@@ -97,6 +102,7 @@ internal fun MusicTopBarSetting.preferenceKey() =
         MusicTopBarSetting.EdgeFade -> PreferencesManager.Keys.MUSIC_TOP_BAR_EDGE_FADE
         MusicTopBarSetting.BlurOptimize -> PreferencesManager.Keys.MUSIC_TOP_BAR_BLUR_OPTIMIZE
         MusicTopBarSetting.BlurQuality -> PreferencesManager.Keys.MUSIC_TOP_BAR_BLUR_QUALITY
+        MusicTopBarSetting.BlurStyle -> PreferencesManager.Keys.MUSIC_TOP_BAR_BLUR_STYLE
     }
 
 internal fun MusicTopBarSetting.defaultValue(): Int = MusicTopBarCustomization().valueOf(this)

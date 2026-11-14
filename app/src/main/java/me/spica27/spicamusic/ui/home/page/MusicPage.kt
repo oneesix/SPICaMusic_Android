@@ -135,6 +135,10 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.graphics.TransformOrigin
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.graphics.BlendMode
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.CompositingStrategy
+import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.input.pointer.positionChange
 import androidx.compose.ui.input.pointer.util.VelocityTracker
@@ -928,48 +932,59 @@ private fun MusicTopBlur(
     Box(modifier = modifier.fillMaxWidth()) {
         if (blurOn) {
             val amount = custom.blurAmount
-            val hardStyle =
-                remember(background, amount) {
+            // One blur layer for the whole band (solid + soft fade), so there is no seam between two stacked blurs.
+            val fade = if (soft) custom.edgeFade.dp else 0.dp
+            val total = solidHeight + fade
+            val solidFraction = if (total > 0.dp) (solidHeight / total).coerceIn(0f, 1f) else 1f
+            // Style 1 = haze (progressive: blur gets weaker toward the edge). Style 0 = normal (full blur + alpha mask).
+            val useProgressive = custom.blurStyle == 1 && fade > 0.dp
+            val density = LocalDensity.current
+            val solidPx = with(density) { solidHeight.toPx() }
+            val totalPx = with(density) { total.toPx() }
+            val blurStyle =
+                remember(background, amount, useProgressive, solidPx, totalPx) {
                     HazeBlurStyle {
                         blurRadius(amount.dp)
                         noiseFactor(0f)
                         fallbackColorEffect(HazeColorEffect.tint(background.copy(alpha = 0.85f)))
+                        if (useProgressive) {
+                            progressive(
+                                HazeProgressive.verticalGradient(
+                                    startY = solidPx,
+                                    startIntensity = 1f,
+                                    endY = totalPx,
+                                    endIntensity = 0f,
+                                ),
+                            )
+                        }
                     }
                 }
             Box(
                 modifier =
                     Modifier
                         .fillMaxWidth()
-                        .height(solidHeight)
-                        .hazeBlur(
+                        .height(total)
+                        .graphicsLayer { compositingStrategy = CompositingStrategy.Offscreen }
+                        .drawWithContent {
+                            drawContent()
+                            if (fade > 0.dp && !useProgressive) {
+                                drawRect(
+                                    brush =
+                                        Brush.verticalGradient(
+                                            0f to Color.Black,
+                                            solidFraction to Color.Black,
+                                            1f to Color.Transparent,
+                                        ),
+                                    blendMode = BlendMode.DstIn,
+                                )
+                            }
+                        }.hazeBlur(
                             input = HazeInput.Sources(hazeState),
-                            style = hardStyle,
+                            style = blurStyle,
                             performanceMode = performanceMode,
+                            expandLayerBounds = false,
                         ),
             )
-            if (soft) {
-                val fadeStyle =
-                    remember(background, amount) {
-                        HazeBlurStyle {
-                            blurRadius(amount.dp)
-                            noiseFactor(0f)
-                            fallbackColorEffect(HazeColorEffect.tint(background.copy(alpha = 0.85f)))
-                            progressive(HazeProgressive.verticalGradient(startIntensity = 1f, endIntensity = 0f))
-                        }
-                    }
-                Box(
-                    modifier =
-                        Modifier
-                            .offset(y = solidHeight)
-                            .fillMaxWidth()
-                            .height(custom.edgeFade.dp)
-                            .hazeBlur(
-                                input = HazeInput.Sources(hazeState),
-                                style = fadeStyle,
-                                performanceMode = performanceMode,
-                            ),
-                )
-            }
         }
         // 没有软边（或模糊关闭）时，用一条细线把顶栏和列表分开。
         if (!blurOn || !soft) {
