@@ -713,6 +713,8 @@
   <string name="settings_option_off">关闭</string>
   <string name="color_style_textured_desc">从封面取色，生成柔和的同色系配色</string>
   <string name="color_style_flat_desc">高对比度的纯色扁平配色</string>
+  <string name="theme_color_style_dynamic">动态</string>
+  <string name="color_style_dynamic_desc">颜色跟随专辑封面，使用“播放器界面配色”引擎</string>
   <string name="bg_top_glow">顶部流光</string>
   <string name="bg_top_glow_desc">顶部边缘的一道柔光</string>
   <string name="bg_liquid_aurora">液态极光</string>

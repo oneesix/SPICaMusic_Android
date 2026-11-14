@@ -13,6 +13,7 @@ import me.spica27.spicamusic.common.entity.DynamicCoverType
 import me.spica27.spicamusic.common.entity.DynamicSpectrumBackground
 import me.spica27.spicamusic.common.entity.ProgressBarStyle
 import me.spica27.spicamusic.common.entity.ThemeColorStyle
+import me.spica27.spicamusic.core.preferences.LyricsStyleSettings
 import me.spica27.spicamusic.feature.settings.domain.SettingsUseCases
 import me.spica27.spicamusic.ui.glass.LiquidGlassSetting
 import me.spica27.spicamusic.ui.glass.LiquidGlassTuning
@@ -197,6 +198,15 @@ class SettingsViewModel(
         viewModelScope.launch {
             settingsUseCases.setString(SettingsUseCases.Keys.THEME_COLOR_STYLE, value)
         }
+    }
+
+    // 颜色风格“动态”共用歌词设置里的“播放器界面配色”选项。
+    val lyricsStyle =
+        settingsUseCases.lyricsStyle
+            .stateIn(viewModelScope, SharingStarted.Eagerly, LyricsStyleSettings())
+
+    fun updateLyricsStyle(transform: (LyricsStyleSettings) -> LyricsStyleSettings) {
+        viewModelScope.launch { settingsUseCases.updateLyricsStyle(transform) }
     }
 
     // 屏幕常亮

@@ -20,6 +20,12 @@ sealed class ThemeColorStyle(
         "扁平化",
     )
 
+    /** 动态：用“播放器界面配色”引擎，让全应用的文字、图标、按钮颜色跟随专辑封面。 */
+    object Dynamic : ThemeColorStyle(
+        "dynamic",
+        "动态",
+    )
+
     override fun toString(): String = name
 
     companion object {
@@ -27,10 +33,11 @@ sealed class ThemeColorStyle(
             when (value) {
                 Textured.value -> Textured
                 Flat.value -> Flat
+                Dynamic.value -> Dynamic
                 else -> Textured
             }
 
         val presets: List<ThemeColorStyle>
-            get() = listOf(Textured, Flat)
+            get() = listOf(Textured, Flat, Dynamic)
     }
 }

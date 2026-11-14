@@ -713,6 +713,8 @@
   <string name="settings_option_off">Off</string>
   <string name="color_style_textured_desc">A tonal palette derived from the album art</string>
   <string name="color_style_flat_desc">Flat, high-contrast solid colors</string>
+  <string name="theme_color_style_dynamic">Dynamic</string>
+  <string name="color_style_dynamic_desc">Colors follow the album art, using the Color player UI engine</string>
   <string name="bg_top_glow">Top Glow</string>
   <string name="bg_top_glow_desc">A soft band of light along the top edge</string>
   <string name="bg_liquid_aurora">Liquid Aurora</string>

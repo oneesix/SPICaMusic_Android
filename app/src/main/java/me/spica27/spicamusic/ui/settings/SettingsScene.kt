@@ -94,6 +94,7 @@ import me.spica27.spicamusic.common.entity.DynamicCoverType
 import me.spica27.spicamusic.common.entity.DynamicSpectrumBackground
 import me.spica27.spicamusic.common.entity.ProgressBarStyle
 import me.spica27.spicamusic.common.entity.ThemeColorStyle
+import me.spica27.spicamusic.core.preferences.LyricsStyleSettings
 import me.spica27.spicamusic.ui.glass.LiquidGlassSetting
 import me.spica27.spicamusic.ui.glass.LiquidGlassTuning
 import me.spica27.spicamusic.ui.glass.LiquidGlassV2Preview
@@ -156,6 +157,7 @@ fun SettingsScreen() {
     val coverTapValue by viewModel.dynamicCoverType.collectAsStateWithLifecycle()
     val progressWaveformValue by viewModel.progressBarStyle.collectAsStateWithLifecycle()
     val colorStyleValue by viewModel.themeColorStyle.collectAsStateWithLifecycle()
+    val lyricsStyle by viewModel.lyricsStyle.collectAsStateWithLifecycle()
     val playerViewModel = LocalPlayerViewModel.current
     val sleepTimer by playerViewModel.sleepTimer.collectAsStateWithLifecycle()
 
@@ -239,6 +241,12 @@ fun SettingsScreen() {
                         onExpandChange = { expandedRowKey = it },
                         onValueChange = viewModel::setThemeColorStyle,
                     )
+                    AnimatedVisibility(visible = colorStyleValue == ThemeColorStyle.Dynamic.value) {
+                        DynamicStyleControls(
+                            settings = lyricsStyle,
+                            onUpdate = viewModel::updateLyricsStyle,
+                        )
+                    }
                     SettingsItemDivider()
                     InlineSelectRow(
                         rowKey = "bottom_bar_layout",
@@ -1074,7 +1082,9 @@ private fun rememberColorStyleOptions(): ImmutableList<SettingsOption> {
     val texturedDesc = stringResource(R.string.color_style_textured_desc)
     val flatLabel = stringResource(R.string.theme_color_style_flat)
     val flatDesc = stringResource(R.string.color_style_flat_desc)
-    return remember(texturedLabel, texturedDesc, flatLabel, flatDesc) {
+    val dynamicLabel = stringResource(R.string.theme_color_style_dynamic)
+    val dynamicDesc = stringResource(R.string.color_style_dynamic_desc)
+    return remember(texturedLabel, texturedDesc, flatLabel, flatDesc, dynamicLabel, dynamicDesc) {
         ImmutableList.copyOf(
             listOf(
                 SettingsOption(
@@ -1088,6 +1098,12 @@ private fun rememberColorStyleOptions(): ImmutableList<SettingsOption> {
                     flatLabel,
                     flatDesc,
                     Icons.Default.Layers,
+                ),
+                SettingsOption(
+                    ThemeColorStyle.Dynamic.value,
+                    dynamicLabel,
+                    dynamicDesc,
+                    Icons.Default.Album,
                 ),
             ),
         )
@@ -1396,6 +1412,73 @@ private fun LiquidGlassTuningControls(
         LyricsSettingsResetButton(
             text = stringResource(R.string.glass_reset),
             onClick = onReset,
+        )
+    }
+}
+
+/** 颜色风格“动态”的调节项：与歌词设置里的“播放器界面配色”是同一组设置。 */
+@Composable
+private fun DynamicStyleControls(
+    settings: LyricsStyleSettings,
+    onUpdate: ((LyricsStyleSettings) -> LyricsStyleSettings) -> Unit,
+) {
+    Column(
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .padding(
+                    start = SettingsRowContentInset,
+                    end = Spacing.Large,
+                    top = Spacing.ExtraSmall,
+                    bottom = Spacing.Small,
+                ),
+    ) {
+        LyricsSettingsToggle(
+            label = stringResource(R.string.lyr_set_dyn_bg),
+            description = stringResource(R.string.lyr_set_dyn_bg_desc),
+            checked = settings.dynamicBackgroundEnabled,
+            onCheckedChange = { v -> onUpdate { it.copy(dynamicBackgroundEnabled = v) } },
+        )
+        LyricsSettingsChips(
+            label = stringResource(R.string.lyr_set_dyn_mode),
+            description = stringResource(R.string.lyr_set_dyn_mode_desc),
+            options = listOf("auto", "dark", "light"),
+            selected = settings.dynamicLyricsMode,
+            optionLabel = {
+                when (it) {
+                    "dark" -> stringResource(R.string.verse_mode_dark)
+                    "light" -> stringResource(R.string.verse_mode_light)
+                    else -> stringResource(R.string.verse_mode_auto)
+                }
+            },
+            onSelect = { v -> onUpdate { it.copy(dynamicLyricsMode = v) } },
+        )
+        LyricsSettingsSlider(
+            label = stringResource(R.string.lyr_set_dyn_opacity),
+            description = stringResource(R.string.lyr_set_dyn_opacity_desc),
+            value = settings.dynamicLyricsOpacity,
+            range = LyricsStyleSettings.DYNAMIC_OPACITY_RANGE,
+            step = 5,
+            valueText = { "$it%" },
+            onValueChange = { v -> onUpdate { it.copy(dynamicLyricsOpacity = v) } },
+        )
+        LyricsSettingsSlider(
+            label = stringResource(R.string.lyr_set_dyn_saturation),
+            description = stringResource(R.string.lyr_set_dyn_saturation_desc),
+            value = settings.dynamicLyricsSaturation,
+            range = LyricsStyleSettings.DYNAMIC_SATURATION_RANGE,
+            step = 5,
+            valueText = { "$it%" },
+            onValueChange = { v -> onUpdate { it.copy(dynamicLyricsSaturation = v) } },
+        )
+        LyricsSettingsSlider(
+            label = stringResource(R.string.lyr_set_dyn_contrast),
+            description = stringResource(R.string.lyr_set_dyn_contrast_desc),
+            value = settings.dynamicLyricsContrast,
+            range = LyricsStyleSettings.DYNAMIC_CONTRAST_RANGE,
+            step = 5,
+            valueText = { "$it%" },
+            onValueChange = { v -> onUpdate { it.copy(dynamicLyricsContrast = v) } },
         )
     }
 }

@@ -20,6 +20,7 @@ import com.skydoves.landscapist.core.Landscapist
 import com.skydoves.landscapist.image.LocalLandscapist
 import dev.chrisbanes.haze.rememberHazeState
 import me.spica27.spicamusic.common.entity.ThemeColorStyle
+import me.spica27.spicamusic.ui.widget.DynamicStyleScope
 import me.spica27.spicamusic.core.preferences.LyricsStyleSettings
 import me.spica27.spicamusic.core.preferences.PreferencesManager
 import me.spica27.spicamusic.ui.adaptive.LocalPaneInfo
@@ -121,6 +122,12 @@ fun AppScaffold() {
         themeColorStyle = ThemeColorStyle.fromString(themeColorStyleValue),
         fontFamily = appFontFamily,
     ) {
+        val currentMediaItem by playerViewModel.currentMediaItem.collectAsStateWithLifecycle()
+        DynamicStyleScope(
+            enabled = themeColorStyleValue == ThemeColorStyle.Dynamic.value,
+            settings = lyricsStyle,
+            artworkUri = currentMediaItem?.mediaMetadata?.artworkUri,
+        ) {
         CompositionLocalProvider(
             LocalLiquidGlassConfig provides LiquidGlassConfig(enabled = liquidGlassEnabled, tuning = liquidGlassTuning),
             LocalLiquidGlassV2Config provides LiquidGlassV2Config(enabled = liquidGlassV2Enabled, tuning = liquidGlassV2Tuning),
@@ -155,6 +162,7 @@ fun AppScaffold() {
                     sharedTransitionScope = this,
                 )
             }
+        }
         }
     }
 }
