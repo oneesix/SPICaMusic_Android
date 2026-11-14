@@ -1,0 +1,405 @@
+diff --git a/app/src/main/java/me/spica27/spicamusic/ui/home/HomeScene.kt b/app/src/main/java/me/spica27/spicamusic/ui/home/HomeScene.kt
+index bb7a5cb..6ffd4fe 100644
+--- a/app/src/main/java/me/spica27/spicamusic/ui/home/HomeScene.kt
++++ b/app/src/main/java/me/spica27/spicamusic/ui/home/HomeScene.kt
+@@ -25,6 +25,7 @@ import androidx.compose.ui.Modifier
+ import androidx.compose.ui.graphics.vector.ImageVector
+ import androidx.compose.ui.res.stringResource
+ import androidx.lifecycle.compose.collectAsStateWithLifecycle
++import dev.chrisbanes.haze.hazeSource
+ import dev.chrisbanes.haze.rememberHazeState
+ import me.spica27.spicamusic.R
+ import me.spica27.spicamusic.artwork.artwork
+@@ -67,6 +68,8 @@ fun HomeScreen() {
+     val displayedMediaItem = mediaItem ?: lastMediaItem
+     val glassEnabled = LocalLiquidGlassConfig.current.enabled
+     val hazeState = rememberHazeState()
++    // Always-on source for the bottom bar blur (the glass source above only exists with Liquid Glass).
++    val bottomBlurState = rememberHazeState()
+     val isPlaying by playerViewModel.isPlaying.collectAsStateWithLifecycle()
+     val position = playerViewModel.currentPosition.collectAsStateWithLifecycle()
+     val duration = playerViewModel.currentDuration.collectAsStateWithLifecycle()
+@@ -83,6 +86,7 @@ fun HomeScreen() {
+         playerAvailable = mediaItem != null,
+         sheetState = sheetState,
+         layout = bottomBarLayout,
++        blurHazeState = bottomBlurState,
+         active = active,
+         onMiniPlayerDragStart = { initialPlayerPage = DEFAULT_PAGE },
+         navigationBar = {
+@@ -131,7 +135,7 @@ fun HomeScreen() {
+             )
+         },
+     ) { padding ->
+-        Box(Modifier.fillMaxSize().liquidGlassSource(hazeState).liquidGlassV2Source()) {
++        Box(Modifier.fillMaxSize().hazeSource(bottomBlurState).liquidGlassSource(hazeState).liquidGlassV2Source()) {
+             pageStateHolder.SaveableStateProvider(currentPage) {
+                 when (currentPage) {
+                     HomePage.Finder -> FinderPage(bottomContentPadding = padding.calculateBottomPadding())
+diff --git a/app/src/main/java/me/spica27/spicamusic/ui/home/player_bar/BottomBarCustomization.kt b/app/src/main/java/me/spica27/spicamusic/ui/home/player_bar/BottomBarCustomization.kt
+index d833afc..1eaa200 100644
+--- a/app/src/main/java/me/spica27/spicamusic/ui/home/player_bar/BottomBarCustomization.kt
++++ b/app/src/main/java/me/spica27/spicamusic/ui/home/player_bar/BottomBarCustomization.kt
+@@ -22,6 +22,11 @@ enum class BottomBarSetting {
+     SearchTab,
+     Bubble,
+     BubbleSize,
++    Blur,
++    BlurAmount,
++    BlurPosition,
++    SoftEdge,
++    EdgeFade,
+ }
+ 
+ /** 标签显示方式。 */
+@@ -51,6 +56,11 @@ data class BottomBarCustomization(
+     val searchTab: Int = 1,
+     val bubble: Int = 1,
+     val bubbleSize: Int = 135,
++    val blur: Int = 1,
++    val blurAmount: Int = 16,
++    val blurPosition: Int = 8,
++    val softEdge: Int = 1,
++    val edgeFade: Int = 32,
+     val icons: List<String> = DefaultIcons,
+     val labels: List<String> = DefaultLabels,
+ ) {
+@@ -79,6 +89,11 @@ data class BottomBarCustomization(
+             searchTab = ints[9],
+             bubble = ints[10],
+             bubbleSize = ints[11],
++            blur = ints[12],
++            blurAmount = ints[13],
++            blurPosition = ints[14],
++            softEdge = ints[15],
++            edgeFade = ints[16],
+             icons = List(4) { texts[it * 2] },
+             labels = List(4) { texts[it * 2 + 1] },
+         )
+@@ -98,6 +113,11 @@ data class BottomBarCustomization(
+             searchTab,
+             bubble,
+             bubbleSize,
++            blur,
++            blurAmount,
++            blurPosition,
++            softEdge,
++            edgeFade,
+         )
+ }
+ 
+diff --git a/app/src/main/java/me/spica27/spicamusic/ui/home/player_bar/HomePlayerScaffold.kt b/app/src/main/java/me/spica27/spicamusic/ui/home/player_bar/HomePlayerScaffold.kt
+index 1bf3cac..87a9298 100644
+--- a/app/src/main/java/me/spica27/spicamusic/ui/home/player_bar/HomePlayerScaffold.kt
++++ b/app/src/main/java/me/spica27/spicamusic/ui/home/player_bar/HomePlayerScaffold.kt
+@@ -14,6 +14,7 @@ import androidx.compose.foundation.gestures.Orientation
+ import androidx.compose.foundation.gestures.draggable
+ import androidx.compose.foundation.gestures.rememberDraggableState
+ import androidx.compose.foundation.layout.Box
++import androidx.compose.foundation.layout.Column
+ import androidx.compose.foundation.layout.ExperimentalLayoutApi
+ import androidx.compose.foundation.layout.PaddingValues
+ import androidx.compose.foundation.layout.WindowInsets
+@@ -61,7 +62,16 @@ import androidx.compose.ui.semantics.semantics
+ import androidx.compose.ui.unit.Constraints
+ import androidx.compose.ui.unit.Density
+ import androidx.compose.ui.unit.LayoutDirection
++import androidx.compose.ui.unit.Dp
+ import androidx.compose.ui.unit.dp
++import dev.chrisbanes.haze.ExperimentalHazeApi
++import dev.chrisbanes.haze.HazeInput
++import dev.chrisbanes.haze.HazePerformanceMode
++import dev.chrisbanes.haze.HazeProgressive
++import dev.chrisbanes.haze.HazeState
++import dev.chrisbanes.haze.blur.HazeBlurStyle
++import dev.chrisbanes.haze.blur.HazeColorEffect
++import dev.chrisbanes.haze.blur.hazeBlur
+ import me.spica27.spicamusic.R
+ import me.spica27.spicamusic.common.entity.BottomBarLayout
+ import me.spica27.spicamusic.ui.theme.EaseOutEmphasized
+@@ -71,7 +81,7 @@ import kotlin.math.roundToInt
+ private const val MiniPlayerFadeEnd = 0.3f
+ private const val NavigationFadeEnd = 0.5f
+ 
+-private enum class PlayerLayoutSlot { MiniPlayer, Navigation, Page, Player }
++private enum class PlayerLayoutSlot { MiniPlayer, Navigation, Page, Blur, Player }
+ 
+ /** 尺寸不纳入状态观察，拖拽仅更新布局和绘制。 */
+ private class PlayerLayoutMeasurements {
+@@ -121,6 +131,7 @@ internal fun HomePlayerScaffold(
+     active: Boolean = true,
+     onMiniPlayerDragStart: () -> Unit = {},
+     layout: BottomBarLayout = BottomBarLayout.Traditional,
++    blurHazeState: HazeState? = null,
+     content: @Composable (PaddingValues) -> Unit,
+ ) {
+     val reducedMotion = LocalReducedMotion.current
+@@ -130,6 +141,8 @@ internal fun HomePlayerScaffold(
+     // 底栏自定义：左右/上下位置与宽高。
+     val custom = LocalBottomBarCustomization.current
+     val collapsedPlayerColor = appearance.miniPlayerContainerColor(colors)
++    // Bottom blur replaces the solid / fading tint behind the bar.
++    val blurOn = blurHazeState != null && custom.blur == 1 && custom.blurAmount > 0
+     val density = LocalDensity.current
+     val layoutDirection = LocalLayoutDirection.current
+     val safeInsets = WindowInsets.safeDrawing
+@@ -219,7 +232,7 @@ internal fun HomePlayerScaffold(
+             }
+         }
+     val navigationSlot: @Composable () -> Unit =
+-        remember(keyboardVisible, navigationBar, appearance, colors.surface, navigationBottomPadding, enter, exit, hiddenSemantics, custom) {
++        remember(keyboardVisible, navigationBar, appearance, colors.surface, navigationBottomPadding, enter, exit, hiddenSemantics, custom, blurOn) {
+             {
+                 Box(
+                     hiddenSemantics.graphicsLayer {
+@@ -233,7 +246,9 @@ internal fun HomePlayerScaffold(
+                             Modifier
+                                 .fillMaxWidth()
+                                 .then(
+-                                    if (appearance.isFloating) {
++                                    if (blurOn) {
++                                        Modifier
++                                    } else if (appearance.isFloating) {
+                                         Modifier.drawBehind {
+                                             // 悬浮栏下方渐隐至主题底色，衔接系统手势区。
+                                             val fadeStart = (size.height - navigationBottomPadding - 24.dp.toPx()).coerceAtLeast(0f)
+@@ -338,11 +353,30 @@ internal fun HomePlayerScaffold(
+                     }
+                 }
+             }.single().measure(Constraints.fixed(width, height))
++        // Blur band behind the bar: solid part up to the bar top + position, then an optional soft fade above it.
++        val barHeight = mini.height + navigation.height
++        val blurSolid = if (blurOn) (barHeight + custom.blurPosition.dp.roundToPx().coerceAtLeast(-barHeight)).coerceAtLeast(0) else 0
++        val blurFade = if (blurOn && custom.softEdge == 1) custom.edgeFade.dp.roundToPx().coerceAtLeast(0) else 0
++        val blur =
++            if (blurHazeState != null && blurSolid + blurFade > 0) {
++                subcompose(PlayerLayoutSlot.Blur) {
++                    BottomBlurBand(
++                        hazeState = blurHazeState,
++                        amount = custom.blurAmount,
++                        solidHeight = blurSolid.toDp(),
++                        fadeHeight = blurFade.toDp(),
++                        alpha = { (1f - progress() / NavigationFadeEnd).coerceIn(0f, 1f) },
++                    )
++                }.single().measure(Constraints.fixed(width, blurSolid + blurFade))
++            } else {
++                null
++            }
+         val player = subcompose(PlayerLayoutSlot.Player, playerSlot).single().measure(Constraints.fixed(width, height))
+         layout(width, height) {
+             val fraction = progress()
+             val top = (measurements.travel * (1f - fraction)).roundToInt()
+             page.placeRelative(0, 0)
++            blur?.placeRelative(0, height - blur.height)
+             navigation.placeRelative(0, height - navigation.height)
+             // 透明后置于播放器下层，避免拦截触摸。
+             if (fraction < MiniPlayerFadeEnd) {
+@@ -356,6 +390,62 @@ internal fun HomePlayerScaffold(
+     }
+ }
+ 
++/** 底栏后面的渐进模糊：与音乐页顶栏同一思路，但向上渐隐；只采样下面的列表，不带色调。 */
++@OptIn(ExperimentalHazeApi::class)
++@Composable
++private fun BottomBlurBand(
++    hazeState: HazeState,
++    amount: Int,
++    solidHeight: Dp,
++    fadeHeight: Dp,
++    alpha: () -> Float,
++) {
++    val background = MaterialTheme.colorScheme.background
++    val hardStyle =
++        remember(background, amount) {
++            HazeBlurStyle {
++                blurRadius(amount.dp)
++                noiseFactor(0f)
++                fallbackColorEffect(HazeColorEffect.tint(background.copy(alpha = 0.85f)))
++            }
++        }
++    val fadeStyle =
++        remember(background, amount) {
++            HazeBlurStyle {
++                blurRadius(amount.dp)
++                noiseFactor(0f)
++                fallbackColorEffect(HazeColorEffect.tint(background.copy(alpha = 0.85f)))
++                progressive(HazeProgressive.verticalGradient(startIntensity = 0f, endIntensity = 1f))
++            }
++        }
++    Column(Modifier.fillMaxSize().graphicsLayer { this.alpha = alpha() }) {
++        if (fadeHeight > 0.dp) {
++            Box(
++                Modifier
++                    .fillMaxWidth()
++                    .height(fadeHeight)
++                    .hazeBlur(
++                        input = HazeInput.Sources(hazeState),
++                        style = fadeStyle,
++                        performanceMode = HazePerformanceMode.Balanced,
++                    ),
++            )
++        }
++        if (solidHeight > 0.dp) {
++            Box(
++                Modifier
++                    .fillMaxWidth()
++                    .height(solidHeight)
++                    .hazeBlur(
++                        input = HazeInput.Sources(hazeState),
++                        style = hardStyle,
++                        performanceMode = HazePerformanceMode.Balanced,
++                    ),
++            )
++        }
++    }
++}
++
+ @Composable
+ internal fun PlayerSheetHandle(
+     onCollapse: () -> Unit,
+diff --git a/app/src/main/java/me/spica27/spicamusic/ui/home/player_bar/MiniPlayerBar.kt b/app/src/main/java/me/spica27/spicamusic/ui/home/player_bar/MiniPlayerBar.kt
+index 5473036..1e6ca10 100644
+--- a/app/src/main/java/me/spica27/spicamusic/ui/home/player_bar/MiniPlayerBar.kt
++++ b/app/src/main/java/me/spica27/spicamusic/ui/home/player_bar/MiniPlayerBar.kt
+@@ -1,6 +1,5 @@
+ package me.spica27.spicamusic.ui.home.player_bar
+ 
+-import androidx.compose.foundation.background
+ import androidx.compose.foundation.clickable
+ import androidx.compose.foundation.layout.Arrangement
+ import androidx.compose.foundation.layout.Column
+@@ -18,7 +17,6 @@ import androidx.compose.foundation.layout.size
+ import androidx.compose.foundation.layout.windowInsetsPadding
+ import androidx.compose.foundation.shape.RoundedCornerShape
+ import androidx.compose.material.icons.Icons
+-import androidx.compose.material.icons.automirrored.filled.PlaylistPlay
+ import androidx.compose.material.icons.rounded.Pause
+ import androidx.compose.material.icons.rounded.PlayArrow
+ import androidx.compose.material3.Icon
+@@ -94,20 +92,13 @@ internal fun MiniPlayerBar(
+                     overflow = TextOverflow.Ellipsis,
+                 )
+             }
+-            Row(horizontalArrangement = Arrangement.spacedBy(4.dp), verticalAlignment = Alignment.CenterVertically) {
+-                IconButton(onClick = onOpenQueue, modifier = Modifier.size(48.dp)) {
+-                    Icon(Icons.AutoMirrored.Filled.PlaylistPlay, stringResource(R.string.queue), tint = foreground)
+-                }
+-                IconButton(
+-                    onClick = onPlayPause,
+-                    modifier = Modifier.size(48.dp).clip(RoundedCornerShape(16.dp)).background(colors.primary),
+-                ) {
+-                    Icon(
+-                        if (isPlaying) Icons.Rounded.Pause else Icons.Rounded.PlayArrow,
+-                        stringResource(if (isPlaying) R.string.pause else R.string.play),
+-                        tint = colors.onPrimary,
+-                    )
+-                }
++            // Queue button removed; play/pause is a plain icon without a background.
++            IconButton(onClick = onPlayPause, modifier = Modifier.size(48.dp)) {
++                Icon(
++                    if (isPlaying) Icons.Rounded.Pause else Icons.Rounded.PlayArrow,
++                    stringResource(if (isPlaying) R.string.pause else R.string.play),
++                    tint = foreground,
++                )
+             }
+         }
+         Spacer(
+diff --git a/app/src/main/java/me/spica27/spicamusic/ui/settings/BottomBarSettings.kt b/app/src/main/java/me/spica27/spicamusic/ui/settings/BottomBarSettings.kt
+index 69c0be7..852a538 100644
+--- a/app/src/main/java/me/spica27/spicamusic/ui/settings/BottomBarSettings.kt
++++ b/app/src/main/java/me/spica27/spicamusic/ui/settings/BottomBarSettings.kt
+@@ -146,6 +146,33 @@ internal fun BottomBarSettingsContent(
+         if (custom.bubble == 1) {
+             GeometrySlider(R.string.bb_bubble_size, BottomBarSetting.BubbleSize, custom.bubbleSize, 100..170, "%")
+         }
++        LyricsSettingsToggle(
++            label = stringResource(R.string.bb_blur),
++            description = stringResource(R.string.bb_blur_sub),
++            checked = custom.blur == 1,
++            onCheckedChange = { onInt(BottomBarSetting.Blur, if (it) 1 else 0) },
++        )
++        if (custom.blur == 1) {
++            GeometrySlider(R.string.mtb_blur_amount, BottomBarSetting.BlurAmount, custom.blurAmount, 0..40, " dp")
++            LyricsSettingsSlider(
++                label = stringResource(R.string.mtb_blur_position),
++                description = stringResource(R.string.bb_blur_position_sub),
++                value = custom.blurPosition,
++                range = -180..120,
++                step = 1,
++                valueText = { "$it dp" },
++                onValueChange = { onInt(BottomBarSetting.BlurPosition, it) },
++            )
++            LyricsSettingsToggle(
++                label = stringResource(R.string.mtb_blur_soft),
++                description = stringResource(R.string.bb_blur_soft_sub),
++                checked = custom.softEdge == 1,
++                onCheckedChange = { onInt(BottomBarSetting.SoftEdge, if (it) 1 else 0) },
++            )
++            if (custom.softEdge == 1) {
++                GeometrySlider(R.string.mtb_blur_fade, BottomBarSetting.EdgeFade, custom.edgeFade, 0..80, " dp")
++            }
++        }
+         LyricsSettingsResetButton(
+             text = stringResource(R.string.bb_reset),
+             onClick = {
+diff --git a/app/src/main/res/values-zh-rTW/strings.xml b/app/src/main/res/values-zh-rTW/strings.xml
+index 97adef4..ad27f96 100644
+--- a/app/src/main/res/values-zh-rTW/strings.xml
++++ b/app/src/main/res/values-zh-rTW/strings.xml
+@@ -1211,6 +1211,10 @@
+   <string name="bb_search_tab_sub">新增搜尋標籤，點擊開啟搜尋頁。</string>
+   <string name="bb_bubble">長按氣泡玻璃</string>
+   <string name="bb_bubble_sub">按住並拖動標籤選擇器，顯示放大的液態玻璃氣泡（Android 13+）。</string>
++  <string name="bb_blur">底欄模糊</string>
++  <string name="bb_blur_sub">列表在模糊的底欄後面捲動。關閉：使用底欄純色。</string>
++  <string name="bb_blur_position_sub">模糊向上延伸到底欄上方的距離。拖到最左則移到最底部。</string>
++  <string name="bb_blur_soft_sub">模糊在底欄上方漸隱，而不是硬邊</string>
+   <string name="bb_bubble_size">氣泡大小</string>
+   <string name="bb_reset">重置底部列</string>
+   <string name="bb_icon_missing">找不到該圖示，已使用預設圖示</string>
+diff --git a/app/src/main/res/values-zh/strings.xml b/app/src/main/res/values-zh/strings.xml
+index 715e09b..b47f200 100644
+--- a/app/src/main/res/values-zh/strings.xml
++++ b/app/src/main/res/values-zh/strings.xml
+@@ -1212,6 +1212,10 @@
+   <string name="bb_search_tab_sub">新增搜索标签，点击打开搜索页。</string>
+   <string name="bb_bubble">长按气泡玻璃</string>
+   <string name="bb_bubble_sub">按住并拖动标签选择器，显示放大的液态玻璃气泡（Android 13+）。</string>
++  <string name="bb_blur">底栏模糊</string>
++  <string name="bb_blur_sub">列表在模糊的底栏后面滚动。关闭：使用底栏纯色。</string>
++  <string name="bb_blur_position_sub">模糊向上延伸到底栏上方的距离。拖到最左则移到最底部。</string>
++  <string name="bb_blur_soft_sub">模糊在底栏上方渐隐，而不是硬边</string>
+   <string name="bb_bubble_size">气泡大小</string>
+   <string name="bb_reset">重置底栏</string>
+   <string name="bb_icon_missing">未找到该图标，已使用默认图标</string>
+diff --git a/app/src/main/res/values/strings.xml b/app/src/main/res/values/strings.xml
+index e25f70c..f68c9d4 100644
+--- a/app/src/main/res/values/strings.xml
++++ b/app/src/main/res/values/strings.xml
+@@ -1212,6 +1212,10 @@
+   <string name="bb_search_tab_sub">Adds a Search tab that opens the search screen.</string>
+   <string name="bb_bubble">Bubble glass when held</string>
+   <string name="bb_bubble_sub">Hold and drag the tab selector to get a magnified liquid glass bubble (Android 13+).</string>
++  <string name="bb_blur">Bottom blur</string>
++  <string name="bb_blur_sub">The list scrolls behind a blurred bottom bar. Off: the solid bar colour.</string>
++  <string name="bb_blur_position_sub">How far the blur reaches above the bar. Far left moves it to the very bottom.</string>
++  <string name="bb_blur_soft_sub">The blur fades out above the bar instead of a hard edge</string>
+   <string name="bb_bubble_size">Bubble size</string>
+   <string name="bb_reset">Reset bottom bar</string>
+   <string name="bb_icon_missing">Icon not found; the default icon is used</string>
+diff --git a/core-preferences/src/main/java/me/spica27/spicamusic/core/preferences/PreferencesManager.kt b/core-preferences/src/main/java/me/spica27/spicamusic/core/preferences/PreferencesManager.kt
+index a4b6150..31f253e 100644
+--- a/core-preferences/src/main/java/me/spica27/spicamusic/core/preferences/PreferencesManager.kt
++++ b/core-preferences/src/main/java/me/spica27/spicamusic/core/preferences/PreferencesManager.kt
+@@ -698,6 +698,11 @@ class PreferencesManager(
+             "search_tab",
+             "bubble",
+             "bubble_size",
++            "blur",
++            "blur_amount",
++            "blur_position",
++            "blur_soft",
++            "blur_fade",
+         ).map { intPreferencesKey("bottom_bar_$it") }
+ 
+     /** 文本项：每个标签依次存放 图标名、文字，共 4 个标签（发现、音乐、曲库、搜索）。 */
