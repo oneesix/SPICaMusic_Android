@@ -1,0 +1,339 @@
+diff --git a/app/src/main/java/me/spica27/spicamusic/ui/home/page/MusicPage.kt b/app/src/main/java/me/spica27/spicamusic/ui/home/page/MusicPage.kt
+index e143baf..5e1397b 100644
+--- a/app/src/main/java/me/spica27/spicamusic/ui/home/page/MusicPage.kt
++++ b/app/src/main/java/me/spica27/spicamusic/ui/home/page/MusicPage.kt
+@@ -197,6 +197,7 @@ import me.spica27.spicamusic.ui.widget.clickHighlight
+ import me.spica27.spicamusic.ui.widget.combinedClickHighlight
+ import me.spica27.spicamusic.ui.widget.displayName
+ import me.spica27.spicamusic.ui.widget.materialSharedAxisZ
++import me.spica27.spicamusic.ui.widget.rememberAlbumArtColor
+ import me.spica27.spicamusic.ui.widget.rememberIOSOverScrollEffect
+ import org.koin.compose.viewmodel.koinActivityViewModel
+ import kotlin.math.abs
+@@ -431,6 +432,10 @@ fun MusicPage(bottomContentPadding: Dp = 0.dp) {
+     val preferencesManager = koinInject<PreferencesManager>()
+     val barCustom = rememberMusicTopBarCustomization(preferencesManager)
+     val bottomBarLayout by homeViewModel.bottomBarLayout.collectAsStateWithLifecycle()
++    val albumNewStyle by
++        preferencesManager
++            .getBoolean(PreferencesManager.Keys.ALBUM_NEW_STYLE)
++            .collectAsStateWithLifecycle(false)
+     val glassEnabled = LocalLiquidGlassConfig.current.enabled
+     val glassHazeState = rememberHazeState()
+     val pageBackdrop = rememberLayerBackdrop()
+@@ -613,6 +618,7 @@ fun MusicPage(bottomContentPadding: Dp = 0.dp) {
+                             val row = index / 2
+                             MusicAlbumCard(
+                                 album = album,
++                                newStyle = albumNewStyle,
+                                 onClick = { backStack.add(AlbumDetailRoute(album)) },
+                                 modifier =
+                                     Modifier
+@@ -1368,13 +1374,18 @@ private fun MusicSongRow(
+     }
+ }
+ 
+-/** 专辑卡：方形封面 + 标题 + 「歌手 · N 首」 */
++/**
++ * 专辑卡：方形封面 + 标题 + 「歌手 · N 首」。
++ * newStyle 开启时信息放进封面底部，渐变色取自封面主色。
++ */
+ @Composable
+ private fun MusicAlbumCard(
+     album: Album,
++    newStyle: Boolean,
+     onClick: () -> Unit,
+     modifier: Modifier = Modifier,
+ ) {
++    val subtitle = "${album.artistDisplay()} · ${stringResource(R.string.songs_count_format, album.numberOfSongs)}"
+     Column(
+         modifier =
+             modifier
+@@ -1383,33 +1394,73 @@ private fun MusicAlbumCard(
+                 .clickHighlight(onClick = onClick),
+         verticalArrangement = Arrangement.spacedBy(Spacing.Small),
+     ) {
+-        AudioCover(
+-            artwork = album.artwork(),
++        Box(
+             modifier =
+                 Modifier
+                     .fillMaxWidth()
+                     .aspectRatio(1f)
+                     .clip(Shapes.ExtraLargeCornerBasedShape),
+-        )
+-        Column(
+-            modifier = Modifier.padding(bottom = Spacing.Small),
+-            verticalArrangement = Arrangement.spacedBy(2.dp),
+         ) {
+-            Text(
+-                text = album.title,
+-                style = MaterialTheme.typography.bodyMedium,
+-                fontWeight = FontWeight.SemiBold,
+-                color = MaterialTheme.colorScheme.onSurface,
+-                maxLines = 1,
+-                overflow = TextOverflow.Ellipsis,
+-            )
+-            Text(
+-                text = "${album.artistDisplay()} · ${stringResource(R.string.songs_count_format, album.numberOfSongs)}",
+-                style = MaterialTheme.typography.bodySmall,
+-                color = MaterialTheme.colorScheme.onSurfaceVariant,
+-                maxLines = 1,
+-                overflow = TextOverflow.Ellipsis,
++            AudioCover(
++                artwork = album.artwork(),
++                modifier = Modifier.fillMaxSize(),
+             )
++            if (newStyle) {
++                val artColor = rememberAlbumArtColor(album.artwork())
++                val shade =
++                    androidx.compose.ui.graphics
++                        .lerp(artColor ?: Color.Black, Color.Black, 0.4f)
++                Column(
++                    modifier =
++                        Modifier
++                            .align(Alignment.BottomStart)
++                            .fillMaxWidth()
++                            .background(
++                                androidx.compose.ui.graphics.Brush.verticalGradient(
++                                    listOf(Color.Transparent, shade),
++                                ),
++                            ).padding(start = 12.dp, end = 12.dp, top = 28.dp, bottom = 10.dp),
++                    verticalArrangement = Arrangement.spacedBy(2.dp),
++                ) {
++                    Text(
++                        text = album.title,
++                        style = MaterialTheme.typography.bodyMedium,
++                        fontWeight = FontWeight.SemiBold,
++                        color = Color.White,
++                        maxLines = 1,
++                        overflow = TextOverflow.Ellipsis,
++                    )
++                    Text(
++                        text = subtitle,
++                        style = MaterialTheme.typography.bodySmall,
++                        color = Color.White.copy(alpha = 0.8f),
++                        maxLines = 1,
++                        overflow = TextOverflow.Ellipsis,
++                    )
++                }
++            }
++        }
++        if (!newStyle) {
++            Column(
++                modifier = Modifier.padding(bottom = Spacing.Small),
++                verticalArrangement = Arrangement.spacedBy(2.dp),
++            ) {
++                Text(
++                    text = album.title,
++                    style = MaterialTheme.typography.bodyMedium,
++                    fontWeight = FontWeight.SemiBold,
++                    color = MaterialTheme.colorScheme.onSurface,
++                    maxLines = 1,
++                    overflow = TextOverflow.Ellipsis,
++                )
++                Text(
++                    text = subtitle,
++                    style = MaterialTheme.typography.bodySmall,
++                    color = MaterialTheme.colorScheme.onSurfaceVariant,
++                    maxLines = 1,
++                    overflow = TextOverflow.Ellipsis,
++                )
++            }
+         }
+     }
+ }
+diff --git a/app/src/main/java/me/spica27/spicamusic/ui/settings/SettingsScene.kt b/app/src/main/java/me/spica27/spicamusic/ui/settings/SettingsScene.kt
+index c72e172..54e065a 100644
+--- a/app/src/main/java/me/spica27/spicamusic/ui/settings/SettingsScene.kt
++++ b/app/src/main/java/me/spica27/spicamusic/ui/settings/SettingsScene.kt
+@@ -40,6 +40,7 @@ import androidx.compose.material.icons.filled.Bedtime
+ import androidx.compose.material.icons.filled.BlurOn
+ import androidx.compose.material.icons.filled.Check
+ import androidx.compose.material.icons.filled.ChevronRight
++import androidx.compose.material.icons.filled.Album
+ import androidx.compose.material.icons.filled.DarkMode
+ import androidx.compose.material.icons.filled.ExpandMore
+ import androidx.compose.material.icons.filled.GraphicEq
+@@ -141,6 +142,7 @@ fun SettingsScreen() {
+     val bottomBarLayout by viewModel.bottomBarLayout.collectAsStateWithLifecycle()
+     val musicTopBarCustomization by viewModel.musicTopBarCustomization.collectAsStateWithLifecycle()
+     val keepScreenOn by viewModel.keepScreenOn.collectAsStateWithLifecycle()
++    val albumNewStyle by viewModel.albumNewStyle.collectAsStateWithLifecycle()
+     val backgroundValue by viewModel.dynamicSpectrumBackground.collectAsStateWithLifecycle()
+     val verseMode by viewModel.verseThemeMode.collectAsStateWithLifecycle()
+     val verseSaturation by viewModel.verseSaturation.collectAsStateWithLifecycle()
+@@ -246,6 +248,14 @@ fun SettingsScreen() {
+                         onValueChange = { viewModel.setBottomBarLayout(BottomBarLayout.fromString(it)) },
+                     )
+                     SettingsItemDivider()
++                    SwitchRow(
++                        title = stringResource(R.string.settings_album_new_style_title),
++                        summary = stringResource(R.string.settings_album_new_style_subtitle),
++                        icon = Icons.Default.Album,
++                        checked = albumNewStyle,
++                        onCheckedChange = viewModel::setAlbumNewStyle,
++                    )
++                    SettingsItemDivider()
+                     SwitchRow(
+                         title = stringResource(R.string.settings_dark_mode_title),
+                         summary = stringResource(R.string.settings_dark_mode_toggle_subtitle),
+diff --git a/app/src/main/java/me/spica27/spicamusic/ui/settings/SettingsViewModel.kt b/app/src/main/java/me/spica27/spicamusic/ui/settings/SettingsViewModel.kt
+index bbbd537..e379333 100644
+--- a/app/src/main/java/me/spica27/spicamusic/ui/settings/SettingsViewModel.kt
++++ b/app/src/main/java/me/spica27/spicamusic/ui/settings/SettingsViewModel.kt
+@@ -209,6 +209,18 @@ class SettingsViewModel(
+         }
+     }
+ 
++    // New album style
++    val albumNewStyle =
++        settingsUseCases
++            .getBoolean(SettingsUseCases.Keys.ALBUM_NEW_STYLE, false)
++            .stateIn(viewModelScope, SharingStarted.Eagerly, false)
++
++    fun setAlbumNewStyle(enabled: Boolean) {
++        viewModelScope.launch {
++            settingsUseCases.setBoolean(SettingsUseCases.Keys.ALBUM_NEW_STYLE, enabled)
++        }
++    }
++
+     // 动态频谱
+     val dynamicSpectrumBackground =
+         settingsUseCases
+diff --git a/app/src/main/java/me/spica27/spicamusic/ui/widget/AlbumArtColor.kt b/app/src/main/java/me/spica27/spicamusic/ui/widget/AlbumArtColor.kt
+new file mode 100644
+index 0000000..de9794d
+--- /dev/null
++++ b/app/src/main/java/me/spica27/spicamusic/ui/widget/AlbumArtColor.kt
+@@ -0,0 +1,67 @@
++package me.spica27.spicamusic.ui.widget
++
++import android.graphics.Bitmap
++import androidx.compose.runtime.Composable
++import androidx.compose.runtime.LaunchedEffect
++import androidx.compose.runtime.getValue
++import androidx.compose.runtime.mutableStateOf
++import androidx.compose.runtime.remember
++import androidx.compose.runtime.setValue
++import androidx.compose.ui.graphics.Color
++import androidx.palette.graphics.Palette
++import com.skydoves.landscapist.core.ImageRequest
++import com.skydoves.landscapist.core.Landscapist
++import com.skydoves.landscapist.core.model.CachePolicy
++import com.skydoves.landscapist.core.model.ImageResult
++import kotlinx.coroutines.Dispatchers
++import kotlinx.coroutines.suspendCancellableCoroutine
++import kotlinx.coroutines.withContext
++import me.spica27.spicamusic.artwork.MusicArtwork
++import kotlin.coroutines.resume
++
++/** Main colour of an album cover, or null while loading / when there is no cover. */
++@Composable
++fun rememberAlbumArtColor(artwork: MusicArtwork?): Color? {
++    var color by remember(artwork) { mutableStateOf<Color?>(null) }
++    LaunchedEffect(artwork) {
++        color = if (artwork == null || artwork.isEmpty) null else loadAlbumArtColor(artwork)
++    }
++    return color
++}
++
++private suspend fun loadAlbumArtColor(artwork: MusicArtwork): Color? {
++    val bitmap =
++        suspendCancellableCoroutine<Bitmap?> { cont ->
++            val request =
++                ImageRequest
++                    .builder()
++                    .model(artwork)
++                    .size(64, 64)
++                    .diskCachePolicy(CachePolicy.DISABLED)
++                    .build()
++            val disposable =
++                Landscapist.getInstance().enqueue(request) { result ->
++                    when (result) {
++                        is ImageResult.Success ->
++                            if (result.isFinal && cont.isActive) cont.resume(result.data as? Bitmap)
++
++                        is ImageResult.Failure -> if (cont.isActive) cont.resume(null)
++
++                        ImageResult.Loading -> Unit
++                    }
++                }
++            cont.invokeOnCancellation { disposable.dispose() }
++        } ?: return null
++    return withContext(Dispatchers.Default) {
++        try {
++            // Palette needs a software bitmap; the cached one is never recycled here.
++            val source =
++                if (bitmap.config == Bitmap.Config.HARDWARE) bitmap.copy(Bitmap.Config.ARGB_8888, false) else bitmap
++            val palette = Palette.from(source).maximumColorCount(16).generate()
++            val swatch = palette.vibrantSwatch ?: palette.dominantSwatch ?: palette.mutedSwatch
++            swatch?.let { Color(it.rgb) }
++        } catch (e: Exception) {
++            null
++        }
++    }
++}
+diff --git a/app/src/main/res/values-zh-rTW/strings.xml b/app/src/main/res/values-zh-rTW/strings.xml
+index b334ea7..97adef4 100644
+--- a/app/src/main/res/values-zh-rTW/strings.xml
++++ b/app/src/main/res/values-zh-rTW/strings.xml
+@@ -362,6 +362,8 @@
+   <string name="settings_dark_mode_subtitle">啟用深色主題</string>
+   <string name="settings_playback">播放</string>
+   <string name="settings_sound_effects_subtitle">均衡器、響度等音效設定</string>
++  <string name="settings_album_new_style_title">新專輯樣式</string>
++  <string name="settings_album_new_style_subtitle">將專輯資訊顯示在封面內</string>
+   <string name="settings_keep_screen_on">螢幕常亮</string>
+   <string name="settings_keep_screen_on_subtitle">播放時保持螢幕常亮</string>
+   <string name="settings_dynamic_spectrum">動態頻譜背景</string>
+diff --git a/app/src/main/res/values-zh/strings.xml b/app/src/main/res/values-zh/strings.xml
+index 664aba6..715e09b 100644
+--- a/app/src/main/res/values-zh/strings.xml
++++ b/app/src/main/res/values-zh/strings.xml
+@@ -364,6 +364,8 @@
+   <string name="settings_dark_mode_subtitle">启用深色主题</string>
+   <string name="settings_playback">播放</string>
+   <string name="settings_sound_effects_subtitle">均衡器、响度等音效设置</string>
++  <string name="settings_album_new_style_title">新专辑样式</string>
++  <string name="settings_album_new_style_subtitle">将专辑信息显示在封面内</string>
+   <string name="settings_keep_screen_on">屏幕常亮</string>
+   <string name="settings_keep_screen_on_subtitle">播放时保持屏幕常亮</string>
+   <string name="settings_dynamic_spectrum">动态频谱背景</string>
+diff --git a/app/src/main/res/values/strings.xml b/app/src/main/res/values/strings.xml
+index c235e3b..e25f70c 100644
+--- a/app/src/main/res/values/strings.xml
++++ b/app/src/main/res/values/strings.xml
+@@ -363,6 +363,8 @@
+   <string name="settings_dark_mode_subtitle">Enable dark theme</string>
+   <string name="settings_playback">Playback</string>
+   <string name="settings_sound_effects_subtitle">Equalizer, loudness and other effects</string>
++  <string name="settings_album_new_style_title">New album style</string>
++  <string name="settings_album_new_style_subtitle">Show album info inside the cover</string>
+   <string name="settings_keep_screen_on">Keep Screen On</string>
+   <string name="settings_keep_screen_on_subtitle">Keep screen on during playback</string>
+   <string name="settings_dynamic_spectrum">Dynamic Spectrum Background</string>
+diff --git a/core-preferences/src/main/java/me/spica27/spicamusic/core/preferences/PreferencesManager.kt b/core-preferences/src/main/java/me/spica27/spicamusic/core/preferences/PreferencesManager.kt
+index ead664f..a4b6150 100644
+--- a/core-preferences/src/main/java/me/spica27/spicamusic/core/preferences/PreferencesManager.kt
++++ b/core-preferences/src/main/java/me/spica27/spicamusic/core/preferences/PreferencesManager.kt
+@@ -46,6 +46,7 @@ class PreferencesManager(
+         val MUSIC_TOP_BAR_EDGE_FADE = intPreferencesKey("music_top_bar_edge_fade")
+         val THEME_COLOR_STYLE = stringPreferencesKey("theme_color_style")
+         val KEEP_SCREEN_ON = booleanPreferencesKey("keep_screen_on")
++        val ALBUM_NEW_STYLE = booleanPreferencesKey("album_new_style")
+         val DYNAMIC_SPECTRUM_BACKGROUND = stringPreferencesKey("dynamic_spectrum_background")
+         // ---- Verse Flow 外观（Auto / Light / Dark、饱和度、鲜艳度、高亮色相）----
+         val VERSE_THEME_MODE = stringPreferencesKey("verse_theme_mode")
+diff --git a/feature-settings-domain/src/main/java/me/spica27/spicamusic/feature/settings/domain/SettingsUseCases.kt b/feature-settings-domain/src/main/java/me/spica27/spicamusic/feature/settings/domain/SettingsUseCases.kt
+index cbf3ebb..f473543 100644
+--- a/feature-settings-domain/src/main/java/me/spica27/spicamusic/feature/settings/domain/SettingsUseCases.kt
++++ b/feature-settings-domain/src/main/java/me/spica27/spicamusic/feature/settings/domain/SettingsUseCases.kt
+@@ -15,6 +15,7 @@ class SettingsUseCases(
+         val BOTTOM_BAR_LAYOUT = PreferencesManager.Keys.BOTTOM_BAR_LAYOUT
+         val THEME_COLOR_STYLE = PreferencesManager.Keys.THEME_COLOR_STYLE
+         val KEEP_SCREEN_ON = PreferencesManager.Keys.KEEP_SCREEN_ON
++        val ALBUM_NEW_STYLE = PreferencesManager.Keys.ALBUM_NEW_STYLE
+         val DYNAMIC_SPECTRUM_BACKGROUND = PreferencesManager.Keys.DYNAMIC_SPECTRUM_BACKGROUND
+         val VERSE_THEME_MODE = PreferencesManager.Keys.VERSE_THEME_MODE
+         val VERSE_THEME_SATURATION = PreferencesManager.Keys.VERSE_THEME_SATURATION
