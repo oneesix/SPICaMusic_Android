@@ -128,6 +128,9 @@ internal fun LyricsBottomBar(
             Modifier
         }
 
+    // Liquid glass on: the buttons and the pill use the app's glass (same settings as the home bars).
+    val liquid = lyricsGlassSurfaceOrNull(hazeState, CircleShape, surface)
+
     Row(
         modifier =
             modifier
@@ -142,6 +145,7 @@ internal fun LyricsBottomBar(
             size = size,
             fill = fill,
             glass = glass,
+            liquid = liquid,
             on = s.showTransliteration && hasTransliteration,
             available = hasTransliteration,
             description = stringResource(R.string.lyr_dock_transliteration),
@@ -168,10 +172,16 @@ internal fun LyricsBottomBar(
                 Modifier
                     .weight(1f)
                     .height(size)
-                    .clip(CircleShape)
-                    .then(glass)
-                    .background(fill)
-                    .padding(pad),
+                    .then(
+                        if (liquid != null) {
+                            liquid
+                        } else {
+                            Modifier
+                                .clip(CircleShape)
+                                .then(glass)
+                                .background(fill)
+                        },
+                    ).padding(pad),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Box(
@@ -240,6 +250,7 @@ internal fun LyricsBottomBar(
             size = size,
             fill = fill,
             glass = glass,
+            liquid = liquid,
             on = s.showTranslation && hasTranslation,
             available = hasTranslation,
             description = stringResource(R.string.lyr_dock_translation),
@@ -268,6 +279,7 @@ private fun DockCircleButton(
     size: Dp,
     fill: Color,
     glass: Modifier,
+    liquid: Modifier?,
     on: Boolean,
     available: Boolean,
     description: String,
@@ -285,10 +297,16 @@ private fun DockCircleButton(
         modifier =
             Modifier
                 .size(size)
-                .clip(CircleShape)
-                .then(glass)
-                .background(fill)
-                .clickable(role = Role.Button, onClickLabel = description, onClick = onClick),
+                .then(
+                    if (liquid != null) {
+                        liquid
+                    } else {
+                        Modifier
+                            .clip(CircleShape)
+                            .then(glass)
+                            .background(fill)
+                    },
+                ).clickable(role = Role.Button, onClickLabel = description, onClick = onClick),
         contentAlignment = Alignment.Center,
     ) {
         content(tint)

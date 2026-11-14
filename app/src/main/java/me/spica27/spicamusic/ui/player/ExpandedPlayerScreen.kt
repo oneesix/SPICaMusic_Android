@@ -120,7 +120,10 @@ import me.spica27.spicamusic.feature.library.domain.SongUseCases
 import me.spica27.spicamusic.player.api.PlayMode
 import me.spica27.spicamusic.player.api.SleepTimerState
 import me.spica27.spicamusic.ui.dialog.artistRouteFor
+import com.kyant.backdrop.backdrops.layerBackdrop
+import com.kyant.backdrop.backdrops.rememberLayerBackdrop
 import me.spica27.spicamusic.ui.glass.LocalLiquidGlassConfig
+import me.spica27.spicamusic.ui.glass.LocalLiquidGlassV2Config
 import me.spica27.spicamusic.ui.navigation.LocalBackStack
 import me.spica27.spicamusic.ui.navigation.Route
 import me.spica27.spicamusic.ui.navigation.SleepTimerRoute
@@ -494,6 +497,8 @@ fun ExpandedPlayerScreen(
     val dynamicStyle by dynamicStyleViewModel.style.collectAsStateWithLifecycle()
     val dynamicColors = rememberDynamicPlayerColors(dynamicStyle, currentMediaItem?.mediaMetadata?.artworkUri)
     val hazeState = rememberHazeState()
+    val playerBgBackdrop = rememberLayerBackdrop()
+    val lyricsGlassV2 = LocalLiquidGlassV2Config.current.enabled
     val lyricsScrimAlpha =
         animateFloatAsState(
             targetValue = if (playerSurface == PlayerSurface.Lyrics) 1f else 0f,
@@ -511,54 +516,62 @@ fun ExpandedPlayerScreen(
                     }.background(MaterialTheme.colorScheme.surface)
                     .fillMaxSize(),
         ) {
-            if (isVerseFlow) {
-                // 与 HTML 完全一致的渐变背景（歌词页额外显示漂移的 mesh）
-                VerseFlowBackground(
-                    theme = verseTheme,
-                    showMesh = playerSurface == PlayerSurface.Lyrics,
-                    mesh = verseMesh,
-                    meshAnimated = animationsEnabled && isAppInForeground,
-                    modifier =
-                        Modifier
-                            .fillMaxSize()
-                            .hazeSource(hazeState),
-                )
-            } else {
-                // 仅在页面可见且应用在前台时启用动态背景。
-                FluidMusicBackground(
-                    modifier =
-                        Modifier
-                            .fillMaxSize()
-                            // 队列顶栏在关闭玻璃时仍需采样动态背景，用于渐变模糊。
-                            .hazeSource(hazeState),
-                    coverColor = coverColor,
-                    isDarkMode = MaterialTheme.colorScheme.surface.luminance() < 0.5f,
-                    coverUri = { currentMediaItem?.mediaMetadata?.artworkUri },
-                    enabled = animationsEnabled && isAppInForeground,
-                )
+            // Liquid glass V2 samples this layer (player background) for the lyrics bars.
+            Box(
+                modifier =
+                    Modifier
+                        .fillMaxSize()
+                        .then(if (lyricsGlassV2) Modifier.layerBackdrop(playerBgBackdrop) else Modifier),
+            ) {
+                if (isVerseFlow) {
+                    // 与 HTML 完全一致的渐变背景（歌词页额外显示漂移的 mesh）
+                    VerseFlowBackground(
+                        theme = verseTheme,
+                        showMesh = playerSurface == PlayerSurface.Lyrics,
+                        mesh = verseMesh,
+                        meshAnimated = animationsEnabled && isAppInForeground,
+                        modifier =
+                            Modifier
+                                .fillMaxSize()
+                                .hazeSource(hazeState),
+                    )
+                } else {
+                    // 仅在页面可见且应用在前台时启用动态背景。
+                    FluidMusicBackground(
+                        modifier =
+                            Modifier
+                                .fillMaxSize()
+                                // 队列顶栏在关闭玻璃时仍需采样动态背景，用于渐变模糊。
+                                .hazeSource(hazeState),
+                        coverColor = coverColor,
+                        isDarkMode = MaterialTheme.colorScheme.surface.luminance() < 0.5f,
+                        coverUri = { currentMediaItem?.mediaMetadata?.artworkUri },
+                        enabled = animationsEnabled && isAppInForeground,
+                    )
 
-                // Color player UI > Color background: an album-colour tint on top of the animated background.
-                dynamicColors?.backgroundTint?.let { tint ->
+                    // Color player UI > Color background: an album-colour tint on top of the animated background.
+                    dynamicColors?.backgroundTint?.let { tint ->
+                        Box(
+                            modifier =
+                                Modifier
+                                    .fillMaxSize()
+                                    .hazeSource(hazeState, zIndex = 0.3f)
+                                    .background(tint),
+                        )
+                    }
+
+                    // 歌词模式只压暗同一份动态背景，不创建第二个背景实例。
                     Box(
                         modifier =
                             Modifier
                                 .fillMaxSize()
-                                .hazeSource(hazeState, zIndex = 0.3f)
-                                .background(tint),
+                                // The source must wrap the dimming (alpha + colour) so the blurred header
+                                // is dimmed exactly like the rest of the lyrics page.
+                                .hazeSource(hazeState, zIndex = 0.5f)
+                                .graphicsLayer { alpha = lyricsScrimAlpha.value }
+                                .background(lyricsScrimColor),
                     )
                 }
-
-                // 歌词模式只压暗同一份动态背景，不创建第二个背景实例。
-                Box(
-                    modifier =
-                        Modifier
-                            .fillMaxSize()
-                            // The source must wrap the dimming (alpha + colour) so the blurred header
-                            // is dimmed exactly like the rest of the lyrics page.
-                            .hazeSource(hazeState, zIndex = 0.5f)
-                            .graphicsLayer { alpha = lyricsScrimAlpha.value }
-                            .background(lyricsScrimColor),
-                )
             }
 
             // Player and lyrics are two layers of one container. A single progress value slides them side by side:
@@ -733,6 +746,7 @@ fun ExpandedPlayerScreen(
                             isLike = songLikeState,
                             onLikeClick = { viewModel.toggleLikeCurrentSong() },
                             hazeState = hazeState,
+                            backgroundBackdrop = playerBgBackdrop,
                             album = currentMediaItem?.mediaMetadata?.albumTitle?.toString(),
                             releaseYear = currentMediaItem?.mediaMetadata?.releaseYear,
                             isSeeking = isSeekingState,

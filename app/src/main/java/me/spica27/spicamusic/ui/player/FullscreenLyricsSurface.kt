@@ -43,6 +43,17 @@ import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.graphics.BlendMode
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.runtime.CompositionLocalProvider
+import com.kyant.backdrop.Backdrop
+import com.kyant.backdrop.backdrops.LayerBackdrop
+import com.kyant.backdrop.backdrops.layerBackdrop
+import com.kyant.backdrop.backdrops.rememberCombinedBackdrop
+import com.kyant.backdrop.backdrops.rememberLayerBackdrop
+import me.spica27.spicamusic.ui.glass.LocalGlassV2Backdrop
+import me.spica27.spicamusic.ui.glass.LocalLiquidGlassConfig
+import me.spica27.spicamusic.ui.glass.LocalLiquidGlassV2Config
+import me.spica27.spicamusic.ui.widget.LyricsControlDefaults
 import androidx.compose.ui.graphics.CompositingStrategy
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.onSizeChanged
@@ -116,9 +127,18 @@ internal fun FullscreenLyricsSurface(
     modifier: Modifier = Modifier,
     /** Extra modifier on the top bar (a swipe there goes back to the player). */
     headerModifier: Modifier = Modifier,
+    /** Liquid glass V2: the player background layer, so the glass bars can see it behind the lyrics. */
+    backgroundBackdrop: LayerBackdrop? = null,
 ) {
     val styleViewModel: LyricsStyleViewModel = koinActivityViewModel()
     val style by styleViewModel.style.collectAsStateWithLifecycle()
+    // Liquid glass (the app's glass settings) on the top bar buttons and the bottom bar.
+    val glassV2 = LocalLiquidGlassV2Config.current.enabled && style.enhanceHeader
+    val lyricsBackdrop = rememberLayerBackdrop()
+    val glassBackdrop: Backdrop =
+        if (backgroundBackdrop != null) rememberCombinedBackdrop(backgroundBackdrop, lyricsBackdrop) else lyricsBackdrop
+    // Glass V1 samples the lyrics through Haze, so the lyrics must be a Haze source then.
+    val glassV1 = style.enhanceHeader && !glassV2 && LocalLiquidGlassConfig.current.enabled
     // Enhance header: blur ON  -> lyrics scroll behind the blurred header.
     //                 blur OFF -> lyrics start below the header; the line separates them.
     val blurBehind = style.enhanceHeader && style.headerBlurEnabled
@@ -147,7 +167,8 @@ internal fun FullscreenLyricsSurface(
                     )
                     // zIndex 1: drawn above the background source (zIndex 0) that shares this state, so the
                     // blurred header shows background + lyrics together and hides the sharp lyrics below it.
-                    .then(if (blurBehind || dockBlur) Modifier.hazeSource(hazeState, zIndex = 1f) else Modifier),
+                    .then(if (blurBehind || dockBlur || glassV1) Modifier.hazeSource(hazeState, zIndex = 1f) else Modifier)
+                    .then(if (glassV2) Modifier.layerBackdrop(lyricsBackdrop) else Modifier),
             toolbarBottomInset = LyricsToolbarBottomInset,
             // 工具栏已移到顶栏右侧（三点按钮）
             showToolbar = false,
@@ -168,7 +189,9 @@ internal fun FullscreenLyricsSurface(
             )
         }
 
+        CompositionLocalProvider(LocalGlassV2Backdrop provides (if (glassV2) glassBackdrop else LocalGlassV2Backdrop.current)) {
         FullscreenLyricsHeader(
+            hazeState = hazeState,
             title = title,
             artist = artist,
             artwork = artwork,
@@ -185,6 +208,7 @@ internal fun FullscreenLyricsSurface(
             onBarHeightChange = { barHeightPx = it },
             modifier = Modifier.align(Alignment.TopCenter).then(headerModifier),
         )
+        }
 
         // Bottom bar, "spread" blur: one blur layer behind the whole bar that fades out above it.
         if (dockSpread) {
@@ -201,6 +225,7 @@ internal fun FullscreenLyricsSurface(
 
         // Bottom bar: transliteration button | pill (cover, artist + time, play/pause) | translation button
         if (style.enhanceHeader) {
+            CompositionLocalProvider(LocalGlassV2Backdrop provides (if (glassV2) glassBackdrop else LocalGlassV2Backdrop.current)) {
             LyricsBottomBar(
                 artist = artist,
                 artwork = artwork,
@@ -212,12 +237,14 @@ internal fun FullscreenLyricsSurface(
                 onHeightChange = { dockHeightPx = it },
                 modifier = Modifier.align(Alignment.BottomCenter),
             )
+            }
         }
     }
 }
 
 @Composable
 private fun FullscreenLyricsHeader(
+    hazeState: HazeState,
     title: String,
     artist: String,
     artwork: MusicArtwork?,
@@ -272,9 +299,16 @@ private fun FullscreenLyricsHeader(
             }
         }
 
+    // Liquid glass on (enhanced header only): the like and dots buttons use the app's glass.
+    val liquid = if (enhanced) lyricsGlassSurfaceOrNull(hazeState, CircleShape, MaterialTheme.colorScheme.surface) else null
+    val buttonModifier = liquid ?: Modifier
+    val buttonColor = if (liquid != null) Color.Transparent else LyricsControlDefaults.surfaceColor
+
     val likeButton: @Composable () -> Unit = {
         LyricsCircleButton(
             onClick = onLikeClick,
+            modifier = buttonModifier,
+            containerColor = buttonColor,
             size = buttonSize,
         ) {
             Icon(
@@ -289,6 +323,8 @@ private fun FullscreenLyricsHeader(
     val dotsButton: @Composable () -> Unit = {
         LyricsCircleButton(
             onClick = { menuExpanded = !menuExpanded },
+            modifier = buttonModifier,
+            containerColor = buttonColor,
             size = buttonSize,
         ) {
             Icon(
