@@ -16,11 +16,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.drawWithContent
-import androidx.compose.ui.graphics.BlendMode
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.CompositingStrategy
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.Dp
@@ -33,6 +29,7 @@ import androidx.media3.exoplayer.ExoPlayer
 import dev.chrisbanes.haze.ExperimentalHazeApi
 import dev.chrisbanes.haze.HazeInput
 import dev.chrisbanes.haze.HazePerformanceMode
+import dev.chrisbanes.haze.HazeProgressive
 import dev.chrisbanes.haze.blur.HazeBlurStyle
 import dev.chrisbanes.haze.blur.HazeColorEffect
 import dev.chrisbanes.haze.blur.hazeBlur
@@ -43,7 +40,8 @@ import me.spica27.spicamusic.ui.widget.AudioCover
 
 /**
  * Full artwork mode: above and below the square album, a flipped copy of the same cover continues the
- * picture. Haze blurs it (amount, optimize and quality come from the Bubble settings) and it fades out.
+ * picture. Haze blurs it with a progressive blur (the same one the queue uses): no blur at the album edge,
+ * full blur far from it. Amount, optimize and quality come from the Bubble settings.
  * Draws outside the parent box on purpose, so the parent must not clip.
  */
 @Composable
@@ -67,7 +65,7 @@ private fun MirrorFill(
     val haze = rememberHazeState()
     val amount = tuning.fillBlurAmountDp
     val style =
-        remember(amount) {
+        remember(amount, above) {
             HazeBlurStyle {
                 blurRadius(amount.dp)
                 noiseFactor(0f)
@@ -75,6 +73,13 @@ private fun MirrorFill(
                 colorEffects(emptyList())
                 fallbackColorEffect(HazeColorEffect.tint(Color.Transparent))
                 alpha(1f)
+                // Sharp next to the album, fully blurred at the far end.
+                progressive(
+                    HazeProgressive.verticalGradient(
+                        startIntensity = if (above) 1f else 0f,
+                        endIntensity = if (above) 0f else 1f,
+                    ),
+                )
             }
         }
     val mode =
@@ -83,14 +88,11 @@ private fun MirrorFill(
         } else {
             HazePerformanceMode.Balanced
         }
-    // The mirror overlaps the sharp album by 10%, so the sharp edge dissolves into it.
-    val shift = side * 0.9f
     Box(
         modifier =
             Modifier
                 .requiredSize(side)
-                .offset(y = if (above) -shift else shift)
-                .fadeOutwards(above),
+                .offset(y = if (above) -side else side),
     ) {
         Box(
             modifier =
@@ -116,45 +118,6 @@ private fun MirrorFill(
         }
     }
 }
-
-/** Fades the content out away from the album: opaque next to it, transparent at the far end. */
-private fun Modifier.fadeOutwards(above: Boolean): Modifier =
-    graphicsLayer { compositingStrategy = CompositingStrategy.Offscreen }
-        .drawWithContent {
-            drawContent()
-            val brush =
-                if (above) {
-                    Brush.verticalGradient(
-                        0.15f to Color.Transparent,
-                        0.65f to Color.Black.copy(alpha = 0.6f),
-                        1f to Color.Black,
-                    )
-                } else {
-                    Brush.verticalGradient(
-                        0f to Color.Black,
-                        0.35f to Color.Black.copy(alpha = 0.6f),
-                        0.85f to Color.Transparent,
-                    )
-                }
-            drawRect(brush = brush, blendMode = BlendMode.DstIn)
-        }
-
-/** Makes the top and bottom [fraction] of the content fade to transparent. */
-internal fun Modifier.fadeVerticalEdges(fraction: Float): Modifier =
-    graphicsLayer { compositingStrategy = CompositingStrategy.Offscreen }
-        .drawWithContent {
-            drawContent()
-            drawRect(
-                brush =
-                    Brush.verticalGradient(
-                        0f to Color.Transparent,
-                        fraction to Color.Black,
-                        1f - fraction to Color.Black,
-                        1f to Color.Transparent,
-                    ),
-                blendMode = BlendMode.DstIn,
-            )
-        }
 
 /**
  * Silent, looping video cover. It keeps the video's own shape (no zoom or crop) and plays only while the

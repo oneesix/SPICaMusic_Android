@@ -487,8 +487,7 @@ internal fun BubblePlayerPage(
                                     .fillMaxSize()
                                     .clip(RoundedCornerShape(radius.dp))
                                     .then(if (v2Enabled) Modifier.layerBackdrop(albumBackdrop) else Modifier)
-                                    .albumHighlight(highlightTuning, radius.toInt())
-                                    .then(if (fullOn) Modifier.fadeVerticalEdges(0.1f) else Modifier),
+                                    .albumHighlight(highlightTuning, radius.toInt()),
                         ) {
                             AnimatedContent(
                                 targetState = item,
