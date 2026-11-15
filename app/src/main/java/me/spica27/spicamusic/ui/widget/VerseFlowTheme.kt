@@ -386,7 +386,7 @@ fun buildVerseTheme(
 // Palette extraction + remember helpers
 // ---------------------------------------------------------------------------------------------
 
-private suspend fun extractVersePalette(
+internal suspend fun extractVersePalette(
     context: android.content.Context,
     uri: Uri?,
 ): VersePalette? =

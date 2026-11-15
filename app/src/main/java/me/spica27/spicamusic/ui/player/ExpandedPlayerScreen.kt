@@ -138,6 +138,7 @@ import me.spica27.spicamusic.ui.widget.DynamicPlayerColorScope
 import me.spica27.spicamusic.ui.widget.FluidMusicBackground
 import me.spica27.spicamusic.ui.widget.rememberDynamicPlayerColors
 import org.koin.compose.viewmodel.koinActivityViewModel
+import me.spica27.spicamusic.ui.widget.SmoothBackground
 import me.spica27.spicamusic.ui.widget.VerseFlowBackground
 import me.spica27.spicamusic.ui.widget.VerseFlowThemeScope
 import me.spica27.spicamusic.ui.widget.rememberVerseTheme
@@ -484,13 +485,18 @@ fun ExpandedPlayerScreen(
     val verseHue by settingsViewModel.verseHue.collectAsStateWithLifecycle()
     val verseMesh by settingsViewModel.verseMesh.collectAsStateWithLifecycle()
     val isVerseFlow = backgroundValue == DynamicSpectrumBackground.VerseFlow.value
+    // Smooth: ColorfulX-style gradient. With "Color player UI" on, text / icons / sliders (and the
+    // lyrics) use the album colours through the same theme scope Verse Flow uses.
+    val smoothSettings by settingsViewModel.smooth.collectAsStateWithLifecycle()
+    val isSmooth = backgroundValue == DynamicSpectrumBackground.Smooth.value
+    val useAlbumTheme = isVerseFlow || (isSmooth && smoothSettings.colorUi)
     val verseTheme =
         rememberVerseTheme(
-            coverUri = if (isVerseFlow) currentMediaItem?.mediaMetadata?.artworkUri else null,
-            mode = verseMode,
-            saturationPercent = verseSaturation,
+            coverUri = if (useAlbumTheme) currentMediaItem?.mediaMetadata?.artworkUri else null,
+            mode = if (isSmooth) smoothSettings.themeMode else verseMode,
+            saturationPercent = if (isSmooth) smoothSettings.saturationPercent else verseSaturation,
             vibrancyPercent = verseVibrancy,
-            hueShift = verseHue,
+            hueShift = if (isSmooth) 0 else verseHue,
         )
     // Color player UI: colours from the album art (null = off).
     val dynamicStyleViewModel: LyricsStyleViewModel = koinActivityViewModel()
@@ -507,7 +513,7 @@ fun ExpandedPlayerScreen(
         )
     val lyricsScrimColor = MaterialTheme.colorScheme.scrim.copy(alpha = 0.14f)
 
-    PlayerThemeScope(isVerseFlow = isVerseFlow, theme = verseTheme, dynamicColors = dynamicColors) {
+    PlayerThemeScope(isVerseFlow = useAlbumTheme, theme = verseTheme, dynamicColors = dynamicColors) {
         Box(
             modifier =
                 modifier
@@ -537,17 +543,29 @@ fun ExpandedPlayerScreen(
                     )
                 } else {
                     // 仅在页面可见且应用在前台时启用动态背景。
-                    FluidMusicBackground(
-                        modifier =
-                            Modifier
-                                .fillMaxSize()
-                                // 队列顶栏在关闭玻璃时仍需采样动态背景，用于渐变模糊。
-                                .hazeSource(hazeState),
-                        coverColor = coverColor,
-                        isDarkMode = MaterialTheme.colorScheme.surface.luminance() < 0.5f,
-                        coverUri = { currentMediaItem?.mediaMetadata?.artworkUri },
-                        enabled = animationsEnabled && isAppInForeground,
-                    )
+                    if (isSmooth) {
+                        SmoothBackground(
+                            coverUri = currentMediaItem?.mediaMetadata?.artworkUri,
+                            settings = smoothSettings,
+                            enabled = animationsEnabled && isAppInForeground,
+                            modifier =
+                                Modifier
+                                    .fillMaxSize()
+                                    .hazeSource(hazeState),
+                        )
+                    } else {
+                        FluidMusicBackground(
+                            modifier =
+                                Modifier
+                                    .fillMaxSize()
+                                    // 队列顶栏在关闭玻璃时仍需采样动态背景，用于渐变模糊。
+                                    .hazeSource(hazeState),
+                            coverColor = coverColor,
+                            isDarkMode = MaterialTheme.colorScheme.surface.luminance() < 0.5f,
+                            coverUri = { currentMediaItem?.mediaMetadata?.artworkUri },
+                            enabled = animationsEnabled && isAppInForeground,
+                        )
+                    }
 
                     // Color player UI > Color background: an album-colour tint on top of the animated background.
                     dynamicColors?.backgroundTint?.let { tint ->

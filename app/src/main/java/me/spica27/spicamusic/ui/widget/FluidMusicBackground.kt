@@ -82,6 +82,7 @@ fun FluidMusicBackground(
         remember(backgroundMode, enabled) {
             backgroundMode != DynamicSpectrumBackground.OFF &&
                 backgroundMode != DynamicSpectrumBackground.VerseFlow &&
+                backgroundMode != DynamicSpectrumBackground.Smooth &&
                 backgroundMode != DynamicSpectrumBackground.BlurCover &&
                 enabled
         }
@@ -137,6 +138,7 @@ fun FluidMusicBackground(
 
         // Verse Flow 由播放器页面直接绘制（需要同时改变文字颜色），这里不重复绘制
         DynamicSpectrumBackground.VerseFlow,
+        DynamicSpectrumBackground.Smooth,
         DynamicSpectrumBackground.OFF,
         ->
             Box(modifier = modifier)

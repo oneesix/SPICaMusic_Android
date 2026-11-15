@@ -28,6 +28,7 @@ import me.spica27.spicamusic.ui.home.page.preferenceKey
 import me.spica27.spicamusic.ui.home.player_bar.BottomBarCustomization
 import me.spica27.spicamusic.ui.home.player_bar.BottomBarSetting
 import me.spica27.spicamusic.ui.player.PillPlayerTuning
+import me.spica27.spicamusic.ui.widget.SmoothSettings
 import me.spica27.spicamusic.ui.widget.VerseMeshSettings
 import me.spica27.spicamusic.ui.widget.VerseThemeMode
 
@@ -355,6 +356,66 @@ class SettingsViewModel(
             settingsUseCases.setInt(SettingsUseCases.Keys.VERSE_THEME_HUE, 0)
         }
     }
+
+    // ---- Smooth background (ColorfulX style) ----
+    private val smoothDefaults = SmoothSettings()
+    private val smoothColorUi = settingsUseCases.getBoolean(SettingsUseCases.Keys.SMOOTH_COLOR_UI, smoothDefaults.colorUi)
+    private val smoothFreeze = settingsUseCases.getBoolean(SettingsUseCases.Keys.SMOOTH_FREEZE, smoothDefaults.freeze)
+    private val smoothSpeed = settingsUseCases.getInt(SettingsUseCases.Keys.SMOOTH_SPEED, smoothDefaults.speedTenths)
+    private val smoothBias = settingsUseCases.getInt(SettingsUseCases.Keys.SMOOTH_BIAS, smoothDefaults.biasMilli)
+    private val smoothNoise = settingsUseCases.getInt(SettingsUseCases.Keys.SMOOTH_NOISE, smoothDefaults.noise)
+    private val smoothTransition = settingsUseCases.getInt(SettingsUseCases.Keys.SMOOTH_TRANSITION, smoothDefaults.transitionTenths)
+    private val smoothPower = settingsUseCases.getInt(SettingsUseCases.Keys.SMOOTH_POWER, smoothDefaults.powerTenths)
+    private val smoothFrameLimit = settingsUseCases.getInt(SettingsUseCases.Keys.SMOOTH_FRAME_LIMIT, smoothDefaults.frameLimit)
+    private val smoothRenderScale = settingsUseCases.getInt(SettingsUseCases.Keys.SMOOTH_RENDER_SCALE, smoothDefaults.renderScalePercent)
+    private val smoothDim = settingsUseCases.getInt(SettingsUseCases.Keys.SMOOTH_DIM, smoothDefaults.dimPercent)
+    private val smoothThemeMode = settingsUseCases.getString(SettingsUseCases.Keys.SMOOTH_THEME_MODE, smoothDefaults.themeMode)
+    private val smoothSaturation = settingsUseCases.getInt(SettingsUseCases.Keys.SMOOTH_SATURATION, smoothDefaults.saturationPercent)
+
+    val smooth =
+        combine(
+            combine(smoothColorUi, smoothFreeze, smoothSpeed, smoothBias, smoothNoise) { c, f, s, b, n ->
+                SmoothSettings(colorUi = c, freeze = f, speedTenths = s, biasMilli = b, noise = n)
+            },
+            combine(smoothTransition, smoothPower, smoothFrameLimit, smoothRenderScale, smoothDim) { t, p, fl, rs, d ->
+                intArrayOf(t, p, fl, rs, d)
+            },
+            combine(smoothThemeMode, smoothSaturation) { m, s -> m to s },
+        ) { a, b, c ->
+            a.copy(
+                speedTenths = a.speedTenths.coerceIn(0, 30),
+                biasMilli = a.biasMilli.coerceIn(2, 200),
+                noise = a.noise.coerceIn(0, 30),
+                transitionTenths = b[0].coerceIn(5, 80),
+                powerTenths = b[1].coerceIn(10, 80),
+                frameLimit = b[2].coerceIn(15, 120),
+                renderScalePercent = b[3].coerceIn(25, 100),
+                dimPercent = b[4].coerceIn(0, 70),
+                themeMode = c.first,
+                saturationPercent = c.second.coerceIn(0, 200),
+            )
+        }.stateIn(viewModelScope, SharingStarted.Eagerly, SmoothSettings())
+
+    /** Only the fields that actually changed are written. */
+    fun updateSmooth(new: SmoothSettings) {
+        val old = smooth.value
+        viewModelScope.launch {
+            if (new.colorUi != old.colorUi) settingsUseCases.setBoolean(SettingsUseCases.Keys.SMOOTH_COLOR_UI, new.colorUi)
+            if (new.freeze != old.freeze) settingsUseCases.setBoolean(SettingsUseCases.Keys.SMOOTH_FREEZE, new.freeze)
+            if (new.speedTenths != old.speedTenths) settingsUseCases.setInt(SettingsUseCases.Keys.SMOOTH_SPEED, new.speedTenths.coerceIn(0, 30))
+            if (new.biasMilli != old.biasMilli) settingsUseCases.setInt(SettingsUseCases.Keys.SMOOTH_BIAS, new.biasMilli.coerceIn(2, 200))
+            if (new.noise != old.noise) settingsUseCases.setInt(SettingsUseCases.Keys.SMOOTH_NOISE, new.noise.coerceIn(0, 30))
+            if (new.transitionTenths != old.transitionTenths) settingsUseCases.setInt(SettingsUseCases.Keys.SMOOTH_TRANSITION, new.transitionTenths.coerceIn(5, 80))
+            if (new.powerTenths != old.powerTenths) settingsUseCases.setInt(SettingsUseCases.Keys.SMOOTH_POWER, new.powerTenths.coerceIn(10, 80))
+            if (new.frameLimit != old.frameLimit) settingsUseCases.setInt(SettingsUseCases.Keys.SMOOTH_FRAME_LIMIT, new.frameLimit.coerceIn(15, 120))
+            if (new.renderScalePercent != old.renderScalePercent) settingsUseCases.setInt(SettingsUseCases.Keys.SMOOTH_RENDER_SCALE, new.renderScalePercent.coerceIn(25, 100))
+            if (new.dimPercent != old.dimPercent) settingsUseCases.setInt(SettingsUseCases.Keys.SMOOTH_DIM, new.dimPercent.coerceIn(0, 70))
+            if (new.themeMode != old.themeMode) settingsUseCases.setString(SettingsUseCases.Keys.SMOOTH_THEME_MODE, new.themeMode)
+            if (new.saturationPercent != old.saturationPercent) settingsUseCases.setInt(SettingsUseCases.Keys.SMOOTH_SATURATION, new.saturationPercent.coerceIn(0, 200))
+        }
+    }
+
+    fun resetSmooth() = updateSmooth(SmoothSettings())
 
     // 动态封面
     val dynamicCoverType =

@@ -37,6 +37,12 @@ sealed class DynamicSpectrumBackground(
         "Verse Flow",
     )
 
+    /** "Smooth": ColorfulX-style gradient from the album colours, with its own settings. */
+    object Smooth : DynamicSpectrumBackground(
+        "smooth",
+        "Smooth",
+    )
+
     object OFF : DynamicSpectrumBackground(
         "off",
         "关闭",
@@ -51,6 +57,7 @@ sealed class DynamicSpectrumBackground(
             is FluidWarp -> "动态流体封面"
             is BlurCover -> "模糊封面"
             is VerseFlow -> "Verse Flow"
+            is Smooth -> "Smooth"
             is OFF -> "关闭"
         }
     }
@@ -64,13 +71,14 @@ sealed class DynamicSpectrumBackground(
                 FluidWarp.value -> FluidWarp
                 BlurCover.value -> BlurCover
                 VerseFlow.value -> VerseFlow
+                Smooth.value -> Smooth
                 OFF.value -> OFF
                 else -> OFF
             }
         }
 
         val presets: List<DynamicSpectrumBackground>
-            get() = listOf(VerseFlow, TopGlow, LiquidAurora, EffectShader, FluidWarp, BlurCover, OFF)
+            get() = listOf(VerseFlow, Smooth, TopGlow, LiquidAurora, EffectShader, FluidWarp, BlurCover, OFF)
     }
 
 }

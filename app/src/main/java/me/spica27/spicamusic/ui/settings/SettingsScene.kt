@@ -122,6 +122,7 @@ import me.spica27.spicamusic.ui.widget.LyricsSettingsResetButton
 import me.spica27.spicamusic.ui.widget.LyricsSettingsSection
 import me.spica27.spicamusic.ui.widget.LyricsSettingsSlider
 import me.spica27.spicamusic.ui.widget.LyricsSettingsToggle
+import me.spica27.spicamusic.ui.widget.SmoothSettings
 import me.spica27.spicamusic.ui.widget.VerseMeshSettings
 import me.spica27.spicamusic.ui.widget.VerseThemeMode
 import me.spica27.spicamusic.ui.widget.clickHighlight
@@ -155,6 +156,7 @@ fun SettingsScreen() {
     val verseVibrancy by viewModel.verseVibrancy.collectAsStateWithLifecycle()
     val verseHue by viewModel.verseHue.collectAsStateWithLifecycle()
     val verseMesh by viewModel.verseMesh.collectAsStateWithLifecycle()
+    val smooth by viewModel.smooth.collectAsStateWithLifecycle()
     val coverTapValue by viewModel.dynamicCoverType.collectAsStateWithLifecycle()
     val progressWaveformValue by viewModel.progressBarStyle.collectAsStateWithLifecycle()
     val playerStyleValue by viewModel.playerStyle.collectAsStateWithLifecycle()
@@ -399,6 +401,23 @@ fun SettingsScreen() {
                             mesh = verseMesh,
                             onChange = viewModel::updateVerseMesh,
                             onReset = viewModel::resetVerseMesh,
+                        )
+                    }
+                    AnimatedVisibility(
+                        visible = backgroundValue == DynamicSpectrumBackground.Smooth.value,
+                        enter =
+                            expandVertically(
+                                animationSpec = tween(durationMillis = 220, easing = EaseOutEmphasized),
+                            ) + fadeIn(tween(durationMillis = 180)),
+                        exit =
+                            shrinkVertically(
+                                animationSpec = tween(durationMillis = 180, easing = EaseOutEmphasized),
+                            ) + fadeOut(tween(durationMillis = 140)),
+                    ) {
+                        SmoothControls(
+                            settings = smooth,
+                            onChange = viewModel::updateSmooth,
+                            onReset = viewModel::resetSmooth,
                         )
                     }
 //                        SettingsItemDivider()
@@ -1149,7 +1168,11 @@ private fun rememberBackgroundOptions(): ImmutableList<SettingsOption> {
     val blurDesc = stringResource(R.string.bg_blur_cover_desc)
     val verse = stringResource(R.string.bg_verse_flow)
     val verseDesc = stringResource(R.string.bg_verse_flow_desc)
+    val smooth = stringResource(R.string.bg_smooth)
+    val smoothDesc = stringResource(R.string.bg_smooth_desc)
     return remember(
+        smooth,
+        smoothDesc,
         verse,
         verseDesc,
         off,
@@ -1172,6 +1195,12 @@ private fun rememberBackgroundOptions(): ImmutableList<SettingsOption> {
                     verse,
                     verseDesc,
                     Icons.Default.Palette,
+                ),
+                SettingsOption(
+                    DynamicSpectrumBackground.Smooth.value,
+                    smooth,
+                    smoothDesc,
+                    Icons.Default.AutoAwesome,
                 ),
                 SettingsOption(
                     DynamicSpectrumBackground.FluidWarp.value,
@@ -1836,6 +1865,144 @@ private fun VerseAppearanceControls(
         )
         LyricsSettingsResetButton(
             text = stringResource(R.string.verse_reset),
+            onClick = onReset,
+        )
+    }
+}
+
+/** Smooth (ColorfulX style) background: every setting of the gradient, plus colour UI and freeze. */
+@Composable
+private fun SmoothControls(
+    settings: SmoothSettings,
+    onChange: (SmoothSettings) -> Unit,
+    onReset: () -> Unit,
+) {
+    fun tenths(v: Int) = "${v / 10}.${v % 10}"
+    Column(
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .padding(
+                    start = SettingsRowContentInset,
+                    end = Spacing.Large,
+                    top = Spacing.ExtraSmall,
+                    bottom = Spacing.Small,
+                ),
+    ) {
+        LyricsSettingsToggle(
+            label = stringResource(R.string.smooth_color_ui),
+            description = stringResource(R.string.smooth_color_ui_desc),
+            checked = settings.colorUi,
+            onCheckedChange = { onChange(settings.copy(colorUi = it)) },
+        )
+        LyricsSettingsToggle(
+            label = stringResource(R.string.smooth_freeze),
+            description = stringResource(R.string.smooth_freeze_desc),
+            checked = settings.freeze,
+            onCheckedChange = { onChange(settings.copy(freeze = it)) },
+        )
+        if (settings.colorUi) {
+            LyricsSettingsChips(
+                label = stringResource(R.string.verse_mode),
+                description = stringResource(R.string.verse_mode_desc),
+                options = listOf(VerseThemeMode.AUTO, VerseThemeMode.LIGHT, VerseThemeMode.DARK),
+                selected = settings.themeMode,
+                optionLabel = {
+                    when (it) {
+                        VerseThemeMode.LIGHT -> stringResource(R.string.verse_mode_light)
+                        VerseThemeMode.DARK -> stringResource(R.string.verse_mode_dark)
+                        else -> stringResource(R.string.verse_mode_auto)
+                    }
+                },
+                onSelect = { onChange(settings.copy(themeMode = it)) },
+            )
+        }
+        LyricsSettingsSlider(
+            label = stringResource(R.string.verse_saturation),
+            description = stringResource(R.string.verse_saturation_desc),
+            value = settings.saturationPercent,
+            range = 0..200,
+            step = 5,
+            valueText = { "$it%" },
+            onValueChange = { onChange(settings.copy(saturationPercent = it)) },
+        )
+        // Speed, colour change and frame limit only matter while the background moves.
+        if (!settings.freeze) {
+            LyricsSettingsSlider(
+                label = stringResource(R.string.smooth_speed),
+                description = stringResource(R.string.smooth_speed_desc),
+                value = settings.speedTenths,
+                range = 0..30,
+                step = 1,
+                valueText = { tenths(it) + "x" },
+                onValueChange = { onChange(settings.copy(speedTenths = it)) },
+            )
+            LyricsSettingsSlider(
+                label = stringResource(R.string.smooth_transition),
+                description = stringResource(R.string.smooth_transition_desc),
+                value = settings.transitionTenths,
+                range = 5..80,
+                step = 5,
+                valueText = { tenths(it) },
+                onValueChange = { onChange(settings.copy(transitionTenths = it)) },
+            )
+            LyricsSettingsSlider(
+                label = stringResource(R.string.smooth_frame_limit),
+                description = stringResource(R.string.smooth_frame_limit_desc),
+                value = settings.frameLimit,
+                range = 15..120,
+                step = 15,
+                valueText = { "$it fps" },
+                onValueChange = { onChange(settings.copy(frameLimit = it)) },
+            )
+        }
+        LyricsSettingsSlider(
+            label = stringResource(R.string.smooth_bias),
+            description = stringResource(R.string.smooth_bias_desc),
+            value = settings.biasMilli,
+            range = 2..200,
+            step = 2,
+            valueText = { "0." + it.toString().padStart(3, '0') },
+            onValueChange = { onChange(settings.copy(biasMilli = it)) },
+        )
+        LyricsSettingsSlider(
+            label = stringResource(R.string.smooth_power),
+            description = stringResource(R.string.smooth_power_desc),
+            value = settings.powerTenths,
+            range = 10..80,
+            step = 5,
+            valueText = { tenths(it) },
+            onValueChange = { onChange(settings.copy(powerTenths = it)) },
+        )
+        LyricsSettingsSlider(
+            label = stringResource(R.string.smooth_noise),
+            description = stringResource(R.string.smooth_noise_desc),
+            value = settings.noise,
+            range = 0..30,
+            step = 1,
+            valueText = { "$it" },
+            onValueChange = { onChange(settings.copy(noise = it)) },
+        )
+        LyricsSettingsSlider(
+            label = stringResource(R.string.smooth_render_scale),
+            description = stringResource(R.string.smooth_render_scale_desc),
+            value = settings.renderScalePercent,
+            range = 25..100,
+            step = 5,
+            valueText = { "$it%" },
+            onValueChange = { onChange(settings.copy(renderScalePercent = it)) },
+        )
+        LyricsSettingsSlider(
+            label = stringResource(R.string.smooth_dim),
+            description = stringResource(R.string.smooth_dim_desc),
+            value = settings.dimPercent,
+            range = 0..70,
+            step = 5,
+            valueText = { "$it%" },
+            onValueChange = { onChange(settings.copy(dimPercent = it)) },
+        )
+        LyricsSettingsResetButton(
+            text = stringResource(R.string.smooth_reset),
             onClick = onReset,
         )
     }
