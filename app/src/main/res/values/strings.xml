@@ -755,6 +755,7 @@
   <string name="smooth_theme_mode_auto">Auto</string>
   <string name="smooth_theme_mode_light">Light</string>
   <string name="smooth_theme_mode_dark">Dark</string>
+  <string name="smooth_theme_mode_vivid">Vivid</string>
   <string name="smooth_saturation">Saturation</string>
   <string name="smooth_saturation_desc">Color intensity of the whole theme</string>
   <string name="bg_off_desc">Plain background. Best for battery life</string>

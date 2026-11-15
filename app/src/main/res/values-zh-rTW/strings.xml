@@ -753,6 +753,7 @@
   <string name="smooth_theme_mode_auto">自動</string>
   <string name="smooth_theme_mode_light">淺色</string>
   <string name="smooth_theme_mode_dark">深色</string>
+  <string name="smooth_theme_mode_vivid">鮮豔</string>
   <string name="smooth_saturation">飽和度</string>
   <string name="smooth_saturation_desc">整個主題的色彩強度</string>
   <string name="bg_off_desc">純色背景，最省電</string>

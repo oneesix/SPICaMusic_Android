@@ -77,6 +77,8 @@ internal class SmoothPalette(
     val lab: FloatArray,
     val count: Int,
     val rgb: List<Color>,
+    /** Look that was used (in vivid mode it is picked from the cover). */
+    val dark: Boolean = true,
 )
 
 private class SmoothState {
@@ -111,26 +113,34 @@ internal fun buildSmoothPalette(
     palette: CoverPalette?,
     saturation: Float,
     dark: Boolean,
+    vivid: Boolean = false,
 ): SmoothPalette {
     val source = palette?.clusters?.take(6)?.map { it.rgb } ?: DefaultSmoothColors
     val colors = if (source.size >= 4) source else List(4) { source[it % source.size] }
     val lab = FloatArray(SLOTS * 3)
     val rgb = ArrayList<Color>()
-    colors.forEachIndexed { i, c ->
-        // saturation: push the colour away from (or towards) its own grey
-        val gray = 0.299f * c[0] + 0.587f * c[1] + 0.114f * c[2]
-        val r = (gray + (c[0] - gray) * saturation).coerceIn(0f, 255f)
-        val g = (gray + (c[1] - gray) * saturation).coerceIn(0f, 255f)
-        val b = (gray + (c[2] - gray) * saturation).coerceIn(0f, 255f)
+    // saturation: push the colour away from (or towards) its own grey
+    val raw =
+        colors.map { c ->
+            val gray = 0.299f * c[0] + 0.587f * c[1] + 0.114f * c[2]
+            rgbToLab(
+                (gray + (c[0] - gray) * saturation).coerceIn(0f, 255f),
+                (gray + (c[1] - gray) * saturation).coerceIn(0f, 255f),
+                (gray + (c[2] - gray) * saturation).coerceIn(0f, 255f),
+            )
+        }
+    // vivid: light or dark is picked from the cover's average lightness
+    val useDark = if (vivid) raw.map { it[0] }.average() < 62.0 else dark
+    raw.forEachIndexed { i, rawLab ->
         // light / dark look: same hue, lightness moved into a light or a dark band
-        val l = toneLab(rgbToLab(r, g, b), dark)
+        val l = if (vivid) toneLabVivid(rawLab, useDark) else toneLab(rawLab, useDark)
         lab[i * 3] = l[0]
         lab[i * 3 + 1] = l[1]
         lab[i * 3 + 2] = l[2]
         val toned = labToRgb(l[0], l[1], l[2])
         rgb.add(Color(toned[0].roundToInt().coerceIn(0, 255), toned[1].roundToInt().coerceIn(0, 255), toned[2].roundToInt().coerceIn(0, 255)))
     }
-    return SmoothPalette(lab, colors.size.coerceAtMost(SLOTS), rgb)
+    return SmoothPalette(lab, colors.size.coerceAtMost(SLOTS), rgb, useDark)
 }
 
 private fun snapColors(
@@ -244,8 +254,8 @@ fun SmoothBackground(
     var coverPalette by remember(coverUri) { mutableStateOf<CoverPalette?>(null) }
     LaunchedEffect(coverUri) { coverPalette = extractCoverPalette(context, coverUri) }
     val palette =
-        remember(coverPalette, settings.saturationPercent, dark) {
-            buildSmoothPalette(coverPalette, settings.saturationPercent / 100f, dark)
+        remember(coverPalette, settings.saturationPercent, settings.themeMode, dark) {
+            buildSmoothPalette(coverPalette, settings.saturationPercent / 100f, dark, settings.themeMode == SmoothThemeMode.VIVID)
         }
     val dim = settings.dimPercent.coerceIn(0, 70) / 100f
 

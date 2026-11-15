@@ -28,6 +28,9 @@ object SmoothThemeMode {
     const val AUTO = "auto"
     const val LIGHT = "light"
     const val DARK = "dark"
+
+    /** Keeps the cover's own lightness and saturation; light or dark is picked per cover. */
+    const val VIVID = "vivid"
 }
 
 /**
@@ -72,6 +75,18 @@ internal fun toneLab(
     val hue = atan2(lab[2], lab[1])
     val l = if (dark) 12f + lab[0] * 0.4f else 64f + lab[0] * 0.26f
     val c = chroma * if (dark) 0.85f else 0.75f
+    return floatArrayOf(l, c * cos(hue), c * sin(hue))
+}
+
+/** Vivid look: keeps the cover's own lightness / saturation, only clamped into a wide light or dark band. */
+internal fun toneLabVivid(
+    lab: FloatArray,
+    dark: Boolean,
+): FloatArray {
+    val chroma = hypot(lab[1], lab[2])
+    val hue = atan2(lab[2], lab[1])
+    val l = if (dark) lab[0].coerceIn(10f, 50f) else lab[0].coerceIn(70f, 90f)
+    val c = chroma * if (dark) 1f else 0.95f
     return floatArrayOf(l, c * cos(hue), c * sin(hue))
 }
 
@@ -131,9 +146,11 @@ private fun rgbColor(c: FloatArray) = Color(c[0].roundToInt().coerceIn(0, 255), 
 internal fun buildSmoothTheme(
     palette: CoverPalette?,
     settings: SmoothSettings,
-    dark: Boolean,
+    darkIn: Boolean,
 ): SmoothTheme {
-    val pal = buildSmoothPalette(palette, settings.saturationPercent / 100f, dark)
+    val vivid = settings.themeMode == SmoothThemeMode.VIVID
+    val pal = buildSmoothPalette(palette, settings.saturationPercent / 100f, darkIn, vivid)
+    val dark = if (vivid) pal.dark else darkIn
     val keep = 1f - settings.dimPercent.coerceIn(0, 70) / 100f
     val bg = ArrayList<FloatArray>()
     val mean = FloatArray(3)
@@ -203,7 +220,7 @@ fun rememberSmoothTheme(
     LaunchedEffect(coverUri) { palette = extractCoverPalette(context, coverUri) }
     val dark = resolveSmoothDark(settings.colorUi, settings.themeMode, appDark)
     val target =
-        remember(palette, settings.saturationPercent, settings.dimPercent, settings.textTintPercent, dark) {
+        remember(palette, settings.saturationPercent, settings.dimPercent, settings.textTintPercent, settings.themeMode, dark) {
             buildSmoothTheme(palette, settings, dark)
         }
     // smooth cross-fade between songs / when sliders move

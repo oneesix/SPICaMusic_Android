@@ -1697,10 +1697,11 @@ private fun SmoothControls(
             LyricsSettingsChips(
                 label = stringResource(R.string.smooth_theme_mode),
                 description = stringResource(R.string.smooth_theme_mode_desc),
-                options = listOf(SmoothThemeMode.AUTO, SmoothThemeMode.LIGHT, SmoothThemeMode.DARK),
+                options = listOf(SmoothThemeMode.AUTO, SmoothThemeMode.VIVID, SmoothThemeMode.LIGHT, SmoothThemeMode.DARK),
                 selected = settings.themeMode,
                 optionLabel = {
                     when (it) {
+                        SmoothThemeMode.VIVID -> stringResource(R.string.smooth_theme_mode_vivid)
                         SmoothThemeMode.LIGHT -> stringResource(R.string.smooth_theme_mode_light)
                         SmoothThemeMode.DARK -> stringResource(R.string.smooth_theme_mode_dark)
                         else -> stringResource(R.string.smooth_theme_mode_auto)
