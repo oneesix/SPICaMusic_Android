@@ -29,6 +29,7 @@ import org.intellij.lang.annotations.Language
 import kotlin.math.abs
 import kotlin.math.cbrt
 import kotlin.math.exp
+import kotlin.math.hypot
 import kotlin.math.max
 import kotlin.math.pow
 import kotlin.math.roundToInt
@@ -68,6 +69,8 @@ data class SmoothSettings(
     val textTintPercent: Int = 100,
     /** 0..70 % extra black over the background on the lyrics screen, keeps lyrics readable. */
     val lyricsDimPercent: Int = 15,
+    /** 0..200 % extra colour strength of the text / icons in the Vivid look (100 = normal). */
+    val textBoostPercent: Int = 100,
 )
 
 private const val SLOTS = 8
@@ -79,6 +82,8 @@ internal class SmoothPalette(
     val rgb: List<Color>,
     /** Look that was used (in vivid mode it is picked from the cover). */
     val dark: Boolean = true,
+    /** Vivid look: the cover colour (LAB) that stands out most from the background, used for text / icons. */
+    val accent: FloatArray? = null,
 )
 
 private class SmoothState {
@@ -140,7 +145,23 @@ internal fun buildSmoothPalette(
         val toned = labToRgb(l[0], l[1], l[2])
         rgb.add(Color(toned[0].roundToInt().coerceIn(0, 255), toned[1].roundToInt().coerceIn(0, 255), toned[2].roundToInt().coerceIn(0, 255)))
     }
-    return SmoothPalette(lab, colors.size.coerceAtMost(SLOTS), rgb, useDark)
+    // vivid: text colour = the cover colour that contrasts most with the finished background
+    var accent: FloatArray? = null
+    if (vivid && raw.isNotEmpty()) {
+        val count = colors.size.coerceAtMost(SLOTS)
+        var bgL = 0f
+        for (i in 0 until count) bgL += lab[i * 3]
+        bgL /= count.coerceAtLeast(1)
+        var best = -1f
+        for (r in raw) {
+            val score = hypot(r[1], r[2]) * (1f + abs(r[0] - bgL) / 50f)
+            if (score > best) {
+                best = score
+                accent = r
+            }
+        }
+    }
+    return SmoothPalette(lab, colors.size.coerceAtMost(SLOTS), rgb, useDark, accent)
 }
 
 private fun snapColors(
@@ -257,7 +278,8 @@ fun SmoothBackground(
         remember(coverPalette, settings.saturationPercent, settings.themeMode, dark) {
             buildSmoothPalette(coverPalette, settings.saturationPercent / 100f, dark, settings.themeMode == SmoothThemeMode.VIVID)
         }
-    val dim = settings.dimPercent.coerceIn(0, 70) / 100f
+    // the Vivid look has no extra dim
+    val dim = if (settings.themeMode == SmoothThemeMode.VIVID) 0f else settings.dimPercent.coerceIn(0, 70) / 100f
 
     Box(modifier = modifier) {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {

@@ -31,6 +31,7 @@ class SettingsUseCases(
         val SMOOTH_SATURATION = PreferencesManager.Keys.SMOOTH_SATURATION
         val SMOOTH_TEXT_TINT = PreferencesManager.Keys.SMOOTH_TEXT_TINT
         val SMOOTH_LYRICS_DIM = PreferencesManager.Keys.SMOOTH_LYRICS_DIM
+        val SMOOTH_TEXT_BOOST = PreferencesManager.Keys.SMOOTH_TEXT_BOOST
         val DYNAMIC_COVER_TYPE = PreferencesManager.Keys.DYNAMIC_COVER_TYPE
         val PROGRESS_BAR_STYLE = PreferencesManager.Keys.PROGRESS_BAR_STYLE
         val PLAYER_STYLE = PreferencesManager.Keys.PLAYER_STYLE

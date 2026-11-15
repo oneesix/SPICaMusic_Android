@@ -1718,6 +1718,17 @@ private fun SmoothControls(
                 valueText = { "$it%" },
                 onValueChange = { onChange(settings.copy(textTintPercent = it)) },
             )
+            if (settings.themeMode == SmoothThemeMode.VIVID) {
+                LyricsSettingsSlider(
+                    label = stringResource(R.string.smooth_text_boost),
+                    description = stringResource(R.string.smooth_text_boost_desc),
+                    value = settings.textBoostPercent,
+                    range = 0..200,
+                    step = 5,
+                    valueText = { "$it%" },
+                    onValueChange = { onChange(settings.copy(textBoostPercent = it)) },
+                )
+            }
         }
         LyricsSettingsSlider(
             label = stringResource(R.string.smooth_saturation),

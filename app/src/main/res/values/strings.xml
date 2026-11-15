@@ -747,6 +747,8 @@
   <string name="smooth_dim_desc">Darkens the background so text stays readable</string>
   <string name="smooth_text_tint">Text tint</string>
   <string name="smooth_text_tint_desc">How much color the text takes from the album. 0% = plain white or dark</string>
+  <string name="smooth_text_boost">Text color boost</string>
+  <string name="smooth_text_boost_desc">Makes text and icons more colorful in the Vivid look. 100% = normal</string>
   <string name="smooth_lyrics_dim">Lyrics screen dim</string>
   <string name="smooth_lyrics_dim_desc">Extra darkening on the lyrics screen so lyrics stay readable</string>
   <string name="smooth_reset">Reset Smooth</string>

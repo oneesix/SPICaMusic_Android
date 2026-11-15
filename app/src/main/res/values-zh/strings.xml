@@ -747,6 +747,8 @@
   <string name="smooth_dim_desc">压暗背景，让文字更清晰</string>
   <string name="smooth_text_tint">文字着色</string>
   <string name="smooth_text_tint_desc">文字从封面取色的程度，0% = 纯白或深色</string>
+  <string name="smooth_text_boost">文字色彩增强</string>
+  <string name="smooth_text_boost_desc">鲜艳外观下让文字和图标颜色更浓，100% = 默认</string>
   <string name="smooth_lyrics_dim">歌词页压暗</string>
   <string name="smooth_lyrics_dim_desc">歌词页额外压暗背景，让歌词更清晰</string>
   <string name="smooth_reset">重置流畅渐变</string>

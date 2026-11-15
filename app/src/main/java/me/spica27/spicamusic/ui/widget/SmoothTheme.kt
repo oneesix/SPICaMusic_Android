@@ -85,8 +85,9 @@ internal fun toneLabVivid(
 ): FloatArray {
     val chroma = hypot(lab[1], lab[2])
     val hue = atan2(lab[2], lab[1])
-    val l = if (dark) lab[0].coerceIn(10f, 50f) else lab[0].coerceIn(70f, 90f)
-    val c = chroma * if (dark) 1f else 0.95f
+    // dark: the cover's own lightness and colour. light: a fixed pastel level with soft colour.
+    val l = if (dark) lab[0].coerceIn(8f, 55f) else 76f + lab[0] * 0.06f
+    val c = if (dark) min(chroma, 85f) else (chroma * 0.5f).coerceIn(18f, 38f)
     return floatArrayOf(l, c * cos(hue), c * sin(hue))
 }
 
@@ -151,7 +152,7 @@ internal fun buildSmoothTheme(
     val vivid = settings.themeMode == SmoothThemeMode.VIVID
     val pal = buildSmoothPalette(palette, settings.saturationPercent / 100f, darkIn, vivid)
     val dark = if (vivid) pal.dark else darkIn
-    val keep = 1f - settings.dimPercent.coerceIn(0, 70) / 100f
+    val keep = if (vivid) 1f else 1f - settings.dimPercent.coerceIn(0, 70) / 100f
     val bg = ArrayList<FloatArray>()
     val mean = FloatArray(3)
     var vividChroma = 0f
@@ -171,8 +172,11 @@ internal fun buildSmoothTheme(
         }
     }
     for (k in 0..2) mean[k] /= bg.size.coerceAtLeast(1)
-    val chromaMax = vividChroma
-    val hue = vividHue
+    // vivid: text takes the colour of the cover colour that stands out most from the background
+    val accent = pal.accent
+    val chromaMax = if (vivid && accent != null) min(hypot(accent[1], accent[2]), 70f) else vividChroma
+    val hue = if (vivid && accent != null) atan2(accent[2], accent[1]) else vividHue
+    val boost = if (vivid) settings.textBoostPercent.coerceIn(0, 200) / 100f else 1f
     val tint = settings.textTintPercent.coerceIn(0, 100) / 100f
 
     fun minContrast(c: FloatArray): Float = bg.minOf { contrastRatio(c, it) }
@@ -181,7 +185,7 @@ internal fun buildSmoothTheme(
         startL: Float,
         chromaMul: Float,
     ): FloatArray {
-        val c = min(chromaMax * chromaMul * tint, 75f)
+        val c = min(chromaMax * chromaMul * tint * boost, if (vivid) 100f else 75f)
         var l = startL
         var rgb = labToRgb(l, c * cos(hue), c * sin(hue))
         for (i in 0 until 70) {
@@ -192,8 +196,10 @@ internal fun buildSmoothTheme(
         return rgb
     }
 
-    val fg = tone(if (dark) 93f else 26f, if (dark) 0.28f else 0.9f)
-    val fg2 = tone(if (dark) 86f else 40f, if (dark) 0.5f else 1.5f)
+    val fg =
+        if (vivid) tone(if (dark) 86f else 24f, 0.9f) else tone(if (dark) 93f else 26f, if (dark) 0.28f else 0.9f)
+    val fg2 =
+        if (vivid) tone(if (dark) 76f else 34f, 0.9f) else tone(if (dark) 86f else 40f, if (dark) 0.5f else 1.5f)
     val surface = rgbColor(mean)
     return SmoothTheme(
         fg = rgbColor(fg),
