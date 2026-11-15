@@ -1,0 +1,64 @@
+diff --git a/app/src/main/java/me/spica27/spicamusic/ui/player/BubblePlayerPage.kt b/app/src/main/java/me/spica27/spicamusic/ui/player/BubblePlayerPage.kt
+index a1c55ad..7ba04db 100644
+--- a/app/src/main/java/me/spica27/spicamusic/ui/player/BubblePlayerPage.kt
++++ b/app/src/main/java/me/spica27/spicamusic/ui/player/BubblePlayerPage.kt
+@@ -50,6 +50,7 @@ import androidx.compose.runtime.setValue
+ import androidx.compose.ui.Alignment
+ import androidx.compose.ui.Modifier
+ import androidx.compose.ui.draw.clip
++import androidx.compose.ui.layout.layout
+ import androidx.compose.ui.graphics.Color
+ import androidx.compose.ui.graphics.lerp
+ import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+@@ -235,7 +236,7 @@ internal fun BubblePlayerPage(
+             heightDp = tuning.infoBarHeightDp,
+             textTenths = tuning.infoTextTenths,
+             background = infoBarGlass ?: Modifier.clip(CircleShape).then(glassBlur).background(barFill),
+-            modifier = Modifier.padding(top = 6.dp).then(dragModifier),
++            modifier = Modifier.padding(top = 10.dp).then(dragModifier),
+         )
+     }
+ 
+@@ -263,7 +264,7 @@ internal fun BubblePlayerPage(
+             Row(
+                 modifier =
+                     Modifier
+-                        .padding(top = 6.dp)
++                        .padding(top = 10.dp)
+                         .then(dragModifier)
+                         .fillMaxWidth()
+                         .height(tuning.topBarHeightDp.dp)
+@@ -604,6 +605,7 @@ internal fun BubblePlayerPage(
+                                     Text(
+                                         text = title,
+                                         fontSize = (tuning.titleTextTenths / 10f).sp,
++                                        lineHeight = (tuning.titleTextTenths / 10f * 1.15f).sp,
+                                         fontWeight = FontWeight.ExtraBold,
+                                         color = onSurface,
+                                         maxLines = 1,
+@@ -613,6 +615,7 @@ internal fun BubblePlayerPage(
+                                     Text(
+                                         text = artist,
+                                         fontSize = (tuning.artistTextTenths / 10f).sp,
++                                        lineHeight = (tuning.artistTextTenths / 10f * 1.15f).sp,
+                                         color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                         maxLines = 1,
+                                         overflow = TextOverflow.Ellipsis,
+@@ -865,8 +868,16 @@ private fun BubbleProgressBar(
+         verticalArrangement = Arrangement.Center,
+     ) {
+         // The app's glow particles progress bar (same drawing as the player's progress bar style).
++        // The area below the line is cut so the times sit close under it (the line stays centered in its area).
+         Box(
+-            modifier = Modifier.fillMaxWidth(),
++            modifier =
++                Modifier
++                    .fillMaxWidth()
++                    .layout { measurable, constraints ->
++                        val placeable = measurable.measure(constraints)
++                        val trim = (placeable.height / 2 - 8.dp.roundToPx()).coerceAtLeast(0)
++                        layout(placeable.width, placeable.height - trim) { placeable.place(0, 0) }
++                    },
+             contentAlignment = Alignment.Center,
+         ) {
+             GlowParticleSeekBar(
