@@ -162,6 +162,14 @@ internal fun BubbleSettingsSheet(
                 onSelect = { onChange(tuning.withValue(BubbleSetting.InfoBarPos, it)) },
             )
             if (tuning.infoBarPos != 2) {
+                LyricsSettingsChips(
+                    label = stringResource(R.string.bp_info_style),
+                    description = "",
+                    options = listOf(0, 1),
+                    selected = tuning.infoBarStyle,
+                    optionLabel = { stringResource(if (it == 0) R.string.bp_info_cols else R.string.bp_info_line) },
+                    onSelect = { onChange(tuning.withValue(BubbleSetting.InfoBarStyle, it)) },
+                )
                 Slide(R.string.bp_h_info, BubbleSetting.InfoBarHeight, 28..64)
                 Slide(R.string.bp_t_info, BubbleSetting.InfoText, 90..180, 5, spText)
             }

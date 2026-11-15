@@ -1271,6 +1271,9 @@
   <string name="bp_info_above">顶栏上方</string>
   <string name="bp_info_below">顶栏下方</string>
   <string name="bp_info_off">隐藏</string>
+  <string name="bp_info_style">样式</string>
+  <string name="bp_info_cols">三列</string>
+  <string name="bp_info_line">单行</string>
   <string name="bp_h_info">信息栏高度</string>
   <string name="bp_t_info">信息栏文字</string>
   <string name="bp_settings_title">气泡播放器</string>

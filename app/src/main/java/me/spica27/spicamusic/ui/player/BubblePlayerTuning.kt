@@ -41,6 +41,7 @@ internal object BubbleSetting {
     const val InfoText = 34
     const val TimeLabel = 35
     const val NextLabel = 36
+    const val InfoBarStyle = 37
 }
 
 /**
@@ -90,6 +91,8 @@ data class BubblePlayerTuning(
     /** Size of the small "Total listening:" and "Upcoming song:" labels in the top bar. */
     val timeLabelTenths: Int = 105,
     val nextLabelTenths: Int = 105,
+    /** Year / album / disc bar style: 0 three columns, 1 one line. */
+    val infoBarStyle: Int = 0,
 ) {
     fun toList(): List<Int> =
         listOf(
@@ -130,6 +133,7 @@ data class BubblePlayerTuning(
             infoTextTenths,
             timeLabelTenths,
             nextLabelTenths,
+            infoBarStyle,
         )
 
     fun encode(): String = toList().joinToString(",")
@@ -183,7 +187,7 @@ data class BubblePlayerTuning(
                 g(12), g(13), g(14), g(15), g(16), g(17), g(18), g(19), g(20), g(21), g(22), g(23),
                 g(24), g(25), g(26), g(27), g(28),
                 g(29), g(30), g(31),
-                g(32), g(33), g(34), g(35), g(36),
+                g(32), g(33), g(34), g(35), g(36), g(37),
             )
         }
 

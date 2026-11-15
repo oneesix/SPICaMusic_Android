@@ -233,6 +233,7 @@ internal fun BubblePlayerPage(
             year = yearText,
             album = albumTitle,
             discTrack = discTrackText,
+            oneLine = tuning.infoBarStyle == 1,
             heightDp = tuning.infoBarHeightDp,
             textTenths = tuning.infoTextTenths,
             background = infoBarGlass ?: Modifier.clip(CircleShape).then(glassBlur).background(barFill),
@@ -495,7 +496,7 @@ internal fun BubblePlayerPage(
                                 Icon(
                                     imageVector = Icons.Rounded.FastRewind,
                                     contentDescription = null,
-                                    tint = Color.White,
+                                    tint = onSurface,
                                     modifier = Modifier.size((tuning.skipSizeDp * 0.56f).dp),
                                 )
                             }
@@ -510,7 +511,7 @@ internal fun BubblePlayerPage(
                                 Icon(
                                     imageVector = if (isPlaying) Icons.Rounded.Pause else Icons.Rounded.PlayArrow,
                                     contentDescription = null,
-                                    tint = Color.White,
+                                    tint = onSurface,
                                     modifier = Modifier.size((tuning.playSizeDp * 0.56f).dp),
                                 )
                             }
@@ -523,7 +524,7 @@ internal fun BubblePlayerPage(
                                 Icon(
                                     imageVector = Icons.Rounded.FastForward,
                                     contentDescription = null,
-                                    tint = Color.White,
+                                    tint = onSurface,
                                     modifier = Modifier.size((tuning.skipSizeDp * 0.56f).dp),
                                 )
                             }
@@ -634,7 +635,7 @@ internal fun BubblePlayerPage(
                                         imageVector =
                                             if (isLike) Icons.Rounded.Favorite else Icons.Rounded.FavoriteBorder,
                                         contentDescription = null,
-                                        tint = if (isLike) Color(0xffcf1322) else onSurface,
+                                        tint = onSurface,
                                         modifier = Modifier.size(size * 0.43f),
                                     )
                                 }
@@ -723,12 +724,13 @@ private fun BubbleCircle(
     }
 }
 
-/** Second top bar: year, album and disc / track in three columns, no divider strips. */
+/** Second top bar: year, album and disc / track in three columns or one line, no divider strips. */
 @Composable
 private fun BubbleInfoBar(
     year: String?,
     album: String?,
     discTrack: String?,
+    oneLine: Boolean,
     heightDp: Int,
     textTenths: Int,
     background: Modifier,
@@ -745,17 +747,30 @@ private fun BubbleInfoBar(
                 .padding(horizontal = 14.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        cells.forEach { (text, weight) ->
+        if (oneLine) {
             Text(
-                text = text,
+                text = cells.joinToString(" \u2022 ") { it.first },
                 fontSize = (textTenths / 10f).sp,
                 fontWeight = FontWeight.SemiBold,
                 color = MaterialTheme.colorScheme.onSurface,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
                 textAlign = TextAlign.Center,
-                modifier = Modifier.weight(weight).padding(horizontal = 4.dp),
+                modifier = Modifier.weight(1f).padding(horizontal = 4.dp),
             )
+        } else {
+            cells.forEach { (text, weight) ->
+                Text(
+                    text = text,
+                    fontSize = (textTenths / 10f).sp,
+                    fontWeight = FontWeight.SemiBold,
+                    color = MaterialTheme.colorScheme.onSurface,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    textAlign = TextAlign.Center,
+                    modifier = Modifier.weight(weight).padding(horizontal = 4.dp),
+                )
+            }
         }
     }
 }
