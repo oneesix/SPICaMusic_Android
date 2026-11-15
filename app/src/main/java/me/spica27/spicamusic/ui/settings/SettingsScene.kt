@@ -121,6 +121,9 @@ import me.spica27.spicamusic.ui.widget.LyricsSettingsResetButton
 import me.spica27.spicamusic.ui.widget.LyricsSettingsSection
 import me.spica27.spicamusic.ui.widget.LyricsSettingsSlider
 import me.spica27.spicamusic.ui.widget.LyricsSettingsToggle
+import me.spica27.spicamusic.ui.widget.BlurPlusAppearance
+import me.spica27.spicamusic.ui.widget.BlurPlusColorStyle
+import me.spica27.spicamusic.ui.widget.BlurPlusSettings
 import me.spica27.spicamusic.ui.widget.SmoothSettings
 import me.spica27.spicamusic.ui.widget.SmoothThemeMode
 import me.spica27.spicamusic.ui.widget.clickHighlight
@@ -150,6 +153,7 @@ fun SettingsScreen() {
     var albumStyleExpanded by rememberSaveable { mutableStateOf(false) }
     val backgroundValue by viewModel.dynamicSpectrumBackground.collectAsStateWithLifecycle()
     val smooth by viewModel.smooth.collectAsStateWithLifecycle()
+    val blurPlus by viewModel.blurPlus.collectAsStateWithLifecycle()
     val coverTapValue by viewModel.dynamicCoverType.collectAsStateWithLifecycle()
     val progressWaveformValue by viewModel.progressBarStyle.collectAsStateWithLifecycle()
     val playerStyleValue by viewModel.playerStyle.collectAsStateWithLifecycle()
@@ -376,6 +380,23 @@ fun SettingsScreen() {
                             settings = smooth,
                             onChange = viewModel::updateSmooth,
                             onReset = viewModel::resetSmooth,
+                        )
+                    }
+                    AnimatedVisibility(
+                        visible = backgroundValue == DynamicSpectrumBackground.BlurPlus.value,
+                        enter =
+                            expandVertically(
+                                animationSpec = tween(durationMillis = 220, easing = EaseOutEmphasized),
+                            ) + fadeIn(tween(durationMillis = 180)),
+                        exit =
+                            shrinkVertically(
+                                animationSpec = tween(durationMillis = 180, easing = EaseOutEmphasized),
+                            ) + fadeOut(tween(durationMillis = 140)),
+                    ) {
+                        BlurPlusControls(
+                            settings = blurPlus,
+                            onChange = viewModel::updateBlurPlus,
+                            onReset = viewModel::resetBlurPlus,
                         )
                     }
 //                        SettingsItemDivider()
@@ -1116,6 +1137,8 @@ private fun rememberBackgroundOptions(): ImmutableList<SettingsOption> {
     val warpDesc = stringResource(R.string.bg_fluid_warp_desc)
     val blur = stringResource(R.string.bg_blur_cover)
     val blurDesc = stringResource(R.string.bg_blur_cover_desc)
+    val blurPlus = stringResource(R.string.bg_blur_plus)
+    val blurPlusDesc = stringResource(R.string.bg_blur_plus_desc)
     val smooth = stringResource(R.string.bg_smooth)
     val smoothDesc = stringResource(R.string.bg_smooth_desc)
     return remember(
@@ -1133,6 +1156,8 @@ private fun rememberBackgroundOptions(): ImmutableList<SettingsOption> {
         warpDesc,
         blur,
         blurDesc,
+        blurPlus,
+        blurPlusDesc,
     ) {
         ImmutableList.copyOf(
             listOf(
@@ -1171,6 +1196,12 @@ private fun rememberBackgroundOptions(): ImmutableList<SettingsOption> {
                     blur,
                     blurDesc,
                     Icons.Default.BlurOn,
+                ),
+                SettingsOption(
+                    DynamicSpectrumBackground.BlurPlus.value,
+                    blurPlus,
+                    blurPlusDesc,
+                    Icons.Default.LensBlur,
                 ),
                 SettingsOption(
                     DynamicSpectrumBackground.OFF.value,
@@ -1830,3 +1861,117 @@ private fun SmoothControls(
     }
 }
 
+/** Blur Plus background: blur, exposure, brightness, contrast, grain, noise, plus the player colour UI. */
+@Composable
+private fun BlurPlusControls(
+    settings: BlurPlusSettings,
+    onChange: (BlurPlusSettings) -> Unit,
+    onReset: () -> Unit,
+) {
+    Column(
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .padding(
+                    start = SettingsRowContentInset,
+                    end = Spacing.Large,
+                    top = Spacing.ExtraSmall,
+                    bottom = Spacing.Small,
+                ),
+    ) {
+        LyricsSettingsSlider(
+            label = stringResource(R.string.blurplus_blur),
+            description = stringResource(R.string.blurplus_blur_desc),
+            value = settings.blur,
+            range = 0..100,
+            step = 1,
+            valueText = { "$it%" },
+            onValueChange = { onChange(settings.copy(blur = it)) },
+        )
+        LyricsSettingsSlider(
+            label = stringResource(R.string.blurplus_exposure),
+            description = stringResource(R.string.blurplus_exposure_desc),
+            value = settings.exposure,
+            range = -100..100,
+            step = 1,
+            valueText = { "$it" },
+            onValueChange = { onChange(settings.copy(exposure = it)) },
+        )
+        LyricsSettingsSlider(
+            label = stringResource(R.string.blurplus_brightness),
+            description = stringResource(R.string.blurplus_brightness_desc),
+            value = settings.brightness,
+            range = -100..100,
+            step = 1,
+            valueText = { "$it" },
+            onValueChange = { onChange(settings.copy(brightness = it)) },
+        )
+        LyricsSettingsSlider(
+            label = stringResource(R.string.blurplus_contrast),
+            description = stringResource(R.string.blurplus_contrast_desc),
+            value = settings.contrast,
+            range = -100..100,
+            step = 1,
+            valueText = { "$it" },
+            onValueChange = { onChange(settings.copy(contrast = it)) },
+        )
+        LyricsSettingsSlider(
+            label = stringResource(R.string.blurplus_grain),
+            description = stringResource(R.string.blurplus_grain_desc),
+            value = settings.grain,
+            range = 0..100,
+            step = 1,
+            valueText = { "$it%" },
+            onValueChange = { onChange(settings.copy(grain = it)) },
+        )
+        LyricsSettingsSlider(
+            label = stringResource(R.string.blurplus_noise),
+            description = stringResource(R.string.blurplus_noise_desc),
+            value = settings.noise,
+            range = 0..100,
+            step = 1,
+            valueText = { "$it%" },
+            onValueChange = { onChange(settings.copy(noise = it)) },
+        )
+        LyricsSettingsToggle(
+            label = stringResource(R.string.blurplus_color_ui),
+            description = stringResource(R.string.blurplus_color_ui_desc),
+            checked = settings.colorUi,
+            onCheckedChange = { onChange(settings.copy(colorUi = it)) },
+        )
+        if (settings.colorUi) {
+            LyricsSettingsChips(
+                label = stringResource(R.string.blurplus_appearance),
+                description = stringResource(R.string.blurplus_appearance_desc),
+                options = listOf(BlurPlusAppearance.AUTO, BlurPlusAppearance.LIGHT, BlurPlusAppearance.DARK),
+                selected = settings.appearance,
+                optionLabel = {
+                    when (it) {
+                        BlurPlusAppearance.LIGHT -> stringResource(R.string.smooth_theme_mode_light)
+                        BlurPlusAppearance.DARK -> stringResource(R.string.smooth_theme_mode_dark)
+                        else -> stringResource(R.string.smooth_theme_mode_auto)
+                    }
+                },
+                onSelect = { onChange(settings.copy(appearance = it)) },
+            )
+            LyricsSettingsChips(
+                label = stringResource(R.string.blurplus_color_style),
+                description = stringResource(R.string.blurplus_color_style_desc),
+                options = listOf(BlurPlusColorStyle.AUTO, BlurPlusColorStyle.TEXTURED, BlurPlusColorStyle.FLAT),
+                selected = settings.colorStyle,
+                optionLabel = {
+                    when (it) {
+                        BlurPlusColorStyle.TEXTURED -> stringResource(R.string.blurplus_style_textured)
+                        BlurPlusColorStyle.FLAT -> stringResource(R.string.blurplus_style_flat)
+                        else -> stringResource(R.string.smooth_theme_mode_auto)
+                    }
+                },
+                onSelect = { onChange(settings.copy(colorStyle = it)) },
+            )
+        }
+        LyricsSettingsResetButton(
+            text = stringResource(R.string.blurplus_reset),
+            onClick = onReset,
+        )
+    }
+}

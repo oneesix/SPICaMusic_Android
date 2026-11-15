@@ -31,6 +31,12 @@ sealed class DynamicSpectrumBackground(
         "模糊封面",
     )
 
+    /** "Blur Plus": blurred cover with blur, exposure, brightness, contrast, grain and noise settings. */
+    object BlurPlus : DynamicSpectrumBackground(
+        "blur_plus",
+        "Blur Plus",
+    )
+
     /** "Smooth": ColorfulX-style gradient from the album colours, with its own settings. */
     object Smooth : DynamicSpectrumBackground(
         "smooth",
@@ -51,6 +57,7 @@ sealed class DynamicSpectrumBackground(
             is FluidWarp -> "动态流体封面"
             is BlurCover -> "模糊封面"
             is Smooth -> "Smooth"
+            is BlurPlus -> "Blur Plus"
             is OFF -> "关闭"
         }
     }
@@ -65,13 +72,14 @@ sealed class DynamicSpectrumBackground(
                 BlurCover.value -> BlurCover
                 "verse_flow" -> Smooth // Verse Flow was removed; its users get Smooth
                 Smooth.value -> Smooth
+                BlurPlus.value -> BlurPlus
                 OFF.value -> OFF
                 else -> OFF
             }
         }
 
         val presets: List<DynamicSpectrumBackground>
-            get() = listOf(Smooth, TopGlow, LiquidAurora, EffectShader, FluidWarp, BlurCover, OFF)
+            get() = listOf(Smooth, TopGlow, LiquidAurora, EffectShader, FluidWarp, BlurCover, BlurPlus, OFF)
     }
 
 }

@@ -245,6 +245,7 @@ fun rememberSmoothTheme(
 @Composable
 fun SmoothThemeScope(
     theme: SmoothTheme?,
+    flat: Boolean = false,
     content: @Composable () -> Unit,
 ) {
     if (theme == null) {
@@ -253,7 +254,7 @@ fun SmoothThemeScope(
     }
     val base = MaterialTheme.colorScheme
     val scheme =
-        remember(base, theme) {
+        remember(base, theme, flat) {
             base.copy(
                 primary = theme.fg,
                 onPrimary = theme.surface,
@@ -274,10 +275,11 @@ fun SmoothThemeScope(
                 onBackground = theme.fg,
                 outline = theme.fg2,
                 outlineVariant = theme.fg.copy(alpha = .26f),
-                surfaceContainerLowest = theme.deep.copy(alpha = .5f),
-                surfaceContainerLow = theme.deep.copy(alpha = .6f),
-                surfaceContainer = theme.deep.copy(alpha = .78f),
-                surfaceContainerHigh = theme.deep.copy(alpha = .86f),
+                // flat: solid controls, otherwise translucent (textured)
+                surfaceContainerLowest = theme.deep.copy(alpha = if (flat) 1f else .5f),
+                surfaceContainerLow = theme.deep.copy(alpha = if (flat) 1f else .6f),
+                surfaceContainer = theme.deep.copy(alpha = if (flat) 1f else .78f),
+                surfaceContainerHigh = theme.deep.copy(alpha = if (flat) 1f else .86f),
                 // seek-bar track: fg at 26 %
                 surfaceContainerHighest = theme.fg.copy(alpha = .26f),
                 inverseSurface = theme.fg,

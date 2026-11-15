@@ -1330,4 +1330,27 @@
   <string name="bp_seek_height">进度条高度</string>
   <string name="bp_seek_thickness">线条粗细</string>
   <string name="bp_seek_width">进度条宽度</string>
+  <string name="bg_blur_plus">模糊增强</string>
+  <string name="bg_blur_plus_desc">模糊封面，可调模糊、曝光、亮度、对比度、颗粒和噪点</string>
+  <string name="blurplus_blur">模糊</string>
+  <string name="blurplus_blur_desc">封面的模糊程度</string>
+  <string name="blurplus_exposure">曝光</string>
+  <string name="blurplus_exposure_desc">让封面更亮或更暗，0 为默认</string>
+  <string name="blurplus_brightness">亮度</string>
+  <string name="blurplus_brightness_desc">增加或减少光线，0 为默认</string>
+  <string name="blurplus_contrast">对比度</string>
+  <string name="blurplus_contrast_desc">明暗之间的差异，0 为默认</string>
+  <string name="blurplus_grain">颗粒</string>
+  <string name="blurplus_grain_desc">封面上的细腻胶片颗粒</string>
+  <string name="blurplus_noise">噪点</string>
+  <string name="blurplus_noise_desc">封面上的粗糙彩色噪点</string>
+  <string name="blurplus_color_ui">播放器界面取色</string>
+  <string name="blurplus_color_ui_desc">文字、图标和滑块使用专辑封面的颜色</string>
+  <string name="blurplus_appearance">外观</string>
+  <string name="blurplus_appearance_desc">自动跟随应用，浅色或深色为强制</string>
+  <string name="blurplus_color_style">配色风格</string>
+  <string name="blurplus_color_style_desc">质感化：带色玻璃质感控件。扁平化：纯色控件。自动跟随应用设置</string>
+  <string name="blurplus_style_textured">质感化</string>
+  <string name="blurplus_style_flat">扁平化</string>
+  <string name="blurplus_reset">重置模糊增强</string>
 </resources>

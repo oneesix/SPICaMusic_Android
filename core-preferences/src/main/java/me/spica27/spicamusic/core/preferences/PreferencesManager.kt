@@ -69,6 +69,17 @@ class PreferencesManager(
         val SMOOTH_LYRICS_DIM = intPreferencesKey("smooth_lyrics_dim")
         val SMOOTH_TEXT_BOOST = intPreferencesKey("smooth_text_boost")
 
+        // ---- Blur Plus background ----
+        val BLUR_PLUS_BLUR = intPreferencesKey("blur_plus_blur")
+        val BLUR_PLUS_EXPOSURE = intPreferencesKey("blur_plus_exposure")
+        val BLUR_PLUS_BRIGHTNESS = intPreferencesKey("blur_plus_brightness")
+        val BLUR_PLUS_CONTRAST = intPreferencesKey("blur_plus_contrast")
+        val BLUR_PLUS_GRAIN = intPreferencesKey("blur_plus_grain")
+        val BLUR_PLUS_NOISE = intPreferencesKey("blur_plus_noise")
+        val BLUR_PLUS_COLOR_UI = booleanPreferencesKey("blur_plus_color_ui")
+        val BLUR_PLUS_APPEARANCE = stringPreferencesKey("blur_plus_appearance")
+        val BLUR_PLUS_COLOR_STYLE = stringPreferencesKey("blur_plus_color_style")
+
         val DYNAMIC_COVER_TYPE = stringPreferencesKey("dynamic_cover_type")
         val PROGRESS_BAR_STYLE = stringPreferencesKey("progress_bar_style")
         val PLAYER_STYLE = stringPreferencesKey("player_style")

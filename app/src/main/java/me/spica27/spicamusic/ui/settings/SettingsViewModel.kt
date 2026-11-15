@@ -27,6 +27,7 @@ import me.spica27.spicamusic.ui.home.page.preferenceKey
 import me.spica27.spicamusic.ui.home.player_bar.BottomBarCustomization
 import me.spica27.spicamusic.ui.home.player_bar.BottomBarSetting
 import me.spica27.spicamusic.ui.player.PillPlayerTuning
+import me.spica27.spicamusic.ui.widget.BlurPlusSettings
 import me.spica27.spicamusic.ui.widget.SmoothSettings
 
 /**
@@ -328,6 +329,54 @@ class SettingsViewModel(
     }
 
     fun resetSmooth() = updateSmooth(SmoothSettings())
+
+    // ---- Blur Plus background ----
+    private val blurPlusDefaults = BlurPlusSettings()
+    private val bpBlur = settingsUseCases.getInt(SettingsUseCases.Keys.BLUR_PLUS_BLUR, blurPlusDefaults.blur)
+    private val bpExposure = settingsUseCases.getInt(SettingsUseCases.Keys.BLUR_PLUS_EXPOSURE, blurPlusDefaults.exposure)
+    private val bpBrightness = settingsUseCases.getInt(SettingsUseCases.Keys.BLUR_PLUS_BRIGHTNESS, blurPlusDefaults.brightness)
+    private val bpContrast = settingsUseCases.getInt(SettingsUseCases.Keys.BLUR_PLUS_CONTRAST, blurPlusDefaults.contrast)
+    private val bpGrain = settingsUseCases.getInt(SettingsUseCases.Keys.BLUR_PLUS_GRAIN, blurPlusDefaults.grain)
+    private val bpNoise = settingsUseCases.getInt(SettingsUseCases.Keys.BLUR_PLUS_NOISE, blurPlusDefaults.noise)
+    private val bpColorUi = settingsUseCases.getBoolean(SettingsUseCases.Keys.BLUR_PLUS_COLOR_UI, blurPlusDefaults.colorUi)
+    private val bpAppearance = settingsUseCases.getString(SettingsUseCases.Keys.BLUR_PLUS_APPEARANCE, blurPlusDefaults.appearance)
+    private val bpColorStyle = settingsUseCases.getString(SettingsUseCases.Keys.BLUR_PLUS_COLOR_STYLE, blurPlusDefaults.colorStyle)
+
+    val blurPlus =
+        combine(
+            combine(bpBlur, bpExposure, bpBrightness, bpContrast, bpGrain) { b, e, br, c, g ->
+                BlurPlusSettings(
+                    blur = b.coerceIn(0, 100),
+                    exposure = e.coerceIn(-100, 100),
+                    brightness = br.coerceIn(-100, 100),
+                    contrast = c.coerceIn(-100, 100),
+                    grain = g.coerceIn(0, 100),
+                )
+            },
+            combine(bpNoise, bpColorUi, bpAppearance, bpColorStyle) { n, ui, a, s ->
+                BlurPlusSettings(noise = n.coerceIn(0, 100), colorUi = ui, appearance = a, colorStyle = s)
+            },
+        ) { a, b ->
+            a.copy(noise = b.noise, colorUi = b.colorUi, appearance = b.appearance, colorStyle = b.colorStyle)
+        }.stateIn(viewModelScope, SharingStarted.Eagerly, BlurPlusSettings())
+
+    /** Only the fields that actually changed are written. */
+    fun updateBlurPlus(new: BlurPlusSettings) {
+        val old = blurPlus.value
+        viewModelScope.launch {
+            if (new.blur != old.blur) settingsUseCases.setInt(SettingsUseCases.Keys.BLUR_PLUS_BLUR, new.blur.coerceIn(0, 100))
+            if (new.exposure != old.exposure) settingsUseCases.setInt(SettingsUseCases.Keys.BLUR_PLUS_EXPOSURE, new.exposure.coerceIn(-100, 100))
+            if (new.brightness != old.brightness) settingsUseCases.setInt(SettingsUseCases.Keys.BLUR_PLUS_BRIGHTNESS, new.brightness.coerceIn(-100, 100))
+            if (new.contrast != old.contrast) settingsUseCases.setInt(SettingsUseCases.Keys.BLUR_PLUS_CONTRAST, new.contrast.coerceIn(-100, 100))
+            if (new.grain != old.grain) settingsUseCases.setInt(SettingsUseCases.Keys.BLUR_PLUS_GRAIN, new.grain.coerceIn(0, 100))
+            if (new.noise != old.noise) settingsUseCases.setInt(SettingsUseCases.Keys.BLUR_PLUS_NOISE, new.noise.coerceIn(0, 100))
+            if (new.colorUi != old.colorUi) settingsUseCases.setBoolean(SettingsUseCases.Keys.BLUR_PLUS_COLOR_UI, new.colorUi)
+            if (new.appearance != old.appearance) settingsUseCases.setString(SettingsUseCases.Keys.BLUR_PLUS_APPEARANCE, new.appearance)
+            if (new.colorStyle != old.colorStyle) settingsUseCases.setString(SettingsUseCases.Keys.BLUR_PLUS_COLOR_STYLE, new.colorStyle)
+        }
+    }
+
+    fun resetBlurPlus() = updateBlurPlus(BlurPlusSettings())
 
     // 动态封面
     val dynamicCoverType =

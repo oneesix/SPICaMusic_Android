@@ -83,6 +83,7 @@ fun FluidMusicBackground(
             backgroundMode != DynamicSpectrumBackground.OFF &&
                 backgroundMode != DynamicSpectrumBackground.Smooth &&
                 backgroundMode != DynamicSpectrumBackground.BlurCover &&
+                backgroundMode != DynamicSpectrumBackground.BlurPlus &&
                 enabled
         }
 
@@ -137,6 +138,8 @@ fun FluidMusicBackground(
 
         // Smooth 由播放器页面直接绘制（需要同时改变文字颜色），这里不重复绘制
         DynamicSpectrumBackground.Smooth,
+        // Blur Plus is drawn by the player page (needs its own settings and colours)
+        DynamicSpectrumBackground.BlurPlus,
         DynamicSpectrumBackground.OFF,
         ->
             Box(modifier = modifier)

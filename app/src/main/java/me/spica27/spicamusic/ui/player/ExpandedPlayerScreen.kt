@@ -115,6 +115,7 @@ import me.spica27.spicamusic.artwork.artwork
 import me.spica27.spicamusic.common.entity.DynamicCoverType
 import me.spica27.spicamusic.common.entity.DynamicSpectrumBackground
 import me.spica27.spicamusic.common.entity.ProgressBarStyle
+import me.spica27.spicamusic.common.entity.ThemeColorStyle
 import me.spica27.spicamusic.core.preferences.PreferencesManager
 import me.spica27.spicamusic.feature.library.domain.ArtistUseCases
 import me.spica27.spicamusic.feature.library.domain.SongUseCases
@@ -136,9 +137,13 @@ import me.spica27.spicamusic.ui.theme.Spacing
 import me.spica27.spicamusic.ui.widget.AudioCover
 import me.spica27.spicamusic.ui.settings.SettingsViewModel
 import me.spica27.spicamusic.ui.widget.FluidMusicBackground
+import me.spica27.spicamusic.ui.widget.BlurPlusBackground
 import me.spica27.spicamusic.ui.widget.SmoothBackground
 import me.spica27.spicamusic.ui.widget.SmoothTheme
 import me.spica27.spicamusic.ui.widget.SmoothThemeScope
+import me.spica27.spicamusic.ui.widget.buildBlurPlusTheme
+import me.spica27.spicamusic.ui.widget.resolveBlurPlusDark
+import me.spica27.spicamusic.ui.widget.resolveBlurPlusFlat
 import me.spica27.spicamusic.ui.widget.resolveSmoothDark
 import me.spica27.spicamusic.ui.widget.rememberSmoothTheme
 import me.spica27.spicamusic.ui.widget.ShowOnIdleContent
@@ -498,6 +503,16 @@ fun ExpandedPlayerScreen(
             appDark = appDark,
             enabled = useAlbumTheme,
         )
+    // Blur Plus: with "Color player UI" on, the UI takes the cover's colour (Appearance + Color style apply).
+    val blurPlusSettings by settingsViewModel.blurPlus.collectAsStateWithLifecycle()
+    val appColorStyleValue by settingsViewModel.themeColorStyle.collectAsStateWithLifecycle()
+    val isBlurPlus = backgroundValue == DynamicSpectrumBackground.BlurPlus.value
+    val blurPlusDark = resolveBlurPlusDark(blurPlusSettings, appDark)
+    val blurPlusFlat = resolveBlurPlusFlat(blurPlusSettings, appColorStyleValue == ThemeColorStyle.Flat.value)
+    val blurPlusTheme =
+        remember(isBlurPlus, blurPlusSettings.colorUi, coverColor, blurPlusDark, blurPlusFlat) {
+            if (isBlurPlus && blurPlusSettings.colorUi) buildBlurPlusTheme(coverColor, blurPlusDark, blurPlusFlat) else null
+        }
     val hazeState = rememberHazeState()
     val playerBgBackdrop = rememberLayerBackdrop()
     val lyricsGlassV2 = LocalLiquidGlassV2Config.current.enabled
@@ -509,7 +524,7 @@ fun ExpandedPlayerScreen(
         )
     val lyricsScrimColor = MaterialTheme.colorScheme.scrim.copy(alpha = 0.14f)
 
-    PlayerThemeScope(theme = smoothTheme) {
+    PlayerThemeScope(theme = smoothTheme ?: blurPlusTheme, flat = isBlurPlus && blurPlusFlat) {
         Box(
             modifier =
                 modifier
@@ -532,6 +547,16 @@ fun ExpandedPlayerScreen(
                         settings = smoothSettings,
                         enabled = animationsEnabled && isAppInForeground,
                         dark = smoothDark,
+                        modifier =
+                            Modifier
+                                .fillMaxSize()
+                                .hazeSource(hazeState),
+                    )
+                } else if (isBlurPlus) {
+                    BlurPlusBackground(
+                        coverUri = currentMediaItem?.mediaMetadata?.artworkUri,
+                        settings = blurPlusSettings,
+                        dark = blurPlusDark,
                         modifier =
                             Modifier
                                 .fillMaxSize()
@@ -799,9 +824,10 @@ fun ExpandedPlayerScreen(
 @Composable
 private fun PlayerThemeScope(
     theme: SmoothTheme?,
+    flat: Boolean = false,
     content: @Composable () -> Unit,
 ) {
-    SmoothThemeScope(theme = theme, content = content)
+    SmoothThemeScope(theme = theme, flat = flat, content = content)
 }
 
 // 音频信息组件

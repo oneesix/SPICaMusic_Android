@@ -32,6 +32,15 @@ class SettingsUseCases(
         val SMOOTH_TEXT_TINT = PreferencesManager.Keys.SMOOTH_TEXT_TINT
         val SMOOTH_LYRICS_DIM = PreferencesManager.Keys.SMOOTH_LYRICS_DIM
         val SMOOTH_TEXT_BOOST = PreferencesManager.Keys.SMOOTH_TEXT_BOOST
+        val BLUR_PLUS_BLUR = PreferencesManager.Keys.BLUR_PLUS_BLUR
+        val BLUR_PLUS_EXPOSURE = PreferencesManager.Keys.BLUR_PLUS_EXPOSURE
+        val BLUR_PLUS_BRIGHTNESS = PreferencesManager.Keys.BLUR_PLUS_BRIGHTNESS
+        val BLUR_PLUS_CONTRAST = PreferencesManager.Keys.BLUR_PLUS_CONTRAST
+        val BLUR_PLUS_GRAIN = PreferencesManager.Keys.BLUR_PLUS_GRAIN
+        val BLUR_PLUS_NOISE = PreferencesManager.Keys.BLUR_PLUS_NOISE
+        val BLUR_PLUS_COLOR_UI = PreferencesManager.Keys.BLUR_PLUS_COLOR_UI
+        val BLUR_PLUS_APPEARANCE = PreferencesManager.Keys.BLUR_PLUS_APPEARANCE
+        val BLUR_PLUS_COLOR_STYLE = PreferencesManager.Keys.BLUR_PLUS_COLOR_STYLE
         val DYNAMIC_COVER_TYPE = PreferencesManager.Keys.DYNAMIC_COVER_TYPE
         val PROGRESS_BAR_STYLE = PreferencesManager.Keys.PROGRESS_BAR_STYLE
         val PLAYER_STYLE = PreferencesManager.Keys.PLAYER_STYLE

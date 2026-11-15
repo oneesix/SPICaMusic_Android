@@ -1330,4 +1330,27 @@
   <string name="bp_seek_height">Bar height</string>
   <string name="bp_seek_thickness">Line thickness</string>
   <string name="bp_seek_width">Bar width</string>
+  <string name="bg_blur_plus">Blur Plus</string>
+  <string name="bg_blur_plus_desc">Blurred cover with blur, exposure, brightness, contrast, grain and noise controls</string>
+  <string name="blurplus_blur">Blur</string>
+  <string name="blurplus_blur_desc">How soft the cover is</string>
+  <string name="blurplus_exposure">Exposure</string>
+  <string name="blurplus_exposure_desc">Makes the cover lighter or darker. 0 = normal</string>
+  <string name="blurplus_brightness">Brightness</string>
+  <string name="blurplus_brightness_desc">Adds or removes light. 0 = normal</string>
+  <string name="blurplus_contrast">Contrast</string>
+  <string name="blurplus_contrast_desc">Difference between light and dark. 0 = normal</string>
+  <string name="blurplus_grain">Grain</string>
+  <string name="blurplus_grain_desc">Fine film grain on top of the cover</string>
+  <string name="blurplus_noise">Noise</string>
+  <string name="blurplus_noise_desc">Coarse color noise on top of the cover</string>
+  <string name="blurplus_color_ui">Color player UI</string>
+  <string name="blurplus_color_ui_desc">Text, icons and sliders take the color of the album art</string>
+  <string name="blurplus_appearance">Appearance</string>
+  <string name="blurplus_appearance_desc">Auto follows the app. Light or Dark forces it</string>
+  <string name="blurplus_color_style">Color style</string>
+  <string name="blurplus_color_style_desc">Textured: tinted, glassy controls. Flat: solid controls. Auto follows the app setting</string>
+  <string name="blurplus_style_textured">Textured</string>
+  <string name="blurplus_style_flat">Flat</string>
+  <string name="blurplus_reset">Reset Blur Plus</string>
 </resources>
