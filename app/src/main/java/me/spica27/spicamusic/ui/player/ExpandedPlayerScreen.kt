@@ -66,6 +66,7 @@ import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.LaunchedEffect
@@ -660,6 +661,9 @@ fun ExpandedPlayerScreen(
                                         enter = Nav3Transitions.expand().targetContentEnter,
                                         skipFirstEnter = playerPageRevealedOnce,
                                     ) {
+                                        CompositionLocalProvider(
+                                            LocalLyricsGlassBackdrop provides (if (lyricsGlassV2) playerBgBackdrop else null),
+                                        ) {
                                         PlayerPage(
                                             playerViewModel = viewModel,
                                             hazeState = hazeState,
@@ -729,6 +733,7 @@ fun ExpandedPlayerScreen(
                                                 ),
                                             onCollapse = onCollapse,
                                         )
+                                        }
                                     }
                                 }
                             } else {
@@ -922,6 +927,52 @@ private fun PlayerPage(
     val pillTuningValue by preferencesManager
         .getString(PreferencesManager.Keys.PILL_PLAYER_TUNING, PillPlayerTuning.Default.encode())
         .collectAsStateWithLifecycle(initialValue = PillPlayerTuning.Default.encode())
+    val bubbleTuningValue by preferencesManager
+        .getString(PreferencesManager.Keys.BUBBLE_PLAYER_TUNING, BubblePlayerTuning.Default.encode())
+        .collectAsStateWithLifecycle(initialValue = BubblePlayerTuning.Default.encode())
+    if (playerStyleValue == PillPlayerTuning.STYLE_BUBBLE) {
+        val bubbleTuning = remember(bubbleTuningValue) { BubblePlayerTuning.decode(bubbleTuningValue) }
+        val bubbleScope = rememberCoroutineScope()
+        val queueItems by playerViewModel.currentPlaylist.collectAsStateWithLifecycle()
+        val queueIndex by playerViewModel.currentMediaItemIndex.collectAsStateWithLifecycle()
+        val nextTitle =
+            remember(queueItems, queueIndex) {
+                if (queueIndex >= 0) queueItems.getOrNull(queueIndex + 1)?.mediaMetadata?.title?.toString() else null
+            }
+        BubblePlayerPage(
+            currentMediaItem = currentMediaItem,
+            nextTitle = nextTitle,
+            seekPositionProvider = seekPositionProvider,
+            realPositionProvider = realPositionProvider,
+            duration = duration,
+            isPlaying = isPlaying,
+            isLike = isLike,
+            playMode = playMode,
+            sampleRate = audioQualityInfo.sampleRate,
+            bitRate = audioQualityInfo.bitRate,
+            isLossless = audioQualityInfo.isLossless,
+            hazeState = hazeState,
+            tuning = bubbleTuning,
+            onTuningChange = { changed ->
+                bubbleScope.launch {
+                    preferencesManager.setString(PreferencesManager.Keys.BUBBLE_PLAYER_TUNING, changed.encode())
+                }
+            },
+            onValueChange = onValueChange,
+            onValueChangeFinished = onValueChangeFinished,
+            onPlayPauseClick = onPlayPauseClick,
+            onPreviousClick = onPreviousClick,
+            onNextClick = onNextClick,
+            onPlayModeClick = onPlayModeClick,
+            onFavoriteClick = onFavoriteClick,
+            onCollapse = onCollapse,
+            onPlaylistClick = onPlaylistClick,
+            onLyricsClick = onLyricsClick,
+            modifier = modifier,
+            coverSwipeModifier = coverSwipeModifier,
+        )
+        return
+    }
     if (playerStyleValue == PillPlayerTuning.STYLE_PILL) {
         val pillTuning = remember(pillTuningValue) { PillPlayerTuning.decode(pillTuningValue) }
         PillPlayerPage(

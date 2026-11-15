@@ -1317,11 +1317,14 @@ private fun rememberPlayerStyleOptions(): ImmutableList<SettingsOption> {
     val classicDesc = stringResource(R.string.player_style_classic_desc)
     val pill = stringResource(R.string.player_style_pill)
     val pillDesc = stringResource(R.string.player_style_pill_desc)
-    return remember(classic, classicDesc, pill, pillDesc) {
+    val bubble = stringResource(R.string.player_style_bubble)
+    val bubbleDesc = stringResource(R.string.player_style_bubble_desc)
+    return remember(classic, classicDesc, pill, pillDesc, bubble, bubbleDesc) {
         ImmutableList.copyOf(
             listOf(
                 SettingsOption(PillPlayerTuning.STYLE_CLASSIC, classic, classicDesc, Icons.Default.Album),
                 SettingsOption(PillPlayerTuning.STYLE_PILL, pill, pillDesc, Icons.Default.ViewAgenda),
+                SettingsOption(PillPlayerTuning.STYLE_BUBBLE, bubble, bubbleDesc, Icons.Default.BlurOn),
             ),
         )
     }

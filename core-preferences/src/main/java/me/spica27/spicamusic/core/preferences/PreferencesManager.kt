@@ -84,6 +84,7 @@ class PreferencesManager(
         val PROGRESS_BAR_STYLE = stringPreferencesKey("progress_bar_style")
         val PLAYER_STYLE = stringPreferencesKey("player_style")
         val PILL_PLAYER_TUNING = stringPreferencesKey("pill_player_tuning")
+        val BUBBLE_PLAYER_TUNING = stringPreferencesKey("bubble_player_tuning")
         val EQ_ENABLED = booleanPreferencesKey("eq_enabled")
         val EQ_BANDS = stringPreferencesKey("eq_bands")
         val LOUDNESS_NORMALIZATION_ENABLED = booleanPreferencesKey("loudness_normalization_enabled")

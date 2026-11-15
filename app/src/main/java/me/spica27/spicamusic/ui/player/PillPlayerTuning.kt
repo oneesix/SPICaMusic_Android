@@ -35,6 +35,7 @@ data class PillPlayerTuning(
     companion object {
         const val STYLE_CLASSIC = "classic"
         const val STYLE_PILL = "pill"
+        const val STYLE_BUBBLE = "bubble"
 
         val Default = PillPlayerTuning()
 
