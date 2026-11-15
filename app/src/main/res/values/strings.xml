@@ -1355,4 +1355,13 @@
   <string name="blurplus_style_textured">Textured</string>
   <string name="blurplus_style_flat">Flat</string>
   <string name="blurplus_reset">Reset Blur Plus</string>
+  <string name="bp_sec_fullart">Full artwork</string>
+  <string name="bp_full_art">Full artwork</string>
+  <string name="bp_full_art_desc">Album fills the screen width. The empty space above and below is filled by a blurred mirror of the cover.</string>
+  <string name="bp_anim_art">Animated artwork</string>
+  <string name="bp_anim_art_desc">Plays a video cover (.mp4) found next to the song. Name it like the song, or cover.mp4 / folder.mp4.</string>
+  <string name="bp_fill_blur_amount">Fill blur amount</string>
+  <string name="bp_fill_blur_optimize">Optimize fill blur</string>
+  <string name="bp_fill_blur_optimize_desc">Lower the blur quality to save battery and keep it smooth.</string>
+  <string name="bp_fill_blur_quality">Fill blur quality</string>
 </resources>

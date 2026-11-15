@@ -1,5 +1,6 @@
 package me.spica27.spicamusic.ui.player
 
+import android.net.Uri
 import android.os.Build
 import android.os.SystemClock
 import androidx.compose.animation.AnimatedContent
@@ -21,6 +22,7 @@ import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.wrapContentSize
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -44,6 +46,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
@@ -55,7 +58,11 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalHapticFeedback
+import androidx.compose.ui.zIndex
+import me.spica27.spicamusic.artwork.ArtworkVideo
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.onClick
@@ -214,6 +221,17 @@ internal fun BubblePlayerPage(
 
     // Time listened to this song: counts only while playing, restarts when the song changes.
     val mediaId = item?.mediaId
+
+    // Full artwork and video cover (both off by default).
+    val artContext = LocalContext.current
+    val screenWidthDp = LocalConfiguration.current.screenWidthDp
+    val fullOn = tuning.fullArtwork == 1
+    val artworkVideoUri by produceState<Uri?>(null, mediaId, tuning.animatedArtwork) {
+        value = null
+        if (tuning.animatedArtwork == 1) {
+            value = ArtworkVideo.find(artContext, item?.mediaMetadata?.artwork()?.path.orEmpty())
+        }
+    }
     var listenedMs by remember(mediaId) { mutableLongStateOf(0L) }
     LaunchedEffect(mediaId, isPlaying) {
         if (isPlaying) {
@@ -374,10 +392,11 @@ internal fun BubblePlayerPage(
                     Modifier
                         .weight(1f)
                         .fillMaxWidth()
-                        .padding(vertical = 10.dp),
+                        .padding(vertical = 10.dp)
+                        .then(if (fullOn) Modifier.zIndex(-1f) else Modifier),
                 contentAlignment = Alignment.Center,
             ) {
-                val panelOn = tuning.albumBackground == 1
+                val panelOn = !fullOn && tuning.albumBackground == 1
                 val infoOn = panelOn && tuning.yearInfo == 1 && infoText != null
                 val pad = if (panelOn) PANEL_PADDING_DP else 0
                 val infoExtra = if (infoOn) INFO_BAR_EXTRA_DP else 0
@@ -387,7 +406,9 @@ internal fun BubblePlayerPage(
                         tuning.albumHeightDp.toFloat(),
                         (maxHeight.value - 2 * pad - infoExtra).coerceAtLeast(120f),
                     )
-                val radius = min(tuning.cornerDp.toFloat(), min(albumWidth, albumHeight) / 2f)
+                val radius = if (fullOn) 0f else min(tuning.cornerDp.toFloat(), min(albumWidth, albumHeight) / 2f)
+                val boxW = if (fullOn) screenWidthDp.toFloat() else albumWidth
+                val boxH = if (fullOn) screenWidthDp.toFloat() else albumHeight
                 val albumBackdrop = rememberLayerBackdrop()
                 val panelGlass =
                     if (panelOn) {
@@ -406,6 +427,7 @@ internal fun BubblePlayerPage(
                 Column(
                     modifier =
                         Modifier
+                            .then(if (fullOn) Modifier.wrapContentSize(Alignment.Center, unbounded = true) else Modifier)
                             .then(coverSwipeModifier)
                             .then(
                                 if (panelOn) {
@@ -450,7 +472,14 @@ internal fun BubblePlayerPage(
                         }
                         Box(modifier = Modifier.height(8.dp))
                     }
-                    Box(modifier = Modifier.size(width = albumWidth.dp, height = albumHeight.dp)) {
+                    Box(modifier = Modifier.size(width = boxW.dp, height = boxH.dp)) {
+                        if (fullOn) {
+                            FullArtworkFill(
+                                artwork = item?.mediaMetadata?.artwork(),
+                                side = boxW.dp,
+                                tuning = tuning,
+                            )
+                        }
                         // The cover is recorded as its own layer, so the buttons on it can refract it.
                         Box(
                             modifier =
@@ -458,7 +487,8 @@ internal fun BubblePlayerPage(
                                     .fillMaxSize()
                                     .clip(RoundedCornerShape(radius.dp))
                                     .then(if (v2Enabled) Modifier.layerBackdrop(albumBackdrop) else Modifier)
-                                    .albumHighlight(highlightTuning, radius.toInt()),
+                                    .albumHighlight(highlightTuning, radius.toInt())
+                                    .then(if (fullOn) Modifier.fadeVerticalEdges(0.1f) else Modifier),
                         ) {
                             AnimatedContent(
                                 targetState = item,
@@ -476,6 +506,13 @@ internal fun BubblePlayerPage(
                                             .fillMaxSize()
                                             .background(MaterialTheme.colorScheme.surfaceContainerHigh)
                                             .clickHighlight(onClick = onLyricsClick),
+                                )
+                            }
+                            artworkVideoUri?.let { videoUri ->
+                                ArtworkVideoCover(
+                                    uri = videoUri,
+                                    playing = isPlaying,
+                                    modifier = Modifier.fillMaxSize().clickHighlight(onClick = onLyricsClick),
                                 )
                             }
                         }

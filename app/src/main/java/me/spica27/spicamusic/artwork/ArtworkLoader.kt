@@ -64,6 +64,9 @@ object ArtworkLoader {
         return landscapist
     }
 
+    /** Current extra-folder roots (empty until loaded). Used to find a cover video next to a song. */
+    fun treeRootsSnapshot(): List<ArtworkTreeRoot> = treeRoots.value.orEmpty()
+
     fun updateTreeRoots(roots: List<ArtworkTreeRoot>) {
         val previous = treeRoots.value
         treeRoots.value = roots

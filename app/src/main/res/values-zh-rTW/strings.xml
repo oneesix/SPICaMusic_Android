@@ -1354,4 +1354,13 @@
   <string name="blurplus_style_textured">質感化</string>
   <string name="blurplus_style_flat">扁平化</string>
   <string name="blurplus_reset">重設模糊增強</string>
+  <string name="bp_sec_fullart">全螢幕封面</string>
+  <string name="bp_full_art">全螢幕封面</string>
+  <string name="bp_full_art_desc">封面鋪滿螢幕寬度，上下空白處以封面的模糊鏡像填充。</string>
+  <string name="bp_anim_art">動態封面</string>
+  <string name="bp_anim_art_desc">播放歌曲同目錄下的影片封面（.mp4），檔名與歌曲相同，或命名為 cover.mp4 / folder.mp4。</string>
+  <string name="bp_fill_blur_amount">填充模糊程度</string>
+  <string name="bp_fill_blur_optimize">最佳化填充模糊</string>
+  <string name="bp_fill_blur_optimize_desc">降低模糊品質以省電並保持流暢。</string>
+  <string name="bp_fill_blur_quality">填充模糊品質</string>
 </resources>

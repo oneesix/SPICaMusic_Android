@@ -200,6 +200,17 @@ internal fun BubbleSettingsSheet(
             Slide(R.string.bp_album_height, BubbleSetting.AlbumHeight, 120..460)
             Slide(R.string.bp_album_corner, BubbleSetting.Corner, 0..130)
 
+            LyricsSettingsSection(stringResource(R.string.bp_sec_fullart))
+            Toggle(R.string.bp_full_art, R.string.bp_full_art_desc, BubbleSetting.FullArtwork)
+            Toggle(R.string.bp_anim_art, R.string.bp_anim_art_desc, BubbleSetting.AnimatedArtwork)
+            if (tuning.fullArtwork == 1) {
+                Slide(R.string.bp_fill_blur_amount, BubbleSetting.FillBlurAmount, 0..60)
+                Toggle(R.string.bp_fill_blur_optimize, R.string.bp_fill_blur_optimize_desc, BubbleSetting.FillBlurOptimize)
+                if (tuning.fillBlurOptimize == 1) {
+                    Slide(R.string.bp_fill_blur_quality, BubbleSetting.FillBlurQuality, 5..100, 5) { "$it%" }
+                }
+            }
+
             LyricsSettingsSection(stringResource(R.string.bp_sec_hl))
             LyricsSettingsChips(
                 label = stringResource(R.string.bp_hl_style),
