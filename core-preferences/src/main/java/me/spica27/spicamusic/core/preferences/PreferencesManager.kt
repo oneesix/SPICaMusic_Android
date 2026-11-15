@@ -51,19 +51,7 @@ class PreferencesManager(
         val KEEP_SCREEN_ON = booleanPreferencesKey("keep_screen_on")
         val ALBUM_NEW_STYLE = booleanPreferencesKey("album_new_style")
         val DYNAMIC_SPECTRUM_BACKGROUND = stringPreferencesKey("dynamic_spectrum_background")
-        // ---- Verse Flow 外观（Auto / Light / Dark、饱和度、鲜艳度、高亮色相）----
-        val VERSE_THEME_MODE = stringPreferencesKey("verse_theme_mode")
-        val VERSE_THEME_SATURATION = intPreferencesKey("verse_theme_saturation")
-        val VERSE_THEME_VIBRANCY = intPreferencesKey("verse_theme_vibrancy")
-        val VERSE_THEME_HUE = intPreferencesKey("verse_theme_hue")
 
-        // ---- Verse Flow 歌词页色块（blobs）----
-        val VERSE_MESH_COUNT = intPreferencesKey("verse_mesh_count")
-        val VERSE_MESH_SIZE = intPreferencesKey("verse_mesh_size")
-        val VERSE_MESH_OPACITY = intPreferencesKey("verse_mesh_opacity")
-        val VERSE_MESH_MOTION = intPreferencesKey("verse_mesh_motion")
-        val VERSE_MESH_COLOR = intPreferencesKey("verse_mesh_color")
-        val VERSE_MESH_ANIMATED = booleanPreferencesKey("verse_mesh_animated")
         // ---- Smooth background (ColorfulX style) ----
         val SMOOTH_COLOR_UI = booleanPreferencesKey("smooth_color_ui")
         val SMOOTH_FREEZE = booleanPreferencesKey("smooth_freeze")
@@ -130,13 +118,6 @@ class PreferencesManager(
         val LYRIC_GRADIENT_ENABLED = booleanPreferencesKey("lyric_gradient_enabled")
         val LYRIC_LIGHT_ENABLED = booleanPreferencesKey("lyric_light_enabled")
         val LYRIC_LIGHT_INTENSITY = intPreferencesKey("lyric_light_intensity")
-        val LYRIC_DYNAMIC_ENABLED = booleanPreferencesKey("lyric_dynamic_enabled")
-        val LYRIC_DYNAMIC_BACKGROUND = booleanPreferencesKey("lyric_dynamic_background")
-        val LYRIC_DYNAMIC_MODE = stringPreferencesKey("lyric_dynamic_mode")
-        val LYRIC_DYNAMIC_OPACITY = intPreferencesKey("lyric_dynamic_opacity")
-        val LYRIC_DYNAMIC_SATURATION = intPreferencesKey("lyric_dynamic_saturation")
-        val LYRIC_DYNAMIC_BG_STRENGTH = intPreferencesKey("lyric_dynamic_bg_strength")
-        val LYRIC_DYNAMIC_CONTRAST = intPreferencesKey("lyric_dynamic_contrast")
         val LYRIC_LINE_MOVE = booleanPreferencesKey("lyric_line_move")
         val LYRIC_LINE_MOVE_MS = intPreferencesKey("lyric_line_move_ms")
         val LYRIC_BG_REVEAL = booleanPreferencesKey("lyric_bg_reveal")
@@ -262,13 +243,6 @@ class PreferencesManager(
                     gradientLyricsEnabled = p[Keys.LYRIC_GRADIENT_ENABLED] ?: d.gradientLyricsEnabled,
                     lyricsLightEnabled = p[Keys.LYRIC_LIGHT_ENABLED] ?: d.lyricsLightEnabled,
                     lyricsLightIntensity = p[Keys.LYRIC_LIGHT_INTENSITY] ?: d.lyricsLightIntensity,
-                    dynamicLyricsEnabled = p[Keys.LYRIC_DYNAMIC_ENABLED] ?: d.dynamicLyricsEnabled,
-                    dynamicBackgroundEnabled = p[Keys.LYRIC_DYNAMIC_BACKGROUND] ?: d.dynamicBackgroundEnabled,
-                    dynamicBackgroundStrength = p[Keys.LYRIC_DYNAMIC_BG_STRENGTH] ?: d.dynamicBackgroundStrength,
-                    dynamicLyricsMode = p[Keys.LYRIC_DYNAMIC_MODE] ?: d.dynamicLyricsMode,
-                    dynamicLyricsOpacity = p[Keys.LYRIC_DYNAMIC_OPACITY] ?: d.dynamicLyricsOpacity,
-                    dynamicLyricsSaturation = p[Keys.LYRIC_DYNAMIC_SATURATION] ?: d.dynamicLyricsSaturation,
-                    dynamicLyricsContrast = p[Keys.LYRIC_DYNAMIC_CONTRAST] ?: d.dynamicLyricsContrast,
                     lineMoveEnabled = p[Keys.LYRIC_LINE_MOVE] ?: d.lineMoveEnabled,
                     lineMoveMs = p[Keys.LYRIC_LINE_MOVE_MS] ?: d.lineMoveMs,
                     bgRevealEnabled = p[Keys.LYRIC_BG_REVEAL] ?: d.bgRevealEnabled,
@@ -394,13 +368,6 @@ class PreferencesManager(
                     gradientLyricsEnabled = p[Keys.LYRIC_GRADIENT_ENABLED] ?: d.gradientLyricsEnabled,
                     lyricsLightEnabled = p[Keys.LYRIC_LIGHT_ENABLED] ?: d.lyricsLightEnabled,
                     lyricsLightIntensity = p[Keys.LYRIC_LIGHT_INTENSITY] ?: d.lyricsLightIntensity,
-                    dynamicLyricsEnabled = p[Keys.LYRIC_DYNAMIC_ENABLED] ?: d.dynamicLyricsEnabled,
-                    dynamicBackgroundEnabled = p[Keys.LYRIC_DYNAMIC_BACKGROUND] ?: d.dynamicBackgroundEnabled,
-                    dynamicBackgroundStrength = p[Keys.LYRIC_DYNAMIC_BG_STRENGTH] ?: d.dynamicBackgroundStrength,
-                    dynamicLyricsMode = p[Keys.LYRIC_DYNAMIC_MODE] ?: d.dynamicLyricsMode,
-                    dynamicLyricsOpacity = p[Keys.LYRIC_DYNAMIC_OPACITY] ?: d.dynamicLyricsOpacity,
-                    dynamicLyricsSaturation = p[Keys.LYRIC_DYNAMIC_SATURATION] ?: d.dynamicLyricsSaturation,
-                    dynamicLyricsContrast = p[Keys.LYRIC_DYNAMIC_CONTRAST] ?: d.dynamicLyricsContrast,
                     lineMoveEnabled = p[Keys.LYRIC_LINE_MOVE] ?: d.lineMoveEnabled,
                     lineMoveMs = p[Keys.LYRIC_LINE_MOVE_MS] ?: d.lineMoveMs,
                     bgRevealEnabled = p[Keys.LYRIC_BG_REVEAL] ?: d.bgRevealEnabled,
@@ -517,13 +484,6 @@ class PreferencesManager(
             p[Keys.LYRIC_GRADIENT_ENABLED] = n.gradientLyricsEnabled
             p[Keys.LYRIC_LIGHT_ENABLED] = n.lyricsLightEnabled
             p[Keys.LYRIC_LIGHT_INTENSITY] = n.lyricsLightIntensity
-            p[Keys.LYRIC_DYNAMIC_ENABLED] = n.dynamicLyricsEnabled
-            p[Keys.LYRIC_DYNAMIC_BACKGROUND] = n.dynamicBackgroundEnabled
-            p[Keys.LYRIC_DYNAMIC_BG_STRENGTH] = n.dynamicBackgroundStrength
-            p[Keys.LYRIC_DYNAMIC_MODE] = n.dynamicLyricsMode
-            p[Keys.LYRIC_DYNAMIC_OPACITY] = n.dynamicLyricsOpacity
-            p[Keys.LYRIC_DYNAMIC_SATURATION] = n.dynamicLyricsSaturation
-            p[Keys.LYRIC_DYNAMIC_CONTRAST] = n.dynamicLyricsContrast
             p[Keys.LYRIC_LINE_MOVE] = n.lineMoveEnabled
             p[Keys.LYRIC_LINE_MOVE_MS] = n.lineMoveMs
             p[Keys.LYRIC_BG_REVEAL] = n.bgRevealEnabled

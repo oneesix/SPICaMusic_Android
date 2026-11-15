@@ -94,7 +94,6 @@ import me.spica27.spicamusic.common.entity.DynamicCoverType
 import me.spica27.spicamusic.common.entity.DynamicSpectrumBackground
 import me.spica27.spicamusic.common.entity.ProgressBarStyle
 import me.spica27.spicamusic.common.entity.ThemeColorStyle
-import me.spica27.spicamusic.core.preferences.LyricsStyleSettings
 import me.spica27.spicamusic.ui.glass.LiquidGlassSetting
 import me.spica27.spicamusic.ui.glass.LiquidGlassTuning
 import me.spica27.spicamusic.ui.glass.LiquidGlassV2Preview
@@ -123,8 +122,7 @@ import me.spica27.spicamusic.ui.widget.LyricsSettingsSection
 import me.spica27.spicamusic.ui.widget.LyricsSettingsSlider
 import me.spica27.spicamusic.ui.widget.LyricsSettingsToggle
 import me.spica27.spicamusic.ui.widget.SmoothSettings
-import me.spica27.spicamusic.ui.widget.VerseMeshSettings
-import me.spica27.spicamusic.ui.widget.VerseThemeMode
+import me.spica27.spicamusic.ui.widget.SmoothThemeMode
 import me.spica27.spicamusic.ui.widget.clickHighlight
 import me.spica27.spicamusic.ui.widget.rememberIOSOverScrollEffect
 import org.koin.compose.viewmodel.koinViewModel
@@ -151,18 +149,12 @@ fun SettingsScreen() {
     val albumStyleTuning by viewModel.albumStyleTuning.collectAsStateWithLifecycle()
     var albumStyleExpanded by rememberSaveable { mutableStateOf(false) }
     val backgroundValue by viewModel.dynamicSpectrumBackground.collectAsStateWithLifecycle()
-    val verseMode by viewModel.verseThemeMode.collectAsStateWithLifecycle()
-    val verseSaturation by viewModel.verseSaturation.collectAsStateWithLifecycle()
-    val verseVibrancy by viewModel.verseVibrancy.collectAsStateWithLifecycle()
-    val verseHue by viewModel.verseHue.collectAsStateWithLifecycle()
-    val verseMesh by viewModel.verseMesh.collectAsStateWithLifecycle()
     val smooth by viewModel.smooth.collectAsStateWithLifecycle()
     val coverTapValue by viewModel.dynamicCoverType.collectAsStateWithLifecycle()
     val progressWaveformValue by viewModel.progressBarStyle.collectAsStateWithLifecycle()
     val playerStyleValue by viewModel.playerStyle.collectAsStateWithLifecycle()
     val pillTuning by viewModel.pillPlayerTuning.collectAsStateWithLifecycle()
     val colorStyleValue by viewModel.themeColorStyle.collectAsStateWithLifecycle()
-    val lyricsStyle by viewModel.lyricsStyle.collectAsStateWithLifecycle()
     val playerViewModel = LocalPlayerViewModel.current
     val sleepTimer by playerViewModel.sleepTimer.collectAsStateWithLifecycle()
 
@@ -246,12 +238,6 @@ fun SettingsScreen() {
                         onExpandChange = { expandedRowKey = it },
                         onValueChange = viewModel::setThemeColorStyle,
                     )
-                    AnimatedVisibility(visible = colorStyleValue == ThemeColorStyle.Dynamic.value) {
-                        DynamicStyleControls(
-                            settings = lyricsStyle,
-                            onUpdate = viewModel::updateLyricsStyle,
-                        )
-                    }
                     SettingsItemDivider()
                     InlineSelectRow(
                         rowKey = "bottom_bar_layout",
@@ -375,34 +361,6 @@ fun SettingsScreen() {
                         onExpandChange = { expandedRowKey = it },
                         onValueChange = viewModel::setDynamicSpectrumBackground,
                     )
-                    AnimatedVisibility(
-                        visible = backgroundValue == DynamicSpectrumBackground.VerseFlow.value,
-                        enter =
-                            expandVertically(
-                                animationSpec = tween(durationMillis = 220, easing = EaseOutEmphasized),
-                            ) + fadeIn(tween(durationMillis = 180)),
-                        exit =
-                            shrinkVertically(
-                                animationSpec = tween(durationMillis = 180, easing = EaseOutEmphasized),
-                            ) + fadeOut(tween(durationMillis = 140)),
-                    ) {
-                        VerseAppearanceControls(
-                            mode = verseMode,
-                            saturation = verseSaturation,
-                            vibrancy = verseVibrancy,
-                            hue = verseHue,
-                            onModeChange = viewModel::setVerseThemeMode,
-                            onSaturationChange = viewModel::setVerseSaturation,
-                            onVibrancyChange = viewModel::setVerseVibrancy,
-                            onHueChange = viewModel::setVerseHue,
-                            onReset = viewModel::resetVerseAppearance,
-                        )
-                        VerseBlobControls(
-                            mesh = verseMesh,
-                            onChange = viewModel::updateVerseMesh,
-                            onReset = viewModel::resetVerseMesh,
-                        )
-                    }
                     AnimatedVisibility(
                         visible = backgroundValue == DynamicSpectrumBackground.Smooth.value,
                         enter =
@@ -1124,9 +1082,7 @@ private fun rememberColorStyleOptions(): ImmutableList<SettingsOption> {
     val texturedDesc = stringResource(R.string.color_style_textured_desc)
     val flatLabel = stringResource(R.string.theme_color_style_flat)
     val flatDesc = stringResource(R.string.color_style_flat_desc)
-    val dynamicLabel = stringResource(R.string.theme_color_style_dynamic)
-    val dynamicDesc = stringResource(R.string.color_style_dynamic_desc)
-    return remember(texturedLabel, texturedDesc, flatLabel, flatDesc, dynamicLabel, dynamicDesc) {
+    return remember(texturedLabel, texturedDesc, flatLabel, flatDesc) {
         ImmutableList.copyOf(
             listOf(
                 SettingsOption(
@@ -1140,12 +1096,6 @@ private fun rememberColorStyleOptions(): ImmutableList<SettingsOption> {
                     flatLabel,
                     flatDesc,
                     Icons.Default.Layers,
-                ),
-                SettingsOption(
-                    ThemeColorStyle.Dynamic.value,
-                    dynamicLabel,
-                    dynamicDesc,
-                    Icons.Default.Album,
                 ),
             ),
         )
@@ -1166,15 +1116,11 @@ private fun rememberBackgroundOptions(): ImmutableList<SettingsOption> {
     val warpDesc = stringResource(R.string.bg_fluid_warp_desc)
     val blur = stringResource(R.string.bg_blur_cover)
     val blurDesc = stringResource(R.string.bg_blur_cover_desc)
-    val verse = stringResource(R.string.bg_verse_flow)
-    val verseDesc = stringResource(R.string.bg_verse_flow_desc)
     val smooth = stringResource(R.string.bg_smooth)
     val smoothDesc = stringResource(R.string.bg_smooth_desc)
     return remember(
         smooth,
         smoothDesc,
-        verse,
-        verseDesc,
         off,
         offDesc,
         topGlow,
@@ -1190,12 +1136,6 @@ private fun rememberBackgroundOptions(): ImmutableList<SettingsOption> {
     ) {
         ImmutableList.copyOf(
             listOf(
-                SettingsOption(
-                    DynamicSpectrumBackground.VerseFlow.value,
-                    verse,
-                    verseDesc,
-                    Icons.Default.Palette,
-                ),
                 SettingsOption(
                     DynamicSpectrumBackground.Smooth.value,
                     smooth,
@@ -1539,84 +1479,6 @@ private fun LiquidGlassTuningControls(
     }
 }
 
-/** 颜色风格“动态”的调节项：与歌词设置里的“播放器界面配色”是同一组设置。 */
-@Composable
-private fun DynamicStyleControls(
-    settings: LyricsStyleSettings,
-    onUpdate: ((LyricsStyleSettings) -> LyricsStyleSettings) -> Unit,
-) {
-    Column(
-        modifier =
-            Modifier
-                .fillMaxWidth()
-                .padding(
-                    start = SettingsRowContentInset,
-                    end = Spacing.Large,
-                    top = Spacing.ExtraSmall,
-                    bottom = Spacing.Small,
-                ),
-    ) {
-        LyricsSettingsToggle(
-            label = stringResource(R.string.lyr_set_dyn_bg),
-            description = stringResource(R.string.lyr_set_dyn_bg_desc),
-            checked = settings.dynamicBackgroundEnabled,
-            onCheckedChange = { v -> onUpdate { it.copy(dynamicBackgroundEnabled = v) } },
-        )
-        if (settings.dynamicBackgroundEnabled) {
-            LyricsSettingsSlider(
-                label = stringResource(R.string.lyr_set_dyn_bg_strength),
-                description = stringResource(R.string.lyr_set_dyn_bg_strength_desc),
-                value = settings.dynamicBackgroundStrength,
-                range = LyricsStyleSettings.DYNAMIC_BG_STRENGTH_RANGE,
-                step = 1,
-                valueText = { "$it%" },
-                onValueChange = { v -> onUpdate { it.copy(dynamicBackgroundStrength = v) } },
-            )
-        }
-        LyricsSettingsChips(
-            label = stringResource(R.string.lyr_set_dyn_mode),
-            description = stringResource(R.string.lyr_set_dyn_mode_desc),
-            options = listOf("auto", "dark", "light"),
-            selected = settings.dynamicLyricsMode,
-            optionLabel = {
-                when (it) {
-                    "dark" -> stringResource(R.string.verse_mode_dark)
-                    "light" -> stringResource(R.string.verse_mode_light)
-                    else -> stringResource(R.string.verse_mode_auto)
-                }
-            },
-            onSelect = { v -> onUpdate { it.copy(dynamicLyricsMode = v) } },
-        )
-        LyricsSettingsSlider(
-            label = stringResource(R.string.lyr_set_dyn_opacity),
-            description = stringResource(R.string.lyr_set_dyn_opacity_desc),
-            value = settings.dynamicLyricsOpacity,
-            range = LyricsStyleSettings.DYNAMIC_OPACITY_RANGE,
-            step = 5,
-            valueText = { "$it%" },
-            onValueChange = { v -> onUpdate { it.copy(dynamicLyricsOpacity = v) } },
-        )
-        LyricsSettingsSlider(
-            label = stringResource(R.string.lyr_set_dyn_saturation),
-            description = stringResource(R.string.lyr_set_dyn_saturation_desc),
-            value = settings.dynamicLyricsSaturation,
-            range = LyricsStyleSettings.DYNAMIC_SATURATION_RANGE,
-            step = 5,
-            valueText = { "$it%" },
-            onValueChange = { v -> onUpdate { it.copy(dynamicLyricsSaturation = v) } },
-        )
-        LyricsSettingsSlider(
-            label = stringResource(R.string.lyr_set_dyn_contrast),
-            description = stringResource(R.string.lyr_set_dyn_contrast_desc),
-            value = settings.dynamicLyricsContrast,
-            range = LyricsStyleSettings.DYNAMIC_CONTRAST_RANGE,
-            step = 5,
-            valueText = { "$it%" },
-            onValueChange = { v -> onUpdate { it.copy(dynamicLyricsContrast = v) } },
-        )
-    }
-}
-
 /** 液态玻璃 V2（Kyant Backdrop）的全部调节项；上方固定的预览行实时显示效果。 */
 @Composable
 private fun LiquidGlassV2Controls(
@@ -1800,79 +1662,6 @@ private fun AlbumStyleControls(
     }
 }
 
-/** Verse Flow 外观：Auto / Light / Dark，饱和度、鲜艳度、高亮色（与 HTML 的 Appearance 一致）。 */
-@Composable
-private fun VerseAppearanceControls(
-    mode: String,
-    saturation: Int,
-    vibrancy: Int,
-    hue: Int,
-    onModeChange: (String) -> Unit,
-    onSaturationChange: (Int) -> Unit,
-    onVibrancyChange: (Int) -> Unit,
-    onHueChange: (Int) -> Unit,
-    onReset: () -> Unit,
-) {
-    val auto = stringResource(R.string.verse_hue_auto)
-    Column(
-        modifier =
-            Modifier
-                .fillMaxWidth()
-                .padding(
-                    start = SettingsRowContentInset,
-                    end = Spacing.Large,
-                    top = Spacing.ExtraSmall,
-                    bottom = Spacing.Small,
-                ),
-    ) {
-        LyricsSettingsChips(
-            label = stringResource(R.string.verse_mode),
-            description = stringResource(R.string.verse_mode_desc),
-            options = listOf(VerseThemeMode.AUTO, VerseThemeMode.LIGHT, VerseThemeMode.DARK),
-            selected = mode,
-            optionLabel = {
-                when (it) {
-                    VerseThemeMode.LIGHT -> stringResource(R.string.verse_mode_light)
-                    VerseThemeMode.DARK -> stringResource(R.string.verse_mode_dark)
-                    else -> stringResource(R.string.verse_mode_auto)
-                }
-            },
-            onSelect = onModeChange,
-        )
-        LyricsSettingsSlider(
-            label = stringResource(R.string.verse_saturation),
-            description = stringResource(R.string.verse_saturation_desc),
-            value = saturation,
-            range = 0..200,
-            step = 5,
-            valueText = { "$it%" },
-            onValueChange = onSaturationChange,
-        )
-        LyricsSettingsSlider(
-            label = stringResource(R.string.verse_vibrancy),
-            description = stringResource(R.string.verse_vibrancy_desc),
-            value = vibrancy,
-            range = 0..100,
-            step = 1,
-            valueText = { "$it%" },
-            onValueChange = onVibrancyChange,
-        )
-        LyricsSettingsSlider(
-            label = stringResource(R.string.verse_highlight),
-            description = stringResource(R.string.verse_highlight_desc),
-            value = hue,
-            range = -180..180,
-            step = 5,
-            valueText = { if (it == 0) auto else (if (it > 0) "+" else "") + it + "°" },
-            onValueChange = onHueChange,
-        )
-        LyricsSettingsResetButton(
-            text = stringResource(R.string.verse_reset),
-            onClick = onReset,
-        )
-    }
-}
-
 /** Smooth (ColorfulX style) background: every setting of the gradient, plus colour UI and freeze. */
 @Composable
 private fun SmoothControls(
@@ -1906,15 +1695,15 @@ private fun SmoothControls(
         )
         if (settings.colorUi) {
             LyricsSettingsChips(
-                label = stringResource(R.string.verse_mode),
-                description = stringResource(R.string.verse_mode_desc),
-                options = listOf(VerseThemeMode.AUTO, VerseThemeMode.LIGHT, VerseThemeMode.DARK),
+                label = stringResource(R.string.smooth_theme_mode),
+                description = stringResource(R.string.smooth_theme_mode_desc),
+                options = listOf(SmoothThemeMode.AUTO, SmoothThemeMode.LIGHT, SmoothThemeMode.DARK),
                 selected = settings.themeMode,
                 optionLabel = {
                     when (it) {
-                        VerseThemeMode.LIGHT -> stringResource(R.string.verse_mode_light)
-                        VerseThemeMode.DARK -> stringResource(R.string.verse_mode_dark)
-                        else -> stringResource(R.string.verse_mode_auto)
+                        SmoothThemeMode.LIGHT -> stringResource(R.string.smooth_theme_mode_light)
+                        SmoothThemeMode.DARK -> stringResource(R.string.smooth_theme_mode_dark)
+                        else -> stringResource(R.string.smooth_theme_mode_auto)
                     }
                 },
                 onSelect = { onChange(settings.copy(themeMode = it)) },
@@ -1930,8 +1719,8 @@ private fun SmoothControls(
             )
         }
         LyricsSettingsSlider(
-            label = stringResource(R.string.verse_saturation),
-            description = stringResource(R.string.verse_saturation_desc),
+            label = stringResource(R.string.smooth_saturation),
+            description = stringResource(R.string.smooth_saturation_desc),
             value = settings.saturationPercent,
             range = 0..200,
             step = 5,
@@ -2029,82 +1818,3 @@ private fun SmoothControls(
     }
 }
 
-/** Verse Flow 歌词页色块：数量、大小、不透明度、颜色、动效速度，以及动画开关（关闭后完全静态）。 */
-@Composable
-private fun VerseBlobControls(
-    mesh: VerseMeshSettings,
-    onChange: (VerseMeshSettings) -> Unit,
-    onReset: () -> Unit,
-) {
-    Column(
-        modifier =
-            Modifier
-                .fillMaxWidth()
-                .padding(
-                    start = SettingsRowContentInset,
-                    end = Spacing.Large,
-                    top = Spacing.ExtraSmall,
-                    bottom = Spacing.Small,
-                ),
-    ) {
-        LyricsSettingsSection(title = stringResource(R.string.verse_blobs_section))
-        LyricsSettingsToggle(
-            label = stringResource(R.string.verse_blobs_anim),
-            description = stringResource(R.string.verse_blobs_anim_desc),
-            checked = mesh.animated,
-            onCheckedChange = { onChange(mesh.copy(animated = it)) },
-        )
-        LyricsSettingsSlider(
-            label = stringResource(R.string.verse_blobs_count),
-            description = stringResource(R.string.verse_blobs_count_desc),
-            value = mesh.blobCount,
-            range = 1..4,
-            step = 1,
-            valueText = { "$it" },
-            onValueChange = { onChange(mesh.copy(blobCount = it)) },
-        )
-        LyricsSettingsSlider(
-            label = stringResource(R.string.verse_blobs_size),
-            description = stringResource(R.string.verse_blobs_size_desc),
-            value = mesh.sizePercent,
-            range = 0..100,
-            step = 1,
-            valueText = { "$it%" },
-            onValueChange = { onChange(mesh.copy(sizePercent = it)) },
-        )
-        LyricsSettingsSlider(
-            label = stringResource(R.string.verse_blobs_opacity),
-            description = stringResource(R.string.verse_blobs_opacity_desc),
-            value = mesh.opacityPercent,
-            range = 0..100,
-            step = 1,
-            valueText = { "$it%" },
-            onValueChange = { onChange(mesh.copy(opacityPercent = it)) },
-        )
-        LyricsSettingsSlider(
-            label = stringResource(R.string.verse_blobs_color),
-            description = stringResource(R.string.verse_blobs_color_desc),
-            value = mesh.colorPercent,
-            range = 0..100,
-            step = 1,
-            valueText = { "$it%" },
-            onValueChange = { onChange(mesh.copy(colorPercent = it)) },
-        )
-        // 动画关闭时速度没有意义，直接隐藏
-        if (mesh.animated) {
-            LyricsSettingsSlider(
-                label = stringResource(R.string.verse_blobs_motion),
-                description = stringResource(R.string.verse_blobs_motion_desc),
-                value = mesh.motionSeconds,
-                range = 5..60,
-                step = 1,
-                valueText = { "${it}s" },
-                onValueChange = { onChange(mesh.copy(motionSeconds = it)) },
-            )
-        }
-        LyricsSettingsResetButton(
-            text = stringResource(R.string.verse_blobs_reset),
-            onClick = onReset,
-        )
-    }
-}

@@ -17,16 +17,6 @@ class SettingsUseCases(
         val KEEP_SCREEN_ON = PreferencesManager.Keys.KEEP_SCREEN_ON
         val ALBUM_NEW_STYLE = PreferencesManager.Keys.ALBUM_NEW_STYLE
         val DYNAMIC_SPECTRUM_BACKGROUND = PreferencesManager.Keys.DYNAMIC_SPECTRUM_BACKGROUND
-        val VERSE_THEME_MODE = PreferencesManager.Keys.VERSE_THEME_MODE
-        val VERSE_THEME_SATURATION = PreferencesManager.Keys.VERSE_THEME_SATURATION
-        val VERSE_THEME_VIBRANCY = PreferencesManager.Keys.VERSE_THEME_VIBRANCY
-        val VERSE_THEME_HUE = PreferencesManager.Keys.VERSE_THEME_HUE
-        val VERSE_MESH_COUNT = PreferencesManager.Keys.VERSE_MESH_COUNT
-        val VERSE_MESH_SIZE = PreferencesManager.Keys.VERSE_MESH_SIZE
-        val VERSE_MESH_OPACITY = PreferencesManager.Keys.VERSE_MESH_OPACITY
-        val VERSE_MESH_MOTION = PreferencesManager.Keys.VERSE_MESH_MOTION
-        val VERSE_MESH_COLOR = PreferencesManager.Keys.VERSE_MESH_COLOR
-        val VERSE_MESH_ANIMATED = PreferencesManager.Keys.VERSE_MESH_ANIMATED
         val SMOOTH_COLOR_UI = PreferencesManager.Keys.SMOOTH_COLOR_UI
         val SMOOTH_FREEZE = PreferencesManager.Keys.SMOOTH_FREEZE
         val SMOOTH_SPEED = PreferencesManager.Keys.SMOOTH_SPEED

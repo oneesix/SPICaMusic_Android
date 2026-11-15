@@ -135,14 +135,12 @@ import me.spica27.spicamusic.ui.theme.Shapes
 import me.spica27.spicamusic.ui.theme.Spacing
 import me.spica27.spicamusic.ui.widget.AudioCover
 import me.spica27.spicamusic.ui.settings.SettingsViewModel
-import me.spica27.spicamusic.ui.widget.DynamicPlayerColorScope
 import me.spica27.spicamusic.ui.widget.FluidMusicBackground
-import me.spica27.spicamusic.ui.widget.rememberDynamicPlayerColors
-import org.koin.compose.viewmodel.koinActivityViewModel
 import me.spica27.spicamusic.ui.widget.SmoothBackground
-import me.spica27.spicamusic.ui.widget.VerseFlowBackground
-import me.spica27.spicamusic.ui.widget.VerseFlowThemeScope
-import me.spica27.spicamusic.ui.widget.rememberVerseTheme
+import me.spica27.spicamusic.ui.widget.SmoothTheme
+import me.spica27.spicamusic.ui.widget.SmoothThemeScope
+import me.spica27.spicamusic.ui.widget.resolveSmoothDark
+import me.spica27.spicamusic.ui.widget.rememberSmoothTheme
 import me.spica27.spicamusic.ui.widget.ShowOnIdleContent
 import me.spica27.spicamusic.ui.widget.audio_seekbar.AudioDynamicWaveSlider
 import me.spica27.spicamusic.ui.widget.audio_seekbar.AudioWaveSlider
@@ -477,44 +475,22 @@ fun ExpandedPlayerScreen(
             uri = currentMediaItem?.mediaMetadata?.artworkUri,
             fallbackColor = MaterialTheme.colorScheme.primary,
         )
-    // Verse Flow 背景：与 HTML 播放器一致的渐变背景 + 同步改变文字颜色
     val settingsViewModel: SettingsViewModel = koinViewModel()
     val backgroundValue by settingsViewModel.dynamicSpectrumBackground.collectAsStateWithLifecycle()
-    val verseMode by settingsViewModel.verseThemeMode.collectAsStateWithLifecycle()
-    val verseSaturation by settingsViewModel.verseSaturation.collectAsStateWithLifecycle()
-    val verseVibrancy by settingsViewModel.verseVibrancy.collectAsStateWithLifecycle()
-    val verseHue by settingsViewModel.verseHue.collectAsStateWithLifecycle()
-    val verseMesh by settingsViewModel.verseMesh.collectAsStateWithLifecycle()
-    val isVerseFlow = backgroundValue == DynamicSpectrumBackground.VerseFlow.value
-    // Smooth: ColorfulX-style gradient. With "Color player UI" on, text / icons / sliders (and the
-    // lyrics) use the album colours through the same theme scope Verse Flow uses.
+    // Smooth: ColorfulX-style gradient. With "Color player UI" on, the look is light (pastel gradient, dark text)
+    // or dark (deep gradient, light text) and the text / icons / sliders (and the lyrics) take the album's hue.
     val smoothSettings by settingsViewModel.smooth.collectAsStateWithLifecycle()
     val isSmooth = backgroundValue == DynamicSpectrumBackground.Smooth.value
-    val useAlbumTheme = isVerseFlow || (isSmooth && smoothSettings.colorUi)
-    val verseTheme =
-        rememberVerseTheme(
+    val appDark = MaterialTheme.colorScheme.surface.luminance() < 0.5f
+    val smoothDark = resolveSmoothDark(smoothSettings.colorUi, smoothSettings.themeMode, appDark)
+    val useAlbumTheme = isSmooth && smoothSettings.colorUi
+    val smoothTheme =
+        rememberSmoothTheme(
             coverUri = if (useAlbumTheme) currentMediaItem?.mediaMetadata?.artworkUri else null,
-            mode = if (isSmooth) smoothSettings.themeMode else verseMode,
-            saturationPercent = if (isSmooth) smoothSettings.saturationPercent else verseSaturation,
-            vibrancyPercent = verseVibrancy,
-            hueShift = if (isSmooth) 0 else verseHue,
+            settings = smoothSettings,
+            appDark = appDark,
+            enabled = useAlbumTheme,
         )
-    // Smooth > Text tint: how strongly text takes the album colour (100% = full, 0% = plain white / dark).
-    val playerTheme =
-        if (isSmooth && smoothSettings.textTintPercent < 100) {
-            val tint = smoothSettings.textTintPercent / 100f
-            val neutral = if (verseTheme.light) Color(0xFF111111) else Color.White
-            verseTheme.copy(
-                fg = androidx.compose.ui.graphics.lerp(neutral, verseTheme.fg, tint),
-                fg2 = androidx.compose.ui.graphics.lerp(neutral.copy(alpha = verseTheme.fg2.alpha), verseTheme.fg2, tint),
-            )
-        } else {
-            verseTheme
-        }
-    // Color player UI: colours from the album art (null = off).
-    val dynamicStyleViewModel: LyricsStyleViewModel = koinActivityViewModel()
-    val dynamicStyle by dynamicStyleViewModel.style.collectAsStateWithLifecycle()
-    val dynamicColors = rememberDynamicPlayerColors(dynamicStyle, currentMediaItem?.mediaMetadata?.artworkUri)
     val hazeState = rememberHazeState()
     val playerBgBackdrop = rememberLayerBackdrop()
     val lyricsGlassV2 = LocalLiquidGlassV2Config.current.enabled
@@ -526,7 +502,7 @@ fun ExpandedPlayerScreen(
         )
     val lyricsScrimColor = MaterialTheme.colorScheme.scrim.copy(alpha = 0.14f)
 
-    PlayerThemeScope(isVerseFlow = useAlbumTheme, theme = playerTheme, dynamicColors = dynamicColors) {
+    PlayerThemeScope(theme = smoothTheme) {
         Box(
             modifier =
                 modifier
@@ -542,77 +518,53 @@ fun ExpandedPlayerScreen(
                         .fillMaxSize()
                         .then(if (lyricsGlassV2) Modifier.layerBackdrop(playerBgBackdrop) else Modifier),
             ) {
-                if (isVerseFlow) {
-                    // 与 HTML 完全一致的渐变背景（歌词页额外显示漂移的 mesh）
-                    VerseFlowBackground(
-                        theme = verseTheme,
-                        showMesh = playerSurface == PlayerSurface.Lyrics,
-                        mesh = verseMesh,
-                        meshAnimated = animationsEnabled && isAppInForeground,
+                // 仅在页面可见且应用在前台时启用动态背景。
+                if (isSmooth) {
+                    SmoothBackground(
+                        coverUri = currentMediaItem?.mediaMetadata?.artworkUri,
+                        settings = smoothSettings,
+                        enabled = animationsEnabled && isAppInForeground,
+                        dark = smoothDark,
                         modifier =
                             Modifier
                                 .fillMaxSize()
                                 .hazeSource(hazeState),
                     )
                 } else {
-                    // 仅在页面可见且应用在前台时启用动态背景。
-                    if (isSmooth) {
-                        SmoothBackground(
-                            coverUri = currentMediaItem?.mediaMetadata?.artworkUri,
-                            settings = smoothSettings,
-                            enabled = animationsEnabled && isAppInForeground,
-                            modifier =
-                                Modifier
-                                    .fillMaxSize()
-                                    .hazeSource(hazeState),
-                        )
-                    } else {
-                        FluidMusicBackground(
-                            modifier =
-                                Modifier
-                                    .fillMaxSize()
-                                    // 队列顶栏在关闭玻璃时仍需采样动态背景，用于渐变模糊。
-                                    .hazeSource(hazeState),
-                            coverColor = coverColor,
-                            isDarkMode = MaterialTheme.colorScheme.surface.luminance() < 0.5f,
-                            coverUri = { currentMediaItem?.mediaMetadata?.artworkUri },
-                            enabled = animationsEnabled && isAppInForeground,
-                        )
-                    }
+                    FluidMusicBackground(
+                        modifier =
+                            Modifier
+                                .fillMaxSize()
+                                // 队列顶栏在关闭玻璃时仍需采样动态背景，用于渐变模糊。
+                                .hazeSource(hazeState),
+                        coverColor = coverColor,
+                        isDarkMode = MaterialTheme.colorScheme.surface.luminance() < 0.5f,
+                        coverUri = { currentMediaItem?.mediaMetadata?.artworkUri },
+                        enabled = animationsEnabled && isAppInForeground,
+                    )
+                }
 
-                    // Color player UI > Color background: an album-colour tint on top of the animated background.
-                    dynamicColors?.backgroundTint?.let { tint ->
-                        Box(
-                            modifier =
-                                Modifier
-                                    .fillMaxSize()
-                                    .hazeSource(hazeState, zIndex = 0.3f)
-                                    .background(tint),
-                        )
-                    }
-
-                    // 歌词模式只压暗同一份动态背景，不创建第二个背景实例。
+                // 歌词模式只压暗同一份动态背景，不创建第二个背景实例。
+                Box(
+                    modifier =
+                        Modifier
+                            .fillMaxSize()
+                            // The source must wrap the dimming (alpha + colour) so the blurred header
+                            // is dimmed exactly like the rest of the lyrics page.
+                            .hazeSource(hazeState, zIndex = 0.5f)
+                            .graphicsLayer { alpha = lyricsScrimAlpha.value }
+                            .background(lyricsScrimColor),
+                )
+                // Smooth > Lyrics dim: extra darkening on the lyrics screen only.
+                if (isSmooth && smoothSettings.lyricsDimPercent > 0) {
                     Box(
                         modifier =
                             Modifier
                                 .fillMaxSize()
-                                // The source must wrap the dimming (alpha + colour) so the blurred header
-                                // is dimmed exactly like the rest of the lyrics page.
-                                .hazeSource(hazeState, zIndex = 0.5f)
+                                .hazeSource(hazeState, zIndex = 0.55f)
                                 .graphicsLayer { alpha = lyricsScrimAlpha.value }
-                                .background(lyricsScrimColor),
+                                .background(Color.Black.copy(alpha = smoothSettings.lyricsDimPercent / 100f)),
                     )
-                    // Smooth > Lyrics dim: extra darkening on the lyrics screen only.
-                    if (isSmooth && smoothSettings.lyricsDimPercent > 0) {
-                        Box(
-                            modifier =
-                                Modifier
-                                    .fillMaxSize()
-                                    .hazeSource(hazeState, zIndex = 0.55f)
-                                    .graphicsLayer { alpha = lyricsScrimAlpha.value }
-                                    .background(Color.Black.copy(alpha = smoothSettings.lyricsDimPercent / 100f)),
-                        )
-                    }
                 }
             }
 
@@ -835,21 +787,13 @@ fun ExpandedPlayerScreen(
     }
 }
 
-/** Verse Flow 开启时，用 HTML 同款配色覆盖 Material 颜色（文字、图标、滑块都跟着变）。 */
+/** Smooth + Color player UI: the album's light or dark colours replace the Material colours (text, icons, sliders). */
 @Composable
 private fun PlayerThemeScope(
-    isVerseFlow: Boolean,
-    theme: me.spica27.spicamusic.ui.widget.VerseTheme,
-    dynamicColors: me.spica27.spicamusic.ui.widget.DynamicPlayerColors? = null,
+    theme: SmoothTheme?,
     content: @Composable () -> Unit,
 ) {
-    DynamicPlayerColorScope(colors = dynamicColors) {
-        if (isVerseFlow) {
-            VerseFlowThemeScope(theme = theme, content = content)
-        } else {
-            content()
-        }
-    }
+    SmoothThemeScope(theme = theme, content = content)
 }
 
 // 音频信息组件

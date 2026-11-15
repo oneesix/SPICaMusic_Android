@@ -13,7 +13,6 @@ import me.spica27.spicamusic.common.entity.DynamicCoverType
 import me.spica27.spicamusic.common.entity.DynamicSpectrumBackground
 import me.spica27.spicamusic.common.entity.ProgressBarStyle
 import me.spica27.spicamusic.common.entity.ThemeColorStyle
-import me.spica27.spicamusic.core.preferences.LyricsStyleSettings
 import me.spica27.spicamusic.feature.settings.domain.SettingsUseCases
 import me.spica27.spicamusic.ui.glass.LiquidGlassSetting
 import me.spica27.spicamusic.ui.glass.LiquidGlassTuning
@@ -29,8 +28,6 @@ import me.spica27.spicamusic.ui.home.player_bar.BottomBarCustomization
 import me.spica27.spicamusic.ui.home.player_bar.BottomBarSetting
 import me.spica27.spicamusic.ui.player.PillPlayerTuning
 import me.spica27.spicamusic.ui.widget.SmoothSettings
-import me.spica27.spicamusic.ui.widget.VerseMeshSettings
-import me.spica27.spicamusic.ui.widget.VerseThemeMode
 
 /**
  * 设置页面 ViewModel
@@ -202,15 +199,6 @@ class SettingsViewModel(
         }
     }
 
-    // 颜色风格“动态”共用歌词设置里的“播放器界面配色”选项。
-    val lyricsStyle =
-        settingsUseCases.lyricsStyle
-            .stateIn(viewModelScope, SharingStarted.Eagerly, LyricsStyleSettings())
-
-    fun updateLyricsStyle(transform: (LyricsStyleSettings) -> LyricsStyleSettings) {
-        viewModelScope.launch { settingsUseCases.updateLyricsStyle(transform) }
-    }
-
     // 屏幕常亮
     val keepScreenOn =
         settingsUseCases
@@ -267,93 +255,6 @@ class SettingsViewModel(
     fun setDynamicSpectrumBackground(value: String) {
         viewModelScope.launch {
             settingsUseCases.setString(SettingsUseCases.Keys.DYNAMIC_SPECTRUM_BACKGROUND, value)
-        }
-    }
-
-    // ---- Verse Flow 外观 ----
-    val verseThemeMode =
-        settingsUseCases
-            .getString(SettingsUseCases.Keys.VERSE_THEME_MODE, VerseThemeMode.AUTO)
-            .stateIn(viewModelScope, SharingStarted.Eagerly, VerseThemeMode.AUTO)
-
-    fun setVerseThemeMode(value: String) {
-        viewModelScope.launch { settingsUseCases.setString(SettingsUseCases.Keys.VERSE_THEME_MODE, value) }
-    }
-
-    /** 饱和度 0..200（%），默认 100 */
-    val verseSaturation =
-        settingsUseCases
-            .getInt(SettingsUseCases.Keys.VERSE_THEME_SATURATION, 100)
-            .stateIn(viewModelScope, SharingStarted.Eagerly, 100)
-
-    fun setVerseSaturation(value: Int) {
-        viewModelScope.launch { settingsUseCases.setInt(SettingsUseCases.Keys.VERSE_THEME_SATURATION, value.coerceIn(0, 200)) }
-    }
-
-    /** 鲜艳度 0..100（%），默认 50 */
-    val verseVibrancy =
-        settingsUseCases
-            .getInt(SettingsUseCases.Keys.VERSE_THEME_VIBRANCY, 50)
-            .stateIn(viewModelScope, SharingStarted.Eagerly, 50)
-
-    fun setVerseVibrancy(value: Int) {
-        viewModelScope.launch { settingsUseCases.setInt(SettingsUseCases.Keys.VERSE_THEME_VIBRANCY, value.coerceIn(0, 100)) }
-    }
-
-    /** 高亮色相偏移 -180..180°，0 = Auto */
-    val verseHue =
-        settingsUseCases
-            .getInt(SettingsUseCases.Keys.VERSE_THEME_HUE, 0)
-            .stateIn(viewModelScope, SharingStarted.Eagerly, 0)
-
-    fun setVerseHue(value: Int) {
-        viewModelScope.launch { settingsUseCases.setInt(SettingsUseCases.Keys.VERSE_THEME_HUE, value.coerceIn(-180, 180)) }
-    }
-
-    // ---- Verse Flow 歌词页色块 ----
-    private val meshCount = settingsUseCases.getInt(SettingsUseCases.Keys.VERSE_MESH_COUNT, VerseMeshSettings().blobCount)
-    private val meshSize = settingsUseCases.getInt(SettingsUseCases.Keys.VERSE_MESH_SIZE, VerseMeshSettings().sizePercent)
-    private val meshOpacity = settingsUseCases.getInt(SettingsUseCases.Keys.VERSE_MESH_OPACITY, VerseMeshSettings().opacityPercent)
-    private val meshMotion = settingsUseCases.getInt(SettingsUseCases.Keys.VERSE_MESH_MOTION, VerseMeshSettings().motionSeconds)
-    private val meshColor = settingsUseCases.getInt(SettingsUseCases.Keys.VERSE_MESH_COLOR, VerseMeshSettings().colorPercent)
-    private val meshAnimated = settingsUseCases.getBoolean(SettingsUseCases.Keys.VERSE_MESH_ANIMATED, VerseMeshSettings().animated)
-
-    val verseMesh =
-        combine(
-            combine(meshCount, meshSize, meshOpacity) { c, s, o -> Triple(c, s, o) },
-            combine(meshMotion, meshColor, meshAnimated) { m, col, a -> Triple(m, col, a) },
-        ) { (c, s, o), (m, col, a) ->
-            VerseMeshSettings(
-                blobCount = c.coerceIn(1, 4),
-                sizePercent = s.coerceIn(0, 100),
-                opacityPercent = o.coerceIn(0, 100),
-                motionSeconds = m.coerceIn(5, 60),
-                colorPercent = col.coerceIn(0, 100),
-                animated = a,
-            )
-        }.stateIn(viewModelScope, SharingStarted.Eagerly, VerseMeshSettings())
-
-    /** Only the fields that actually changed are written. */
-    fun updateVerseMesh(new: VerseMeshSettings) {
-        val old = verseMesh.value
-        viewModelScope.launch {
-            if (new.blobCount != old.blobCount) settingsUseCases.setInt(SettingsUseCases.Keys.VERSE_MESH_COUNT, new.blobCount.coerceIn(1, 4))
-            if (new.sizePercent != old.sizePercent) settingsUseCases.setInt(SettingsUseCases.Keys.VERSE_MESH_SIZE, new.sizePercent.coerceIn(0, 100))
-            if (new.opacityPercent != old.opacityPercent) settingsUseCases.setInt(SettingsUseCases.Keys.VERSE_MESH_OPACITY, new.opacityPercent.coerceIn(0, 100))
-            if (new.motionSeconds != old.motionSeconds) settingsUseCases.setInt(SettingsUseCases.Keys.VERSE_MESH_MOTION, new.motionSeconds.coerceIn(5, 60))
-            if (new.colorPercent != old.colorPercent) settingsUseCases.setInt(SettingsUseCases.Keys.VERSE_MESH_COLOR, new.colorPercent.coerceIn(0, 100))
-            if (new.animated != old.animated) settingsUseCases.setBoolean(SettingsUseCases.Keys.VERSE_MESH_ANIMATED, new.animated)
-        }
-    }
-
-    fun resetVerseMesh() = updateVerseMesh(VerseMeshSettings())
-
-    fun resetVerseAppearance() {
-        viewModelScope.launch {
-            settingsUseCases.setString(SettingsUseCases.Keys.VERSE_THEME_MODE, VerseThemeMode.AUTO)
-            settingsUseCases.setInt(SettingsUseCases.Keys.VERSE_THEME_SATURATION, 100)
-            settingsUseCases.setInt(SettingsUseCases.Keys.VERSE_THEME_VIBRANCY, 50)
-            settingsUseCases.setInt(SettingsUseCases.Keys.VERSE_THEME_HUE, 0)
         }
     }
 

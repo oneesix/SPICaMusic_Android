@@ -60,8 +60,8 @@ data class SmoothSettings(
     val renderScalePercent: Int = 50,
     /** 0..70 % black on top, keeps text readable. */
     val dimPercent: Int = 20,
-    /** Auto / light / dark text colours (when [colorUi] is on). */
-    val themeMode: String = VerseThemeMode.AUTO,
+    /** Auto / light / dark look: pastel background + dark text, or deep background + light text (when [colorUi] is on). */
+    val themeMode: String = SmoothThemeMode.AUTO,
     /** 0..200 % colour saturation of the album colours. */
     val saturationPercent: Int = 100,
     /** 0..100 % how strongly the text takes the album colour (0 = plain white / dark text). */
@@ -73,7 +73,7 @@ data class SmoothSettings(
 private const val SLOTS = 8
 
 /** Colours of one cover: LAB values (flattened, SLOTS * 3), the number of colours used, plus sRGB for the fallback. */
-private class SmoothPalette(
+internal class SmoothPalette(
     val lab: FloatArray,
     val count: Int,
     val rgb: List<Color>,
@@ -88,7 +88,7 @@ private class SmoothState {
 
 private fun srgbToLinear(v: Float): Float = if (v > 0.04045f) ((v + 0.055f) / 1.055f).pow(2.4f) else v / 12.92f
 
-private fun rgbToLab(r255: Float, g255: Float, b255: Float): FloatArray {
+internal fun rgbToLab(r255: Float, g255: Float, b255: Float): FloatArray {
     val r = srgbToLinear(r255 / 255f)
     val g = srgbToLinear(g255 / 255f)
     val b = srgbToLinear(b255 / 255f)
@@ -107,9 +107,10 @@ private val DefaultSmoothColors =
         intArrayOf(74, 11, 4),
     )
 
-private fun buildSmoothPalette(
-    palette: VersePalette?,
+internal fun buildSmoothPalette(
+    palette: CoverPalette?,
     saturation: Float,
+    dark: Boolean,
 ): SmoothPalette {
     val source = palette?.clusters?.take(6)?.map { it.rgb } ?: DefaultSmoothColors
     val colors = if (source.size >= 4) source else List(4) { source[it % source.size] }
@@ -121,11 +122,13 @@ private fun buildSmoothPalette(
         val r = (gray + (c[0] - gray) * saturation).coerceIn(0f, 255f)
         val g = (gray + (c[1] - gray) * saturation).coerceIn(0f, 255f)
         val b = (gray + (c[2] - gray) * saturation).coerceIn(0f, 255f)
-        val l = rgbToLab(r, g, b)
+        // light / dark look: same hue, lightness moved into a light or a dark band
+        val l = toneLab(rgbToLab(r, g, b), dark)
         lab[i * 3] = l[0]
         lab[i * 3 + 1] = l[1]
         lab[i * 3 + 2] = l[2]
-        rgb.add(Color(r.roundToInt(), g.roundToInt(), b.roundToInt()))
+        val toned = labToRgb(l[0], l[1], l[2])
+        rgb.add(Color(toned[0].roundToInt().coerceIn(0, 255), toned[1].roundToInt().coerceIn(0, 255), toned[2].roundToInt().coerceIn(0, 255)))
     }
     return SmoothPalette(lab, colors.size.coerceAtMost(SLOTS), rgb)
 }
@@ -225,7 +228,8 @@ private const val SMOOTH_SHADER =
     """
 
 /**
- * Smooth background. [enabled] = false (app in background / animations off) behaves like [SmoothSettings.freeze].
+ * Smooth background. [dark] picks the look: a deep gradient (dark) or a pastel gradient (light).
+ * [enabled] = false (app in background / animations off) behaves like [SmoothSettings.freeze].
  * Needs Android 13+ (AGSL); older versions get a static album-colour gradient.
  */
 @Composable
@@ -233,14 +237,15 @@ fun SmoothBackground(
     coverUri: Uri?,
     settings: SmoothSettings,
     enabled: Boolean,
+    dark: Boolean,
     modifier: Modifier = Modifier,
 ) {
     val context = LocalContext.current
-    var versePalette by remember(coverUri) { mutableStateOf<VersePalette?>(null) }
-    LaunchedEffect(coverUri) { versePalette = extractVersePalette(context, coverUri) }
+    var coverPalette by remember(coverUri) { mutableStateOf<CoverPalette?>(null) }
+    LaunchedEffect(coverUri) { coverPalette = extractCoverPalette(context, coverUri) }
     val palette =
-        remember(versePalette, settings.saturationPercent) {
-            buildSmoothPalette(versePalette, settings.saturationPercent / 100f)
+        remember(coverPalette, settings.saturationPercent, dark) {
+            buildSmoothPalette(coverPalette, settings.saturationPercent / 100f, dark)
         }
     val dim = settings.dimPercent.coerceIn(0, 70) / 100f
 

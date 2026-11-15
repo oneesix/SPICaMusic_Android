@@ -31,12 +31,6 @@ sealed class DynamicSpectrumBackground(
         "模糊封面",
     )
 
-    /** Verse "flow" look: album-derived gradient + accent text colours (HTML appearance system). */
-    object VerseFlow : DynamicSpectrumBackground(
-        "verse_flow",
-        "Verse Flow",
-    )
-
     /** "Smooth": ColorfulX-style gradient from the album colours, with its own settings. */
     object Smooth : DynamicSpectrumBackground(
         "smooth",
@@ -56,7 +50,6 @@ sealed class DynamicSpectrumBackground(
             is EffectShader -> "流体效果"
             is FluidWarp -> "动态流体封面"
             is BlurCover -> "模糊封面"
-            is VerseFlow -> "Verse Flow"
             is Smooth -> "Smooth"
             is OFF -> "关闭"
         }
@@ -70,7 +63,7 @@ sealed class DynamicSpectrumBackground(
                 EffectShader.value -> EffectShader
                 FluidWarp.value -> FluidWarp
                 BlurCover.value -> BlurCover
-                VerseFlow.value -> VerseFlow
+                "verse_flow" -> Smooth // Verse Flow was removed; its users get Smooth
                 Smooth.value -> Smooth
                 OFF.value -> OFF
                 else -> OFF
@@ -78,7 +71,7 @@ sealed class DynamicSpectrumBackground(
         }
 
         val presets: List<DynamicSpectrumBackground>
-            get() = listOf(VerseFlow, Smooth, TopGlow, LiquidAurora, EffectShader, FluidWarp, BlurCover, OFF)
+            get() = listOf(Smooth, TopGlow, LiquidAurora, EffectShader, FluidWarp, BlurCover, OFF)
     }
 
 }
