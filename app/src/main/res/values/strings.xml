@@ -749,6 +749,10 @@
   <string name="smooth_render_scale_desc">Lower = lighter on the phone, higher = sharper</string>
   <string name="smooth_dim">Dim</string>
   <string name="smooth_dim_desc">Darkens the background so text stays readable</string>
+  <string name="smooth_text_tint">Text tint</string>
+  <string name="smooth_text_tint_desc">How much color the text takes from the album. 0% = plain white or dark</string>
+  <string name="smooth_lyrics_dim">Lyrics screen dim</string>
+  <string name="smooth_lyrics_dim_desc">Extra darkening on the lyrics screen so lyrics stay readable</string>
   <string name="smooth_reset">Reset Smooth</string>
   <string name="verse_mode">Appearance</string>
   <string name="verse_mode_desc">Auto follows the cover. Light or Dark forces it</string>

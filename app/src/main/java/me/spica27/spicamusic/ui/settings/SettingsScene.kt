@@ -1916,6 +1916,15 @@ private fun SmoothControls(
                 },
                 onSelect = { onChange(settings.copy(themeMode = it)) },
             )
+            LyricsSettingsSlider(
+                label = stringResource(R.string.smooth_text_tint),
+                description = stringResource(R.string.smooth_text_tint_desc),
+                value = settings.textTintPercent,
+                range = 0..100,
+                step = 5,
+                valueText = { "$it%" },
+                onValueChange = { onChange(settings.copy(textTintPercent = it)) },
+            )
         }
         LyricsSettingsSlider(
             label = stringResource(R.string.verse_saturation),
@@ -2000,6 +2009,15 @@ private fun SmoothControls(
             step = 5,
             valueText = { "$it%" },
             onValueChange = { onChange(settings.copy(dimPercent = it)) },
+        )
+        LyricsSettingsSlider(
+            label = stringResource(R.string.smooth_lyrics_dim),
+            description = stringResource(R.string.smooth_lyrics_dim_desc),
+            value = settings.lyricsDimPercent,
+            range = 0..70,
+            step = 5,
+            valueText = { "$it%" },
+            onValueChange = { onChange(settings.copy(lyricsDimPercent = it)) },
         )
         LyricsSettingsResetButton(
             text = stringResource(R.string.smooth_reset),

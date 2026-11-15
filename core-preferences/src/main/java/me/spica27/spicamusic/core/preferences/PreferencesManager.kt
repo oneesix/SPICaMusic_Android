@@ -77,6 +77,8 @@ class PreferencesManager(
         val SMOOTH_DIM = intPreferencesKey("smooth_dim")
         val SMOOTH_THEME_MODE = stringPreferencesKey("smooth_theme_mode")
         val SMOOTH_SATURATION = intPreferencesKey("smooth_saturation")
+        val SMOOTH_TEXT_TINT = intPreferencesKey("smooth_text_tint")
+        val SMOOTH_LYRICS_DIM = intPreferencesKey("smooth_lyrics_dim")
 
         val DYNAMIC_COVER_TYPE = stringPreferencesKey("dynamic_cover_type")
         val PROGRESS_BAR_STYLE = stringPreferencesKey("progress_bar_style")

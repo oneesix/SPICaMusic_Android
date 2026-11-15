@@ -749,6 +749,10 @@
   <string name="smooth_render_scale_desc">越低越省资源，越高越清晰</string>
   <string name="smooth_dim">压暗</string>
   <string name="smooth_dim_desc">压暗背景，让文字更清晰</string>
+  <string name="smooth_text_tint">文字着色</string>
+  <string name="smooth_text_tint_desc">文字从封面取色的程度，0% = 纯白或深色</string>
+  <string name="smooth_lyrics_dim">歌词页压暗</string>
+  <string name="smooth_lyrics_dim_desc">歌词页额外压暗背景，让歌词更清晰</string>
   <string name="smooth_reset">重置流畅渐变</string>
   <string name="verse_mode">外观</string>
   <string name="verse_mode_desc">自动跟随封面，浅色或深色则强制指定</string>

@@ -64,6 +64,10 @@ data class SmoothSettings(
     val themeMode: String = VerseThemeMode.AUTO,
     /** 0..200 % colour saturation of the album colours. */
     val saturationPercent: Int = 100,
+    /** 0..100 % how strongly the text takes the album colour (0 = plain white / dark text). */
+    val textTintPercent: Int = 100,
+    /** 0..70 % extra black over the background on the lyrics screen, keeps lyrics readable. */
+    val lyricsDimPercent: Int = 15,
 )
 
 private const val SLOTS = 8

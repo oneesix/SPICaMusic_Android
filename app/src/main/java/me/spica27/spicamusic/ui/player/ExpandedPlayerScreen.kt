@@ -498,6 +498,18 @@ fun ExpandedPlayerScreen(
             vibrancyPercent = verseVibrancy,
             hueShift = if (isSmooth) 0 else verseHue,
         )
+    // Smooth > Text tint: how strongly text takes the album colour (100% = full, 0% = plain white / dark).
+    val playerTheme =
+        if (isSmooth && smoothSettings.textTintPercent < 100) {
+            val tint = smoothSettings.textTintPercent / 100f
+            val neutral = if (verseTheme.light) Color(0xFF111111) else Color.White
+            verseTheme.copy(
+                fg = androidx.compose.ui.graphics.lerp(neutral, verseTheme.fg, tint),
+                fg2 = androidx.compose.ui.graphics.lerp(neutral.copy(alpha = verseTheme.fg2.alpha), verseTheme.fg2, tint),
+            )
+        } else {
+            verseTheme
+        }
     // Color player UI: colours from the album art (null = off).
     val dynamicStyleViewModel: LyricsStyleViewModel = koinActivityViewModel()
     val dynamicStyle by dynamicStyleViewModel.style.collectAsStateWithLifecycle()
@@ -513,7 +525,7 @@ fun ExpandedPlayerScreen(
         )
     val lyricsScrimColor = MaterialTheme.colorScheme.scrim.copy(alpha = 0.14f)
 
-    PlayerThemeScope(isVerseFlow = useAlbumTheme, theme = verseTheme, dynamicColors = dynamicColors) {
+    PlayerThemeScope(isVerseFlow = useAlbumTheme, theme = playerTheme, dynamicColors = dynamicColors) {
         Box(
             modifier =
                 modifier
@@ -589,6 +601,17 @@ fun ExpandedPlayerScreen(
                                 .graphicsLayer { alpha = lyricsScrimAlpha.value }
                                 .background(lyricsScrimColor),
                     )
+                    // Smooth > Lyrics dim: extra darkening on the lyrics screen only.
+                    if (isSmooth && smoothSettings.lyricsDimPercent > 0) {
+                        Box(
+                            modifier =
+                                Modifier
+                                    .fillMaxSize()
+                                    .hazeSource(hazeState, zIndex = 0.55f)
+                                    .graphicsLayer { alpha = lyricsScrimAlpha.value }
+                                    .background(Color.Black.copy(alpha = smoothSettings.lyricsDimPercent / 100f)),
+                        )
+                    }
                 }
             }
 

@@ -371,6 +371,8 @@ class SettingsViewModel(
     private val smoothDim = settingsUseCases.getInt(SettingsUseCases.Keys.SMOOTH_DIM, smoothDefaults.dimPercent)
     private val smoothThemeMode = settingsUseCases.getString(SettingsUseCases.Keys.SMOOTH_THEME_MODE, smoothDefaults.themeMode)
     private val smoothSaturation = settingsUseCases.getInt(SettingsUseCases.Keys.SMOOTH_SATURATION, smoothDefaults.saturationPercent)
+    private val smoothTextTint = settingsUseCases.getInt(SettingsUseCases.Keys.SMOOTH_TEXT_TINT, smoothDefaults.textTintPercent)
+    private val smoothLyricsDim = settingsUseCases.getInt(SettingsUseCases.Keys.SMOOTH_LYRICS_DIM, smoothDefaults.lyricsDimPercent)
 
     val smooth =
         combine(
@@ -380,7 +382,9 @@ class SettingsViewModel(
             combine(smoothTransition, smoothPower, smoothFrameLimit, smoothRenderScale, smoothDim) { t, p, fl, rs, d ->
                 intArrayOf(t, p, fl, rs, d)
             },
-            combine(smoothThemeMode, smoothSaturation) { m, s -> m to s },
+            combine(smoothThemeMode, smoothSaturation, smoothTextTint, smoothLyricsDim) { m, s, t, l ->
+                m to intArrayOf(s, t, l)
+            },
         ) { a, b, c ->
             a.copy(
                 speedTenths = a.speedTenths.coerceIn(0, 30),
@@ -392,7 +396,9 @@ class SettingsViewModel(
                 renderScalePercent = b[3].coerceIn(25, 100),
                 dimPercent = b[4].coerceIn(0, 70),
                 themeMode = c.first,
-                saturationPercent = c.second.coerceIn(0, 200),
+                saturationPercent = c.second[0].coerceIn(0, 200),
+                textTintPercent = c.second[1].coerceIn(0, 100),
+                lyricsDimPercent = c.second[2].coerceIn(0, 70),
             )
         }.stateIn(viewModelScope, SharingStarted.Eagerly, SmoothSettings())
 
@@ -412,6 +418,8 @@ class SettingsViewModel(
             if (new.dimPercent != old.dimPercent) settingsUseCases.setInt(SettingsUseCases.Keys.SMOOTH_DIM, new.dimPercent.coerceIn(0, 70))
             if (new.themeMode != old.themeMode) settingsUseCases.setString(SettingsUseCases.Keys.SMOOTH_THEME_MODE, new.themeMode)
             if (new.saturationPercent != old.saturationPercent) settingsUseCases.setInt(SettingsUseCases.Keys.SMOOTH_SATURATION, new.saturationPercent.coerceIn(0, 200))
+            if (new.textTintPercent != old.textTintPercent) settingsUseCases.setInt(SettingsUseCases.Keys.SMOOTH_TEXT_TINT, new.textTintPercent.coerceIn(0, 100))
+            if (new.lyricsDimPercent != old.lyricsDimPercent) settingsUseCases.setInt(SettingsUseCases.Keys.SMOOTH_LYRICS_DIM, new.lyricsDimPercent.coerceIn(0, 70))
         }
     }
 
