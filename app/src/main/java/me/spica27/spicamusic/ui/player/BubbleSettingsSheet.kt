@@ -23,6 +23,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import me.spica27.spicamusic.R
+import me.spica27.spicamusic.ui.widget.LyricsSettingsChips
 import me.spica27.spicamusic.ui.widget.LyricsSettingsResetButton
 import me.spica27.spicamusic.ui.widget.LyricsSettingsSection
 import me.spica27.spicamusic.ui.widget.LyricsSettingsSlider
@@ -160,6 +161,34 @@ internal fun BubbleSettingsSheet(
             Slide(R.string.bp_album_width, BubbleSetting.AlbumWidth, 120..albumMaxWidthDp.coerceAtLeast(121))
             Slide(R.string.bp_album_height, BubbleSetting.AlbumHeight, 120..460)
             Slide(R.string.bp_album_corner, BubbleSetting.Corner, 0..130)
+
+            LyricsSettingsSection(stringResource(R.string.bp_sec_hl))
+            LyricsSettingsChips(
+                label = stringResource(R.string.bp_hl_style),
+                description = "",
+                options = listOf(0, 1, 2, 3),
+                selected = tuning.hlStyle,
+                optionLabel = {
+                    stringResource(
+                        when (it) {
+                            0 -> R.string.bp_hl_off
+                            1 -> R.string.bp_hl_directional
+                            2 -> R.string.bp_hl_ambient
+                            else -> R.string.bp_hl_solid
+                        },
+                    )
+                },
+                onSelect = { onChange(tuning.withValue(BubbleSetting.HlStyle, it)) },
+            )
+            if (tuning.hlStyle != 0) {
+                val tenthsDp: (Int) -> String = { String.format(Locale.US, "%.1f dp", it / 10f) }
+                Slide(R.string.bp_hl_width, BubbleSetting.HlWidth, 1..60, 1, tenthsDp)
+                Slide(R.string.bp_hl_alpha, BubbleSetting.HlAlpha, 1..100) { "$it%" }
+                if (tuning.hlStyle == 1) {
+                    Slide(R.string.bp_hl_angle, BubbleSetting.HlAngle, 0..360, 5) { "$it°" }
+                    Slide(R.string.bp_hl_falloff, BubbleSetting.HlFalloff, 0..40, 1) { String.format(Locale.US, "%.1f", it / 10f) }
+                }
+            }
 
             LyricsSettingsSection(stringResource(R.string.bp_sec_buttons))
             Slide(R.string.bp_play_size, BubbleSetting.PlaySize, 32..96)

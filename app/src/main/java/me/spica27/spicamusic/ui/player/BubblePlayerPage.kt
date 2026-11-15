@@ -87,6 +87,8 @@ import me.spica27.spicamusic.artwork.artwork
 import me.spica27.spicamusic.player.api.PlayMode
 import me.spica27.spicamusic.ui.glass.LocalLiquidGlassV2Config
 import me.spica27.spicamusic.ui.glass.liquidGlassV2Surface
+import me.spica27.spicamusic.ui.home.page.AlbumStyleTuning
+import me.spica27.spicamusic.ui.home.page.albumHighlight
 import me.spica27.spicamusic.ui.widget.AudioCover
 import me.spica27.spicamusic.ui.widget.clickHighlight
 import me.spica27.spicamusic.ui.widget.materialSharedAxisYIn
@@ -180,6 +182,23 @@ internal fun BubblePlayerPage(
             Modifier
         }
 
+    // Liquid glass on the bars: follows the app's liquid glass settings (null when it is off).
+    val topGlass = lyricsGlassSurfaceOrNull(hazeState, CircleShape, surface)
+    val titleGlass = lyricsGlassSurfaceOrNull(hazeState, CircleShape, surface)
+    val lyricsGlass = lyricsGlassSurfaceOrNull(hazeState, CircleShape, surface)
+    val progressGlass =
+        lyricsGlassSurfaceOrNull(hazeState, RoundedCornerShape(22.dp), surface)
+    val highlightTuning =
+        remember(tuning.hlStyle, tuning.hlWidthTenths, tuning.hlAlphaPercent, tuning.hlAngle, tuning.hlFalloffTenths) {
+            AlbumStyleTuning(
+                highlightStyle = tuning.hlStyle,
+                highlightWidthTenths = tuning.hlWidthTenths,
+                highlightAlphaPercent = tuning.hlAlphaPercent,
+                highlightAngle = tuning.hlAngle,
+                highlightFalloffTenths = tuning.hlFalloffTenths,
+            )
+        }
+
     // Time listened to this song: counts only while playing, restarts when the song changes.
     val mediaId = item?.mediaId
     var listenedMs by remember(mediaId) { mutableLongStateOf(0L) }
@@ -220,9 +239,8 @@ internal fun BubblePlayerPage(
                         .padding(top = 6.dp)
                         .fillMaxWidth()
                         .height(tuning.topBarHeightDp.dp)
+                        .then(topGlass ?: Modifier.clip(CircleShape).then(glassBlur).background(barFill))
                         .clip(CircleShape)
-                        .then(glassBlur)
-                        .background(barFill)
                         .padding(6.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
@@ -317,6 +335,18 @@ internal fun BubblePlayerPage(
                     )
                 val radius = min(tuning.cornerDp.toFloat(), min(albumWidth, albumHeight) / 2f)
                 val albumBackdrop = rememberLayerBackdrop()
+                val panelGlass =
+                    if (panelOn) {
+                        lyricsGlassSurfaceOrNull(hazeState, RoundedCornerShape((radius + pad).dp), surface)
+                    } else {
+                        null
+                    }
+                val infoGlass =
+                    if (infoOn) {
+                        lyricsGlassSurfaceOrNull(hazeState, RoundedCornerShape(radius.dp), surface)
+                    } else {
+                        null
+                    }
                 val v2Enabled = LocalLiquidGlassV2Config.current.enabled
 
                 Column(
@@ -326,9 +356,13 @@ internal fun BubblePlayerPage(
                             .then(
                                 if (panelOn) {
                                     Modifier
-                                        .clip(RoundedCornerShape((radius + pad).dp))
-                                        .then(glassBlur)
-                                        .background(barFill)
+                                        .then(
+                                            panelGlass
+                                                ?: Modifier
+                                                    .clip(RoundedCornerShape((radius + pad).dp))
+                                                    .then(glassBlur)
+                                                    .background(barFill),
+                                        ).clip(RoundedCornerShape((radius + pad).dp))
                                         .padding(pad.dp)
                                 } else {
                                     Modifier
@@ -342,8 +376,12 @@ internal fun BubblePlayerPage(
                                 Modifier
                                     .width(albumWidth.dp)
                                     .height(26.dp)
-                                    .clip(RoundedCornerShape(radius.dp))
-                                    .background(onSurface.copy(alpha = 0.12f)),
+                                    .then(
+                                        infoGlass
+                                            ?: Modifier
+                                                .clip(RoundedCornerShape(radius.dp))
+                                                .background(onSurface.copy(alpha = 0.12f)),
+                                    ).clip(RoundedCornerShape(radius.dp)),
                             contentAlignment = Alignment.Center,
                         ) {
                             Text(
@@ -365,7 +403,8 @@ internal fun BubblePlayerPage(
                                 Modifier
                                     .fillMaxSize()
                                     .clip(RoundedCornerShape(radius.dp))
-                                    .then(if (v2Enabled) Modifier.layerBackdrop(albumBackdrop) else Modifier),
+                                    .then(if (v2Enabled) Modifier.layerBackdrop(albumBackdrop) else Modifier)
+                                    .albumHighlight(highlightTuning, radius.toInt()),
                         ) {
                             AnimatedContent(
                                 targetState = item,
@@ -452,6 +491,7 @@ internal fun BubblePlayerPage(
                                 height = tuning.progressHeightDp.dp,
                                 blur = glassBlur,
                                 fill = barFill,
+                                glass = progressGlass,
                                 progress =
                                     if (duration > 0) (seekPositionProvider() / duration).coerceIn(0f, 1f) else 0f,
                                 playedMs = realPositionProvider().toLong(),
@@ -499,9 +539,8 @@ internal fun BubblePlayerPage(
                                         Modifier
                                             .weight(1f)
                                             .height(size)
+                                            .then(titleGlass ?: Modifier.clip(CircleShape).then(glassBlur).background(barFill))
                                             .clip(CircleShape)
-                                            .then(glassBlur)
-                                            .background(barFill)
                                             .padding(horizontal = 16.dp),
                                     verticalArrangement = Arrangement.Center,
                                     horizontalAlignment = Alignment.CenterHorizontally,
@@ -549,9 +588,8 @@ internal fun BubblePlayerPage(
                                     Modifier
                                         .fillMaxWidth()
                                         .height(tuning.lyricsBarHeightDp.dp)
-                                        .clip(CircleShape)
-                                        .then(glassBlur)
-                                        .background(barFill),
+                                        .then(lyricsGlass ?: Modifier.clip(CircleShape).then(glassBlur).background(barFill))
+                                        .clip(CircleShape),
                                 contentAlignment = Alignment.Center,
                             ) {
                                 MiniLyric(
@@ -708,6 +746,7 @@ private fun BubbleProgressBar(
     height: Dp,
     blur: Modifier,
     fill: Color,
+    glass: Modifier?,
     progress: Float,
     playedMs: Long,
     durationMs: Long,
@@ -723,9 +762,8 @@ private fun BubbleProgressBar(
             Modifier
                 .fillMaxWidth()
                 .height(height)
+                .then(glass ?: Modifier.clip(RoundedCornerShape(22.dp)).then(blur).background(fill))
                 .clip(RoundedCornerShape(22.dp))
-                .then(blur)
-                .background(fill)
                 .padding(horizontal = 16.dp),
         verticalArrangement = Arrangement.Center,
     ) {

@@ -1299,4 +1299,14 @@
   <string name="bp_btn_bottom">Distance from bottom</string>
   <string name="bp_btn_shift">Left / right shift</string>
   <string name="bp_reset">Reset Bubble player</string>
+  <string name="bp_sec_hl">Album highlight</string>
+  <string name="bp_hl_style">Highlight style</string>
+  <string name="bp_hl_off">Off</string>
+  <string name="bp_hl_directional">Directional</string>
+  <string name="bp_hl_ambient">Ambient</string>
+  <string name="bp_hl_solid">Solid</string>
+  <string name="bp_hl_width">Highlight width</string>
+  <string name="bp_hl_alpha">Highlight opacity</string>
+  <string name="bp_hl_angle">Highlight angle</string>
+  <string name="bp_hl_falloff">Highlight falloff</string>
 </resources>

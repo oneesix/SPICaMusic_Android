@@ -1298,4 +1298,14 @@
   <string name="bp_btn_bottom">離底部距離</string>
   <string name="bp_btn_shift">左右偏移</string>
   <string name="bp_reset">重設氣泡播放器</string>
+  <string name="bp_sec_hl">專輯高光</string>
+  <string name="bp_hl_style">高光樣式</string>
+  <string name="bp_hl_off">關閉</string>
+  <string name="bp_hl_directional">方向光</string>
+  <string name="bp_hl_ambient">環境光</string>
+  <string name="bp_hl_solid">純色</string>
+  <string name="bp_hl_width">高光寬度</string>
+  <string name="bp_hl_alpha">高光不透明度</string>
+  <string name="bp_hl_angle">高光角度</string>
+  <string name="bp_hl_falloff">高光衰減</string>
 </resources>

@@ -28,6 +28,11 @@ internal object BubbleSetting {
     const val BlurOptimize = 21
     const val BlurQuality = 22
     const val BarOrder = 23
+    const val HlStyle = 24
+    const val HlWidth = 25
+    const val HlAlpha = 26
+    const val HlAngle = 27
+    const val HlFalloff = 28
 }
 
 /**
@@ -60,6 +65,12 @@ data class BubblePlayerTuning(
     val blurOptimize: Int = 0,
     val blurQuality: Int = 45,
     val barOrderCode: Int = DEFAULT_ORDER_CODE,
+    /** Album highlight: 0 off, 1 directional, 2 ambient, 3 solid (same as the new album style). */
+    val hlStyle: Int = 0,
+    val hlWidthTenths: Int = 12,
+    val hlAlphaPercent: Int = 50,
+    val hlAngle: Int = 45,
+    val hlFalloffTenths: Int = 20,
 ) {
     fun toList(): List<Int> =
         listOf(
@@ -87,6 +98,11 @@ data class BubblePlayerTuning(
             blurOptimize,
             blurQuality,
             barOrderCode,
+            hlStyle,
+            hlWidthTenths,
+            hlAlphaPercent,
+            hlAngle,
+            hlFalloffTenths,
         )
 
     fun encode(): String = toList().joinToString(",")
@@ -138,6 +154,7 @@ data class BubblePlayerTuning(
             return BubblePlayerTuning(
                 g(0), g(1), g(2), g(3), g(4), g(5), g(6), g(7), g(8), g(9), g(10), g(11),
                 g(12), g(13), g(14), g(15), g(16), g(17), g(18), g(19), g(20), g(21), g(22), g(23),
+                g(24), g(25), g(26), g(27), g(28),
             )
         }
 
