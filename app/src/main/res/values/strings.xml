@@ -1250,4 +1250,22 @@
   <string name="blur_style_sub">Normal: full-strength blur that fades out smoothly. Haze: blur gets weaker toward the edge.</string>
   <string name="blur_style_normal">Normal</string>
   <string name="blur_style_haze">Haze</string>
+  <string name="settings_player_style">Player style</string>
+  <string name="settings_player_style_subtitle">Layout of the full-screen player</string>
+  <string name="player_style_classic">Classic</string>
+  <string name="player_style_classic_desc">Square cover with a waveform seek bar</string>
+  <string name="player_style_pill">Pill</string>
+  <string name="player_style_pill_desc">Tall flat cover with a ring seek bar</string>
+  <string name="pill_see_lyrics">See lyrics</string>
+  <string name="pill_album_width">Album width</string>
+  <string name="pill_album_height">Album height</string>
+  <string name="pill_bottom_radius">Bottom radius</string>
+  <string name="pill_ring_padding">Ring padding</string>
+  <string name="pill_actions_height">Mix/like height</string>
+  <string name="pill_play_size">Play size</string>
+  <string name="pill_play_height">Play height</string>
+  <string name="pill_skip_size">Skip size</string>
+  <string name="pill_skip_side">Skip side</string>
+  <string name="pill_skip_height">Skip height</string>
+  <string name="pill_reset">Reset pill player</string>
 </resources>

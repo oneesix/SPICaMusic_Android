@@ -1249,4 +1249,22 @@
   <string name="blur_style_sub">一般：全強度模糊，平滑漸隱。Haze：模糊向邊緣逐漸減弱。</string>
   <string name="blur_style_normal">一般</string>
   <string name="blur_style_haze">Haze</string>
+  <string name="settings_player_style">播放器樣式</string>
+  <string name="settings_player_style_subtitle">全螢幕播放器的版面</string>
+  <string name="player_style_classic">經典</string>
+  <string name="player_style_classic_desc">方形封面與波形進度條</string>
+  <string name="player_style_pill">膠囊</string>
+  <string name="player_style_pill_desc">扁平長封面與圓環進度條</string>
+  <string name="pill_see_lyrics">查看歌詞</string>
+  <string name="pill_album_width">專輯寬度</string>
+  <string name="pill_album_height">專輯高度</string>
+  <string name="pill_bottom_radius">底部圓角</string>
+  <string name="pill_ring_padding">圓環間距</string>
+  <string name="pill_actions_height">混合/喜歡高度</string>
+  <string name="pill_play_size">播放鍵大小</string>
+  <string name="pill_play_height">播放鍵高度</string>
+  <string name="pill_skip_size">上下首大小</string>
+  <string name="pill_skip_side">上下首邊距</string>
+  <string name="pill_skip_height">上下首高度</string>
+  <string name="pill_reset">重設膠囊播放器</string>
 </resources>

@@ -29,6 +29,8 @@ class SettingsUseCases(
         val VERSE_MESH_ANIMATED = PreferencesManager.Keys.VERSE_MESH_ANIMATED
         val DYNAMIC_COVER_TYPE = PreferencesManager.Keys.DYNAMIC_COVER_TYPE
         val PROGRESS_BAR_STYLE = PreferencesManager.Keys.PROGRESS_BAR_STYLE
+        val PLAYER_STYLE = PreferencesManager.Keys.PLAYER_STYLE
+        val PILL_PLAYER_TUNING = PreferencesManager.Keys.PILL_PLAYER_TUNING
         val EQ_ENABLED = PreferencesManager.Keys.EQ_ENABLED
         val EQ_BANDS = PreferencesManager.Keys.EQ_BANDS
         val LOUDNESS_NORMALIZATION_ENABLED = PreferencesManager.Keys.LOUDNESS_NORMALIZATION_ENABLED

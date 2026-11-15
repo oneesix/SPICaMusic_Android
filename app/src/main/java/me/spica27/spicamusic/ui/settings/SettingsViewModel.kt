@@ -27,6 +27,7 @@ import me.spica27.spicamusic.ui.home.page.defaultValue
 import me.spica27.spicamusic.ui.home.page.preferenceKey
 import me.spica27.spicamusic.ui.home.player_bar.BottomBarCustomization
 import me.spica27.spicamusic.ui.home.player_bar.BottomBarSetting
+import me.spica27.spicamusic.ui.player.PillPlayerTuning
 import me.spica27.spicamusic.ui.widget.VerseMeshSettings
 import me.spica27.spicamusic.ui.widget.VerseThemeMode
 
@@ -380,6 +381,53 @@ class SettingsViewModel(
     fun setProgressBarStyle(value: String) {
         viewModelScope.launch {
             settingsUseCases.setString(SettingsUseCases.Keys.PROGRESS_BAR_STYLE, value)
+        }
+    }
+
+    // 播放器样式（classic / pill）
+    val playerStyle =
+        settingsUseCases
+            .getString(
+                SettingsUseCases.Keys.PLAYER_STYLE,
+                PillPlayerTuning.STYLE_CLASSIC,
+            ).stateIn(viewModelScope, SharingStarted.Eagerly, PillPlayerTuning.STYLE_CLASSIC)
+
+    fun setPlayerStyle(value: String) {
+        viewModelScope.launch {
+            settingsUseCases.setString(SettingsUseCases.Keys.PLAYER_STYLE, value)
+        }
+    }
+
+    // Pill 播放器的布局调节
+    val pillPlayerTuning =
+        settingsUseCases
+            .getString(
+                SettingsUseCases.Keys.PILL_PLAYER_TUNING,
+                PillPlayerTuning.Default.encode(),
+            ).map { PillPlayerTuning.decode(it) }
+            .stateIn(viewModelScope, SharingStarted.Eagerly, PillPlayerTuning.Default)
+
+    fun setPillPlayerTuning(
+        index: Int,
+        value: Int,
+    ) {
+        val values = pillPlayerTuning.value.toList().toMutableList()
+        if (index !in values.indices) return
+        values[index] = value
+        viewModelScope.launch {
+            settingsUseCases.setString(
+                SettingsUseCases.Keys.PILL_PLAYER_TUNING,
+                PillPlayerTuning.fromList(values).encode(),
+            )
+        }
+    }
+
+    fun resetPillPlayerTuning() {
+        viewModelScope.launch {
+            settingsUseCases.setString(
+                SettingsUseCases.Keys.PILL_PLAYER_TUNING,
+                PillPlayerTuning.Default.encode(),
+            )
         }
     }
 }

@@ -686,6 +686,7 @@ fun ExpandedPlayerScreen(
                                                     onSettle = settleSurface,
                                                     onDragActive = { surfaceDragging = it },
                                                 ),
+                                            onCollapse = onCollapse,
                                         )
                                     }
                                 }
@@ -869,9 +870,45 @@ private fun PlayerPage(
     isSeekingState: Boolean = false,
     /** Swipe on the album cover (right to left) opens the lyrics. */
     coverSwipeModifier: Modifier = Modifier,
+    /** Collapses the full-screen player (used by the pill style's back button). */
+    onCollapse: () -> Unit = {},
 ) {
     // 读取动态封面设置
     val preferencesManager: PreferencesManager = koinInject()
+    val playerStyleValue by preferencesManager
+        .getString(PreferencesManager.Keys.PLAYER_STYLE, PillPlayerTuning.STYLE_CLASSIC)
+        .collectAsStateWithLifecycle(initialValue = PillPlayerTuning.STYLE_CLASSIC)
+    val pillTuningValue by preferencesManager
+        .getString(PreferencesManager.Keys.PILL_PLAYER_TUNING, PillPlayerTuning.Default.encode())
+        .collectAsStateWithLifecycle(initialValue = PillPlayerTuning.Default.encode())
+    if (playerStyleValue == PillPlayerTuning.STYLE_PILL) {
+        val pillTuning = remember(pillTuningValue) { PillPlayerTuning.decode(pillTuningValue) }
+        PillPlayerPage(
+            currentMediaItem = currentMediaItem,
+            seekPositionProvider = seekPositionProvider,
+            realPositionProvider = realPositionProvider,
+            duration = duration,
+            isPlaying = isPlaying,
+            isLike = isLike,
+            playMode = playMode,
+            isAppInForeground = isAppInForeground,
+            animationsEnabled = animationsEnabled,
+            tuning = pillTuning,
+            onValueChange = onValueChange,
+            onValueChangeFinished = onValueChangeFinished,
+            onPlayPauseClick = onPlayPauseClick,
+            onPreviousClick = onPreviousClick,
+            onNextClick = onNextClick,
+            onPlayModeClick = onPlayModeClick,
+            onFavoriteClick = onFavoriteClick,
+            onCollapse = onCollapse,
+            onPlaylistClick = onPlaylistClick,
+            onLyricsClick = onLyricsClick,
+            modifier = modifier,
+            coverSwipeModifier = coverSwipeModifier,
+        )
+        return
+    }
     val dynamicCoverTypeValue by preferencesManager
         .getString(PreferencesManager.Keys.DYNAMIC_COVER_TYPE, DynamicCoverType.ShiningStars.value)
         .collectAsStateWithLifecycle(initialValue = DynamicCoverType.ShiningStars.value)

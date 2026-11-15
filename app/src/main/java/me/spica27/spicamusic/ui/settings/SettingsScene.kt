@@ -109,6 +109,7 @@ import me.spica27.spicamusic.ui.navigation.IgnoredSongsRoute
 import me.spica27.spicamusic.ui.navigation.LocalBackStack
 import me.spica27.spicamusic.ui.navigation.SleepTimerRoute
 import me.spica27.spicamusic.ui.player.LocalPlayerViewModel
+import me.spica27.spicamusic.ui.player.PillPlayerTuning
 import me.spica27.spicamusic.ui.player.formatSleepTimerRemaining
 import me.spica27.spicamusic.ui.theme.EaseOutEmphasized
 import me.spica27.spicamusic.ui.theme.LayoutTokens
@@ -156,6 +157,8 @@ fun SettingsScreen() {
     val verseMesh by viewModel.verseMesh.collectAsStateWithLifecycle()
     val coverTapValue by viewModel.dynamicCoverType.collectAsStateWithLifecycle()
     val progressWaveformValue by viewModel.progressBarStyle.collectAsStateWithLifecycle()
+    val playerStyleValue by viewModel.playerStyle.collectAsStateWithLifecycle()
+    val pillTuning by viewModel.pillPlayerTuning.collectAsStateWithLifecycle()
     val colorStyleValue by viewModel.themeColorStyle.collectAsStateWithLifecycle()
     val lyricsStyle by viewModel.lyricsStyle.collectAsStateWithLifecycle()
     val playerViewModel = LocalPlayerViewModel.current
@@ -350,6 +353,7 @@ fun SettingsScreen() {
                 val backgroundOptions = rememberBackgroundOptions()
                 val coverTapOptions = rememberCoverTapOptions()
                 val progressWaveformOptions = rememberProgressWaveformOptions()
+                val playerStyleOptions = rememberPlayerStyleOptions()
                 SettingsSectionCard(
                     title = stringResource(R.string.settings_section_player_visual),
                     subtitle = stringResource(R.string.settings_section_player_visual_subtitle),
@@ -421,6 +425,25 @@ fun SettingsScreen() {
                         onExpandChange = { expandedRowKey = it },
                         onValueChange = viewModel::setProgressBarStyle,
                     )
+                    SettingsItemDivider()
+                    InlineSelectRow(
+                        rowKey = "player_style",
+                        title = stringResource(R.string.settings_player_style),
+                        summary = stringResource(R.string.settings_player_style_subtitle),
+                        icon = Icons.Default.Album,
+                        options = playerStyleOptions,
+                        currentValue = playerStyleValue,
+                        expandedKey = expandedRowKey,
+                        onExpandChange = { expandedRowKey = it },
+                        onValueChange = viewModel::setPlayerStyle,
+                    )
+                    AnimatedVisibility(visible = playerStyleValue == PillPlayerTuning.STYLE_PILL) {
+                        PillPlayerControls(
+                            tuning = pillTuning,
+                            onChange = viewModel::setPillPlayerTuning,
+                            onReset = viewModel::resetPillPlayerTuning,
+                        )
+                    }
                 }
             }
 
@@ -1255,6 +1278,74 @@ private fun rememberProgressWaveformOptions(): ImmutableList<SettingsOption> {
                     Icons.Default.AutoAwesome,
                 ),
             ),
+        )
+    }
+}
+
+@Composable
+private fun rememberPlayerStyleOptions(): ImmutableList<SettingsOption> {
+    val classic = stringResource(R.string.player_style_classic)
+    val classicDesc = stringResource(R.string.player_style_classic_desc)
+    val pill = stringResource(R.string.player_style_pill)
+    val pillDesc = stringResource(R.string.player_style_pill_desc)
+    return remember(classic, classicDesc, pill, pillDesc) {
+        ImmutableList.copyOf(
+            listOf(
+                SettingsOption(PillPlayerTuning.STYLE_CLASSIC, classic, classicDesc, Icons.Default.Album),
+                SettingsOption(PillPlayerTuning.STYLE_PILL, pill, pillDesc, Icons.Default.ViewAgenda),
+            ),
+        )
+    }
+}
+
+/** Pill 播放器的布局调节：专辑、圆环、播放键、上下曲和混合/喜欢按钮位置。 */
+@Composable
+private fun PillPlayerControls(
+    tuning: PillPlayerTuning,
+    onChange: (Int, Int) -> Unit,
+    onReset: () -> Unit,
+) {
+    @Composable
+    fun PillSlider(
+        label: Int,
+        index: Int,
+        value: Int,
+        range: IntRange,
+        step: Int = 1,
+    ) = LyricsSettingsSlider(
+        label = stringResource(label),
+        description = "",
+        value = value,
+        range = range,
+        step = step,
+        valueText = { "$it dp" },
+        onValueChange = { onChange(index, it) },
+    )
+
+    Column(
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .padding(
+                    start = SettingsRowContentInset,
+                    end = Spacing.Large,
+                    top = Spacing.ExtraSmall,
+                    bottom = Spacing.Small,
+                ),
+    ) {
+        PillSlider(R.string.pill_album_width, 0, tuning.albumWidthDp, 120..300, 2)
+        PillSlider(R.string.pill_album_height, 1, tuning.albumHeightDp, 200..420, 2)
+        PillSlider(R.string.pill_bottom_radius, 2, tuning.bottomRadiusDp, 0..150, 2)
+        PillSlider(R.string.pill_ring_padding, 3, tuning.ringPaddingDp, -30..30)
+        PillSlider(R.string.pill_actions_height, 4, tuning.actionsHeightDp, -20..60)
+        PillSlider(R.string.pill_play_size, 5, tuning.playSizeDp, 40..90)
+        PillSlider(R.string.pill_play_height, 6, tuning.playHeightDp, -20..80)
+        PillSlider(R.string.pill_skip_size, 7, tuning.skipSizeDp, 20..50)
+        PillSlider(R.string.pill_skip_side, 8, tuning.skipSideDp, 0..60)
+        PillSlider(R.string.pill_skip_height, 9, tuning.skipHeightDp, -60..60)
+        LyricsSettingsResetButton(
+            text = stringResource(R.string.pill_reset),
+            onClick = onReset,
         )
     }
 }

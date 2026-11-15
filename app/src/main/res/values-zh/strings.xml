@@ -1250,4 +1250,22 @@
   <string name="blur_style_sub">普通：全强度模糊，平滑渐隐。Haze：模糊向边缘逐渐减弱。</string>
   <string name="blur_style_normal">普通</string>
   <string name="blur_style_haze">Haze</string>
+  <string name="settings_player_style">播放器样式</string>
+  <string name="settings_player_style_subtitle">全屏播放器的布局</string>
+  <string name="player_style_classic">经典</string>
+  <string name="player_style_classic_desc">方形封面与波形进度条</string>
+  <string name="player_style_pill">胶囊</string>
+  <string name="player_style_pill_desc">扁平长封面与圆环进度条</string>
+  <string name="pill_see_lyrics">查看歌词</string>
+  <string name="pill_album_width">专辑宽度</string>
+  <string name="pill_album_height">专辑高度</string>
+  <string name="pill_bottom_radius">底部圆角</string>
+  <string name="pill_ring_padding">圆环间距</string>
+  <string name="pill_actions_height">混合/喜欢高度</string>
+  <string name="pill_play_size">播放键大小</string>
+  <string name="pill_play_height">播放键高度</string>
+  <string name="pill_skip_size">上下曲大小</string>
+  <string name="pill_skip_side">上下曲边距</string>
+  <string name="pill_skip_height">上下曲高度</string>
+  <string name="pill_reset">重置胶囊播放器</string>
 </resources>
