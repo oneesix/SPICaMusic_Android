@@ -1,0 +1,22 @@
+diff --git a/app/src/main/java/me/spica27/spicamusic/ui/widget/BlurPlusBackground.kt b/app/src/main/java/me/spica27/spicamusic/ui/widget/BlurPlusBackground.kt
+index f9abe9d..58726e7 100644
+--- a/app/src/main/java/me/spica27/spicamusic/ui/widget/BlurPlusBackground.kt
++++ b/app/src/main/java/me/spica27/spicamusic/ui/widget/BlurPlusBackground.kt
+@@ -176,7 +176,7 @@ fun BlurPlusBackground(
+ ) {
+     val density = LocalDensity.current
+     val surface = MaterialTheme.colorScheme.surface
+-    val radiusPx = with(density) { (settings.blur.coerceIn(0, 100) * 0.8f).dp.toPx() }
++    val radiusPx = settings.blur.coerceIn(0, 100) * 0.8f * density.density
+     val canBlur = Build.VERSION.SDK_INT >= Build.VERSION_CODES.S
+     val paint =
+         remember(settings.exposure, settings.brightness, settings.contrast) {
+@@ -239,7 +239,7 @@ fun BlurPlusBackground(
+                 .matchParentSize()
+                 .drawBehind {
+                     if (grainAlpha > 0f) drawRect(brush = grainBrush, alpha = grainAlpha, blendMode = BlendMode.Overlay)
+-                    if (noiseAlpha > 0f) drawRect(brush = noiseBrush, alpha = noiseAlpha, blendMode = BlendMode.SoftLight)
++                    if (noiseAlpha > 0f) drawRect(brush = noiseBrush, alpha = noiseAlpha, blendMode = BlendMode.Softlight)
+                 },
+         )
+     }
