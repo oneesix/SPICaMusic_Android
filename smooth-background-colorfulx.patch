@@ -1,0 +1,946 @@
+diff --git a/app/src/main/java/me/spica27/spicamusic/ui/player/ExpandedPlayerScreen.kt b/app/src/main/java/me/spica27/spicamusic/ui/player/ExpandedPlayerScreen.kt
+index 45cb137..7a35fec 100644
+--- a/app/src/main/java/me/spica27/spicamusic/ui/player/ExpandedPlayerScreen.kt
++++ b/app/src/main/java/me/spica27/spicamusic/ui/player/ExpandedPlayerScreen.kt
+@@ -138,6 +138,7 @@ import me.spica27.spicamusic.ui.widget.DynamicPlayerColorScope
+ import me.spica27.spicamusic.ui.widget.FluidMusicBackground
+ import me.spica27.spicamusic.ui.widget.rememberDynamicPlayerColors
+ import org.koin.compose.viewmodel.koinActivityViewModel
++import me.spica27.spicamusic.ui.widget.SmoothBackground
+ import me.spica27.spicamusic.ui.widget.VerseFlowBackground
+ import me.spica27.spicamusic.ui.widget.VerseFlowThemeScope
+ import me.spica27.spicamusic.ui.widget.rememberVerseTheme
+@@ -484,13 +485,18 @@ fun ExpandedPlayerScreen(
+     val verseHue by settingsViewModel.verseHue.collectAsStateWithLifecycle()
+     val verseMesh by settingsViewModel.verseMesh.collectAsStateWithLifecycle()
+     val isVerseFlow = backgroundValue == DynamicSpectrumBackground.VerseFlow.value
++    // Smooth: ColorfulX-style gradient. With "Color player UI" on, text / icons / sliders (and the
++    // lyrics) use the album colours through the same theme scope Verse Flow uses.
++    val smoothSettings by settingsViewModel.smooth.collectAsStateWithLifecycle()
++    val isSmooth = backgroundValue == DynamicSpectrumBackground.Smooth.value
++    val useAlbumTheme = isVerseFlow || (isSmooth && smoothSettings.colorUi)
+     val verseTheme =
+         rememberVerseTheme(
+-            coverUri = if (isVerseFlow) currentMediaItem?.mediaMetadata?.artworkUri else null,
+-            mode = verseMode,
+-            saturationPercent = verseSaturation,
++            coverUri = if (useAlbumTheme) currentMediaItem?.mediaMetadata?.artworkUri else null,
++            mode = if (isSmooth) smoothSettings.themeMode else verseMode,
++            saturationPercent = if (isSmooth) smoothSettings.saturationPercent else verseSaturation,
+             vibrancyPercent = verseVibrancy,
+-            hueShift = verseHue,
++            hueShift = if (isSmooth) 0 else verseHue,
+         )
+     // Color player UI: colours from the album art (null = off).
+     val dynamicStyleViewModel: LyricsStyleViewModel = koinActivityViewModel()
+@@ -507,7 +513,7 @@ fun ExpandedPlayerScreen(
+         )
+     val lyricsScrimColor = MaterialTheme.colorScheme.scrim.copy(alpha = 0.14f)
+ 
+-    PlayerThemeScope(isVerseFlow = isVerseFlow, theme = verseTheme, dynamicColors = dynamicColors) {
++    PlayerThemeScope(isVerseFlow = useAlbumTheme, theme = verseTheme, dynamicColors = dynamicColors) {
+         Box(
+             modifier =
+                 modifier
+@@ -537,17 +543,29 @@ fun ExpandedPlayerScreen(
+                     )
+                 } else {
+                     // 仅在页面可见且应用在前台时启用动态背景。
+-                    FluidMusicBackground(
+-                        modifier =
+-                            Modifier
+-                                .fillMaxSize()
+-                                // 队列顶栏在关闭玻璃时仍需采样动态背景，用于渐变模糊。
+-                                .hazeSource(hazeState),
+-                        coverColor = coverColor,
+-                        isDarkMode = MaterialTheme.colorScheme.surface.luminance() < 0.5f,
+-                        coverUri = { currentMediaItem?.mediaMetadata?.artworkUri },
+-                        enabled = animationsEnabled && isAppInForeground,
+-                    )
++                    if (isSmooth) {
++                        SmoothBackground(
++                            coverUri = currentMediaItem?.mediaMetadata?.artworkUri,
++                            settings = smoothSettings,
++                            enabled = animationsEnabled && isAppInForeground,
++                            modifier =
++                                Modifier
++                                    .fillMaxSize()
++                                    .hazeSource(hazeState),
++                        )
++                    } else {
++                        FluidMusicBackground(
++                            modifier =
++                                Modifier
++                                    .fillMaxSize()
++                                    // 队列顶栏在关闭玻璃时仍需采样动态背景，用于渐变模糊。
++                                    .hazeSource(hazeState),
++                            coverColor = coverColor,
++                            isDarkMode = MaterialTheme.colorScheme.surface.luminance() < 0.5f,
++                            coverUri = { currentMediaItem?.mediaMetadata?.artworkUri },
++                            enabled = animationsEnabled && isAppInForeground,
++                        )
++                    }
+ 
+                     // Color player UI > Color background: an album-colour tint on top of the animated background.
+                     dynamicColors?.backgroundTint?.let { tint ->
+diff --git a/app/src/main/java/me/spica27/spicamusic/ui/settings/SettingsScene.kt b/app/src/main/java/me/spica27/spicamusic/ui/settings/SettingsScene.kt
+index 24fbdd2..51359a4 100644
+--- a/app/src/main/java/me/spica27/spicamusic/ui/settings/SettingsScene.kt
++++ b/app/src/main/java/me/spica27/spicamusic/ui/settings/SettingsScene.kt
+@@ -122,6 +122,7 @@ import me.spica27.spicamusic.ui.widget.LyricsSettingsResetButton
+ import me.spica27.spicamusic.ui.widget.LyricsSettingsSection
+ import me.spica27.spicamusic.ui.widget.LyricsSettingsSlider
+ import me.spica27.spicamusic.ui.widget.LyricsSettingsToggle
++import me.spica27.spicamusic.ui.widget.SmoothSettings
+ import me.spica27.spicamusic.ui.widget.VerseMeshSettings
+ import me.spica27.spicamusic.ui.widget.VerseThemeMode
+ import me.spica27.spicamusic.ui.widget.clickHighlight
+@@ -155,6 +156,7 @@ fun SettingsScreen() {
+     val verseVibrancy by viewModel.verseVibrancy.collectAsStateWithLifecycle()
+     val verseHue by viewModel.verseHue.collectAsStateWithLifecycle()
+     val verseMesh by viewModel.verseMesh.collectAsStateWithLifecycle()
++    val smooth by viewModel.smooth.collectAsStateWithLifecycle()
+     val coverTapValue by viewModel.dynamicCoverType.collectAsStateWithLifecycle()
+     val progressWaveformValue by viewModel.progressBarStyle.collectAsStateWithLifecycle()
+     val playerStyleValue by viewModel.playerStyle.collectAsStateWithLifecycle()
+@@ -401,6 +403,23 @@ fun SettingsScreen() {
+                             onReset = viewModel::resetVerseMesh,
+                         )
+                     }
++                    AnimatedVisibility(
++                        visible = backgroundValue == DynamicSpectrumBackground.Smooth.value,
++                        enter =
++                            expandVertically(
++                                animationSpec = tween(durationMillis = 220, easing = EaseOutEmphasized),
++                            ) + fadeIn(tween(durationMillis = 180)),
++                        exit =
++                            shrinkVertically(
++                                animationSpec = tween(durationMillis = 180, easing = EaseOutEmphasized),
++                            ) + fadeOut(tween(durationMillis = 140)),
++                    ) {
++                        SmoothControls(
++                            settings = smooth,
++                            onChange = viewModel::updateSmooth,
++                            onReset = viewModel::resetSmooth,
++                        )
++                    }
+ //                        SettingsItemDivider()
+ //                        InlineSelectRow(
+ //                            rowKey = "cover_tap",
+@@ -1149,7 +1168,11 @@ private fun rememberBackgroundOptions(): ImmutableList<SettingsOption> {
+     val blurDesc = stringResource(R.string.bg_blur_cover_desc)
+     val verse = stringResource(R.string.bg_verse_flow)
+     val verseDesc = stringResource(R.string.bg_verse_flow_desc)
++    val smooth = stringResource(R.string.bg_smooth)
++    val smoothDesc = stringResource(R.string.bg_smooth_desc)
+     return remember(
++        smooth,
++        smoothDesc,
+         verse,
+         verseDesc,
+         off,
+@@ -1173,6 +1196,12 @@ private fun rememberBackgroundOptions(): ImmutableList<SettingsOption> {
+                     verseDesc,
+                     Icons.Default.Palette,
+                 ),
++                SettingsOption(
++                    DynamicSpectrumBackground.Smooth.value,
++                    smooth,
++                    smoothDesc,
++                    Icons.Default.AutoAwesome,
++                ),
+                 SettingsOption(
+                     DynamicSpectrumBackground.FluidWarp.value,
+                     warp,
+@@ -1841,6 +1870,144 @@ private fun VerseAppearanceControls(
+     }
+ }
+ 
++/** Smooth (ColorfulX style) background: every setting of the gradient, plus colour UI and freeze. */
++@Composable
++private fun SmoothControls(
++    settings: SmoothSettings,
++    onChange: (SmoothSettings) -> Unit,
++    onReset: () -> Unit,
++) {
++    fun tenths(v: Int) = "${v / 10}.${v % 10}"
++    Column(
++        modifier =
++            Modifier
++                .fillMaxWidth()
++                .padding(
++                    start = SettingsRowContentInset,
++                    end = Spacing.Large,
++                    top = Spacing.ExtraSmall,
++                    bottom = Spacing.Small,
++                ),
++    ) {
++        LyricsSettingsToggle(
++            label = stringResource(R.string.smooth_color_ui),
++            description = stringResource(R.string.smooth_color_ui_desc),
++            checked = settings.colorUi,
++            onCheckedChange = { onChange(settings.copy(colorUi = it)) },
++        )
++        LyricsSettingsToggle(
++            label = stringResource(R.string.smooth_freeze),
++            description = stringResource(R.string.smooth_freeze_desc),
++            checked = settings.freeze,
++            onCheckedChange = { onChange(settings.copy(freeze = it)) },
++        )
++        if (settings.colorUi) {
++            LyricsSettingsChips(
++                label = stringResource(R.string.verse_mode),
++                description = stringResource(R.string.verse_mode_desc),
++                options = listOf(VerseThemeMode.AUTO, VerseThemeMode.LIGHT, VerseThemeMode.DARK),
++                selected = settings.themeMode,
++                optionLabel = {
++                    when (it) {
++                        VerseThemeMode.LIGHT -> stringResource(R.string.verse_mode_light)
++                        VerseThemeMode.DARK -> stringResource(R.string.verse_mode_dark)
++                        else -> stringResource(R.string.verse_mode_auto)
++                    }
++                },
++                onSelect = { onChange(settings.copy(themeMode = it)) },
++            )
++        }
++        LyricsSettingsSlider(
++            label = stringResource(R.string.verse_saturation),
++            description = stringResource(R.string.verse_saturation_desc),
++            value = settings.saturationPercent,
++            range = 0..200,
++            step = 5,
++            valueText = { "$it%" },
++            onValueChange = { onChange(settings.copy(saturationPercent = it)) },
++        )
++        // Speed, colour change and frame limit only matter while the background moves.
++        if (!settings.freeze) {
++            LyricsSettingsSlider(
++                label = stringResource(R.string.smooth_speed),
++                description = stringResource(R.string.smooth_speed_desc),
++                value = settings.speedTenths,
++                range = 0..30,
++                step = 1,
++                valueText = { tenths(it) + "x" },
++                onValueChange = { onChange(settings.copy(speedTenths = it)) },
++            )
++            LyricsSettingsSlider(
++                label = stringResource(R.string.smooth_transition),
++                description = stringResource(R.string.smooth_transition_desc),
++                value = settings.transitionTenths,
++                range = 5..80,
++                step = 5,
++                valueText = { tenths(it) },
++                onValueChange = { onChange(settings.copy(transitionTenths = it)) },
++            )
++            LyricsSettingsSlider(
++                label = stringResource(R.string.smooth_frame_limit),
++                description = stringResource(R.string.smooth_frame_limit_desc),
++                value = settings.frameLimit,
++                range = 15..120,
++                step = 15,
++                valueText = { "$it fps" },
++                onValueChange = { onChange(settings.copy(frameLimit = it)) },
++            )
++        }
++        LyricsSettingsSlider(
++            label = stringResource(R.string.smooth_bias),
++            description = stringResource(R.string.smooth_bias_desc),
++            value = settings.biasMilli,
++            range = 2..200,
++            step = 2,
++            valueText = { "0." + it.toString().padStart(3, '0') },
++            onValueChange = { onChange(settings.copy(biasMilli = it)) },
++        )
++        LyricsSettingsSlider(
++            label = stringResource(R.string.smooth_power),
++            description = stringResource(R.string.smooth_power_desc),
++            value = settings.powerTenths,
++            range = 10..80,
++            step = 5,
++            valueText = { tenths(it) },
++            onValueChange = { onChange(settings.copy(powerTenths = it)) },
++        )
++        LyricsSettingsSlider(
++            label = stringResource(R.string.smooth_noise),
++            description = stringResource(R.string.smooth_noise_desc),
++            value = settings.noise,
++            range = 0..30,
++            step = 1,
++            valueText = { "$it" },
++            onValueChange = { onChange(settings.copy(noise = it)) },
++        )
++        LyricsSettingsSlider(
++            label = stringResource(R.string.smooth_render_scale),
++            description = stringResource(R.string.smooth_render_scale_desc),
++            value = settings.renderScalePercent,
++            range = 25..100,
++            step = 5,
++            valueText = { "$it%" },
++            onValueChange = { onChange(settings.copy(renderScalePercent = it)) },
++        )
++        LyricsSettingsSlider(
++            label = stringResource(R.string.smooth_dim),
++            description = stringResource(R.string.smooth_dim_desc),
++            value = settings.dimPercent,
++            range = 0..70,
++            step = 5,
++            valueText = { "$it%" },
++            onValueChange = { onChange(settings.copy(dimPercent = it)) },
++        )
++        LyricsSettingsResetButton(
++            text = stringResource(R.string.smooth_reset),
++            onClick = onReset,
++        )
++    }
++}
++
+ /** Verse Flow 歌词页色块：数量、大小、不透明度、颜色、动效速度，以及动画开关（关闭后完全静态）。 */
+ @Composable
+ private fun VerseBlobControls(
+diff --git a/app/src/main/java/me/spica27/spicamusic/ui/settings/SettingsViewModel.kt b/app/src/main/java/me/spica27/spicamusic/ui/settings/SettingsViewModel.kt
+index e2e9fce..4454ae2 100644
+--- a/app/src/main/java/me/spica27/spicamusic/ui/settings/SettingsViewModel.kt
++++ b/app/src/main/java/me/spica27/spicamusic/ui/settings/SettingsViewModel.kt
+@@ -28,6 +28,7 @@ import me.spica27.spicamusic.ui.home.page.preferenceKey
+ import me.spica27.spicamusic.ui.home.player_bar.BottomBarCustomization
+ import me.spica27.spicamusic.ui.home.player_bar.BottomBarSetting
+ import me.spica27.spicamusic.ui.player.PillPlayerTuning
++import me.spica27.spicamusic.ui.widget.SmoothSettings
+ import me.spica27.spicamusic.ui.widget.VerseMeshSettings
+ import me.spica27.spicamusic.ui.widget.VerseThemeMode
+ 
+@@ -356,6 +357,66 @@ class SettingsViewModel(
+         }
+     }
+ 
++    // ---- Smooth background (ColorfulX style) ----
++    private val smoothDefaults = SmoothSettings()
++    private val smoothColorUi = settingsUseCases.getBoolean(SettingsUseCases.Keys.SMOOTH_COLOR_UI, smoothDefaults.colorUi)
++    private val smoothFreeze = settingsUseCases.getBoolean(SettingsUseCases.Keys.SMOOTH_FREEZE, smoothDefaults.freeze)
++    private val smoothSpeed = settingsUseCases.getInt(SettingsUseCases.Keys.SMOOTH_SPEED, smoothDefaults.speedTenths)
++    private val smoothBias = settingsUseCases.getInt(SettingsUseCases.Keys.SMOOTH_BIAS, smoothDefaults.biasMilli)
++    private val smoothNoise = settingsUseCases.getInt(SettingsUseCases.Keys.SMOOTH_NOISE, smoothDefaults.noise)
++    private val smoothTransition = settingsUseCases.getInt(SettingsUseCases.Keys.SMOOTH_TRANSITION, smoothDefaults.transitionTenths)
++    private val smoothPower = settingsUseCases.getInt(SettingsUseCases.Keys.SMOOTH_POWER, smoothDefaults.powerTenths)
++    private val smoothFrameLimit = settingsUseCases.getInt(SettingsUseCases.Keys.SMOOTH_FRAME_LIMIT, smoothDefaults.frameLimit)
++    private val smoothRenderScale = settingsUseCases.getInt(SettingsUseCases.Keys.SMOOTH_RENDER_SCALE, smoothDefaults.renderScalePercent)
++    private val smoothDim = settingsUseCases.getInt(SettingsUseCases.Keys.SMOOTH_DIM, smoothDefaults.dimPercent)
++    private val smoothThemeMode = settingsUseCases.getString(SettingsUseCases.Keys.SMOOTH_THEME_MODE, smoothDefaults.themeMode)
++    private val smoothSaturation = settingsUseCases.getInt(SettingsUseCases.Keys.SMOOTH_SATURATION, smoothDefaults.saturationPercent)
++
++    val smooth =
++        combine(
++            combine(smoothColorUi, smoothFreeze, smoothSpeed, smoothBias, smoothNoise) { c, f, s, b, n ->
++                SmoothSettings(colorUi = c, freeze = f, speedTenths = s, biasMilli = b, noise = n)
++            },
++            combine(smoothTransition, smoothPower, smoothFrameLimit, smoothRenderScale, smoothDim) { t, p, fl, rs, d ->
++                intArrayOf(t, p, fl, rs, d)
++            },
++            combine(smoothThemeMode, smoothSaturation) { m, s -> m to s },
++        ) { a, b, c ->
++            a.copy(
++                speedTenths = a.speedTenths.coerceIn(0, 30),
++                biasMilli = a.biasMilli.coerceIn(2, 200),
++                noise = a.noise.coerceIn(0, 30),
++                transitionTenths = b[0].coerceIn(5, 80),
++                powerTenths = b[1].coerceIn(10, 80),
++                frameLimit = b[2].coerceIn(15, 120),
++                renderScalePercent = b[3].coerceIn(25, 100),
++                dimPercent = b[4].coerceIn(0, 70),
++                themeMode = c.first,
++                saturationPercent = c.second.coerceIn(0, 200),
++            )
++        }.stateIn(viewModelScope, SharingStarted.Eagerly, SmoothSettings())
++
++    /** Only the fields that actually changed are written. */
++    fun updateSmooth(new: SmoothSettings) {
++        val old = smooth.value
++        viewModelScope.launch {
++            if (new.colorUi != old.colorUi) settingsUseCases.setBoolean(SettingsUseCases.Keys.SMOOTH_COLOR_UI, new.colorUi)
++            if (new.freeze != old.freeze) settingsUseCases.setBoolean(SettingsUseCases.Keys.SMOOTH_FREEZE, new.freeze)
++            if (new.speedTenths != old.speedTenths) settingsUseCases.setInt(SettingsUseCases.Keys.SMOOTH_SPEED, new.speedTenths.coerceIn(0, 30))
++            if (new.biasMilli != old.biasMilli) settingsUseCases.setInt(SettingsUseCases.Keys.SMOOTH_BIAS, new.biasMilli.coerceIn(2, 200))
++            if (new.noise != old.noise) settingsUseCases.setInt(SettingsUseCases.Keys.SMOOTH_NOISE, new.noise.coerceIn(0, 30))
++            if (new.transitionTenths != old.transitionTenths) settingsUseCases.setInt(SettingsUseCases.Keys.SMOOTH_TRANSITION, new.transitionTenths.coerceIn(5, 80))
++            if (new.powerTenths != old.powerTenths) settingsUseCases.setInt(SettingsUseCases.Keys.SMOOTH_POWER, new.powerTenths.coerceIn(10, 80))
++            if (new.frameLimit != old.frameLimit) settingsUseCases.setInt(SettingsUseCases.Keys.SMOOTH_FRAME_LIMIT, new.frameLimit.coerceIn(15, 120))
++            if (new.renderScalePercent != old.renderScalePercent) settingsUseCases.setInt(SettingsUseCases.Keys.SMOOTH_RENDER_SCALE, new.renderScalePercent.coerceIn(25, 100))
++            if (new.dimPercent != old.dimPercent) settingsUseCases.setInt(SettingsUseCases.Keys.SMOOTH_DIM, new.dimPercent.coerceIn(0, 70))
++            if (new.themeMode != old.themeMode) settingsUseCases.setString(SettingsUseCases.Keys.SMOOTH_THEME_MODE, new.themeMode)
++            if (new.saturationPercent != old.saturationPercent) settingsUseCases.setInt(SettingsUseCases.Keys.SMOOTH_SATURATION, new.saturationPercent.coerceIn(0, 200))
++        }
++    }
++
++    fun resetSmooth() = updateSmooth(SmoothSettings())
++
+     // 动态封面
+     val dynamicCoverType =
+         settingsUseCases
+diff --git a/app/src/main/java/me/spica27/spicamusic/ui/widget/FluidMusicBackground.kt b/app/src/main/java/me/spica27/spicamusic/ui/widget/FluidMusicBackground.kt
+index 5d9106e..f17cc55 100644
+--- a/app/src/main/java/me/spica27/spicamusic/ui/widget/FluidMusicBackground.kt
++++ b/app/src/main/java/me/spica27/spicamusic/ui/widget/FluidMusicBackground.kt
+@@ -82,6 +82,7 @@ fun FluidMusicBackground(
+         remember(backgroundMode, enabled) {
+             backgroundMode != DynamicSpectrumBackground.OFF &&
+                 backgroundMode != DynamicSpectrumBackground.VerseFlow &&
++                backgroundMode != DynamicSpectrumBackground.Smooth &&
+                 backgroundMode != DynamicSpectrumBackground.BlurCover &&
+                 enabled
+         }
+@@ -137,6 +138,7 @@ fun FluidMusicBackground(
+ 
+         // Verse Flow 由播放器页面直接绘制（需要同时改变文字颜色），这里不重复绘制
+         DynamicSpectrumBackground.VerseFlow,
++        DynamicSpectrumBackground.Smooth,
+         DynamicSpectrumBackground.OFF,
+         ->
+             Box(modifier = modifier)
+diff --git a/app/src/main/java/me/spica27/spicamusic/ui/widget/SmoothBackground.kt b/app/src/main/java/me/spica27/spicamusic/ui/widget/SmoothBackground.kt
+new file mode 100644
+index 0000000..9aedfc1
+--- /dev/null
++++ b/app/src/main/java/me/spica27/spicamusic/ui/widget/SmoothBackground.kt
+@@ -0,0 +1,337 @@
++package me.spica27.spicamusic.ui.widget
++
++import android.graphics.RuntimeShader
++import android.net.Uri
++import android.os.Build
++import androidx.annotation.RequiresApi
++import androidx.compose.foundation.background
++import androidx.compose.foundation.layout.Box
++import androidx.compose.foundation.layout.fillMaxSize
++import androidx.compose.runtime.Composable
++import androidx.compose.runtime.LaunchedEffect
++import androidx.compose.runtime.getValue
++import androidx.compose.runtime.mutableStateOf
++import androidx.compose.runtime.remember
++import androidx.compose.runtime.rememberUpdatedState
++import androidx.compose.runtime.setValue
++import androidx.compose.runtime.withFrameNanos
++import androidx.compose.ui.Modifier
++import androidx.compose.ui.draw.drawBehind
++import androidx.compose.ui.graphics.Brush
++import androidx.compose.ui.graphics.Color
++import androidx.compose.ui.graphics.CompositingStrategy
++import androidx.compose.ui.graphics.ShaderBrush
++import androidx.compose.ui.graphics.TransformOrigin
++import androidx.compose.ui.layout.layout
++import androidx.compose.ui.platform.LocalContext
++import androidx.compose.ui.unit.Constraints
++import org.intellij.lang.annotations.Language
++import kotlin.math.abs
++import kotlin.math.cbrt
++import kotlin.math.exp
++import kotlin.math.max
++import kotlin.math.pow
++import kotlin.math.roundToInt
++import kotlin.random.Random
++
++/**
++ * "Smooth" player background (a port of the ColorfulX gradient): up to 8 colours taken from the
++ * album art are blended by distance in LAB colour space; the colour points drift around.
++ * All values are stored as Ints (see the *Tenths / *Milli fields) so they fit the settings store.
++ */
++data class SmoothSettings(
++    /** Player text / icons / sliders take their colours from the album art. */
++    val colorUi: Boolean = true,
++    /** true = the background stops moving (no per-frame work). */
++    val freeze: Boolean = false,
++    /** 0..30 -> 0.0..3.0 (ColorfulX speed, 0 = still). */
++    val speedTenths: Int = 10,
++    /** 2..200 -> 0.002..0.200 (ColorfulX bias: higher = softer). */
++    val biasMilli: Int = 10,
++    /** 0..30 pixels of grain (ColorfulX noise). */
++    val noise: Int = 8,
++    /** 5..80 -> 0.5..8.0 (how fast the colours change after a song change). */
++    val transitionTenths: Int = 35,
++    /** 10..80 -> 1.0..8.0 (ColorfulX blend power, 4 = default). */
++    val powerTenths: Int = 40,
++    /** 15..120 frames per second. */
++    val frameLimit: Int = 60,
++    /** 25..100 % of the screen resolution the gradient is drawn at. */
++    val renderScalePercent: Int = 50,
++    /** 0..70 % black on top, keeps text readable. */
++    val dimPercent: Int = 20,
++    /** Auto / light / dark text colours (when [colorUi] is on). */
++    val themeMode: String = VerseThemeMode.AUTO,
++    /** 0..200 % colour saturation of the album colours. */
++    val saturationPercent: Int = 100,
++)
++
++private const val SLOTS = 8
++
++/** Colours of one cover: LAB values (flattened, SLOTS * 3), the number of colours used, plus sRGB for the fallback. */
++private class SmoothPalette(
++    val lab: FloatArray,
++    val count: Int,
++    val rgb: List<Color>,
++)
++
++private class SmoothState {
++    val pos = FloatArray(SLOTS * 2) { Random.nextFloat() }
++    val tgt = FloatArray(SLOTS * 2) { Random.nextFloat() }
++    val cur = FloatArray(SLOTS * 3)
++    var snapped = false
++}
++
++private fun srgbToLinear(v: Float): Float = if (v > 0.04045f) ((v + 0.055f) / 1.055f).pow(2.4f) else v / 12.92f
++
++private fun rgbToLab(r255: Float, g255: Float, b255: Float): FloatArray {
++    val r = srgbToLinear(r255 / 255f)
++    val g = srgbToLinear(g255 / 255f)
++    val b = srgbToLinear(b255 / 255f)
++    val x = (r * 0.4124f + g * 0.3576f + b * 0.1805f) / 0.95047f
++    val y = r * 0.2126f + g * 0.7152f + b * 0.0722f
++    val z = (r * 0.0193f + g * 0.1192f + b * 0.9505f) / 1.08883f
++    fun f(t: Float) = if (t > 0.008856f) cbrt(t) else 7.787f * t + 16f / 116f
++    return floatArrayOf(116f * f(y) - 16f, 500f * (f(x) - f(y)), 200f * (f(y) - f(z)))
++}
++
++private val DefaultSmoothColors =
++    listOf(
++        intArrayOf(125, 20, 8),
++        intArrayOf(143, 26, 9),
++        intArrayOf(255, 170, 60),
++        intArrayOf(74, 11, 4),
++    )
++
++private fun buildSmoothPalette(
++    palette: VersePalette?,
++    saturation: Float,
++): SmoothPalette {
++    val source = palette?.clusters?.take(6)?.map { it.rgb } ?: DefaultSmoothColors
++    val colors = if (source.size >= 4) source else List(4) { source[it % source.size] }
++    val lab = FloatArray(SLOTS * 3)
++    val rgb = ArrayList<Color>()
++    colors.forEachIndexed { i, c ->
++        // saturation: push the colour away from (or towards) its own grey
++        val gray = 0.299f * c[0] + 0.587f * c[1] + 0.114f * c[2]
++        val r = (gray + (c[0] - gray) * saturation).coerceIn(0f, 255f)
++        val g = (gray + (c[1] - gray) * saturation).coerceIn(0f, 255f)
++        val b = (gray + (c[2] - gray) * saturation).coerceIn(0f, 255f)
++        val l = rgbToLab(r, g, b)
++        lab[i * 3] = l[0]
++        lab[i * 3 + 1] = l[1]
++        lab[i * 3 + 2] = l[2]
++        rgb.add(Color(r.roundToInt(), g.roundToInt(), b.roundToInt()))
++    }
++    return SmoothPalette(lab, colors.size.coerceAtMost(SLOTS), rgb)
++}
++
++private fun snapColors(
++    s: SmoothState,
++    p: SmoothPalette,
++) {
++    for (i in 0 until SLOTS * 3) s.cur[i] = p.lab[i]
++    s.snapped = true
++}
++
++private fun stepState(
++    s: SmoothState,
++    p: SmoothPalette,
++    dt: Float,
++    speed: Float,
++    transition: Float,
++) {
++    // colours ease towards the new palette (after a song change)
++    val k = 1f - exp(-dt * transition)
++    for (i in 0 until SLOTS * 3) s.cur[i] += (p.lab[i] - s.cur[i]) * k
++    // points drift towards random targets; a new target is picked when one is close (as in ColorfulX)
++    val m = 1f - exp(-dt * speed * 0.5f)
++    for (i in 0 until p.count) {
++        val x = i * 2
++        val y = x + 1
++        s.pos[x] += (s.tgt[x] - s.pos[x]) * m
++        s.pos[y] += (s.tgt[y] - s.pos[y]) * m
++        if (abs(s.pos[x] - s.tgt[x]) < 0.125f || abs(s.pos[y] - s.tgt[y]) < 0.125f) {
++            s.tgt[x] = Random.nextFloat()
++            s.tgt[y] = Random.nextFloat()
++        }
++    }
++}
++
++@Language("AGSL")
++private const val SMOOTH_SHADER =
++    """
++    uniform float2 resolution;
++    uniform float bias;
++    uniform float noise;
++    uniform float power;
++    uniform float count;
++    uniform float2 pts[8];
++    uniform float3 cols[8];
++
++    float2 hash23(float3 p3) {
++        p3 = fract(p3 * float3(443.897, 441.423, 0.0973));
++        p3 += dot(p3, p3.yzx + 19.19);
++        return fract((p3.xx + p3.yz) * p3.zy);
++    }
++
++    float labInv(float t, float f) {
++        return t > 0.008856 ? t : (f - 16.0 / 116.0) / 7.787;
++    }
++
++    float gamma(float c) {
++        c = clamp(c, 0.0, 1.0);
++        return c <= 0.0031308 ? 12.92 * c : 1.055 * pow(c, 1.0 / 2.4) - 0.055;
++    }
++
++    float3 lab2rgb(float3 lab) {
++        float y = (lab.x + 16.0) / 116.0;
++        float x = lab.y / 500.0 + y;
++        float z = y - lab.z / 200.0;
++        float X = labInv(x * x * x, x) * 0.95047;
++        float Y = labInv(y * y * y, y);
++        float Z = labInv(z * z * z, z) * 1.08883;
++        float r = X * 3.2406 + Y * -1.5372 + Z * -0.4986;
++        float g = X * -0.9689 + Y * 1.8758 + Z * 0.0415;
++        float b = X * 0.0557 + Y * -0.2040 + Z * 1.0570;
++        return float3(gamma(r), gamma(g), gamma(b));
++    }
++
++    half4 main(float2 fragCoord) {
++        float2 n = hash23(float3(fragCoord / float2(resolution.x, resolution.x), 0.0));
++        float2 uv = (fragCoord + sin(n * 6.2831853) * noise) / resolution.x;
++        float aspect = resolution.y / resolution.x;
++        float total = 0.0;
++        for (int i = 0; i < 8; i++) {
++            if (float(i) < count) {
++                float d = length(uv - pts[i] * float2(1.0, aspect));
++                total += 1.0 / (bias + pow(d, power));
++            }
++        }
++        float3 lab = float3(0.0);
++        for (int j = 0; j < 8; j++) {
++            if (float(j) < count) {
++                float d = length(uv - pts[j] * float2(1.0, aspect));
++                float c = 1.0 / (bias + pow(d, power));
++                lab += cols[j] * (c / total);
++            }
++        }
++        return half4(half3(lab2rgb(lab)), 1.0);
++    }
++    """
++
++/**
++ * Smooth background. [enabled] = false (app in background / animations off) behaves like [SmoothSettings.freeze].
++ * Needs Android 13+ (AGSL); older versions get a static album-colour gradient.
++ */
++@Composable
++fun SmoothBackground(
++    coverUri: Uri?,
++    settings: SmoothSettings,
++    enabled: Boolean,
++    modifier: Modifier = Modifier,
++) {
++    val context = LocalContext.current
++    var versePalette by remember(coverUri) { mutableStateOf<VersePalette?>(null) }
++    LaunchedEffect(coverUri) { versePalette = extractVersePalette(context, coverUri) }
++    val palette =
++        remember(versePalette, settings.saturationPercent) {
++            buildSmoothPalette(versePalette, settings.saturationPercent / 100f)
++        }
++    val dim = settings.dimPercent.coerceIn(0, 70) / 100f
++
++    Box(modifier = modifier) {
++        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
++            SmoothShaderLayer(
++                palette = palette,
++                settings = settings,
++                enabled = enabled,
++                modifier = Modifier.fillMaxSize(),
++            )
++        } else {
++            val colors = palette.rgb.take(3).let { if (it.size < 2) it + it else it }
++            Box(modifier = Modifier.fillMaxSize().background(Brush.verticalGradient(colors)))
++        }
++        Box(modifier = Modifier.fillMaxSize().background(Color.Black.copy(alpha = dim)))
++    }
++}
++
++@RequiresApi(Build.VERSION_CODES.TIRAMISU)
++@Composable
++private fun SmoothShaderLayer(
++    palette: SmoothPalette,
++    settings: SmoothSettings,
++    enabled: Boolean,
++    modifier: Modifier = Modifier,
++) {
++    val context = LocalContext.current
++    val state = remember { SmoothState() }
++    var tick by remember { mutableStateOf(0) }
++    val cfg by rememberUpdatedState(settings)
++    val pal by rememberUpdatedState(palette)
++    val running = enabled && !settings.freeze
++
++    // First frame, frozen, or paused: show the new colours at once (no animation).
++    LaunchedEffect(palette, running) {
++        if (!state.snapped || !running) {
++            snapColors(state, palette)
++            tick++
++        }
++    }
++
++    // Animation loop; it is not running at all while frozen.
++    LaunchedEffect(running, settings.frameLimit) {
++        if (!running) return@LaunchedEffect
++        val minDelta = 1_000_000_000L / settings.frameLimit.coerceAtLeast(1)
++        var last = 0L
++        while (true) {
++            withFrameNanos { now ->
++                if (last == 0L) {
++                    last = now
++                } else if (now - last >= minDelta) {
++                    val dt = ((now - last) / 1_000_000_000f).coerceAtMost(0.1f)
++                    last = now
++                    stepState(state, pal, dt, cfg.speedTenths / 10f, cfg.transitionTenths / 10f)
++                    tick++
++                }
++            }
++        }
++    }
++
++    val shader = remember { RuntimeShader(SMOOTH_SHADER) }
++    val brush = remember(shader) { ShaderBrush(shader) }
++    val scale = (settings.renderScalePercent / 100f).coerceIn(0.2f, 1f)
++    val screenWidth = context.resources.displayMetrics.widthPixels.toFloat()
++
++    Box(
++        modifier =
++            modifier
++                // Draw the gradient at a lower resolution and scale it up (render scale).
++                .layout { measurable, constraints ->
++                    val w = max(1, (constraints.maxWidth * scale).roundToInt())
++                    val h = max(1, (constraints.maxHeight * scale).roundToInt())
++                    val placeable = measurable.measure(Constraints.fixed(w, h))
++                    layout(constraints.maxWidth, constraints.maxHeight) {
++                        placeable.placeWithLayer(0, 0) {
++                            scaleX = constraints.maxWidth.toFloat() / w
++                            scaleY = constraints.maxHeight.toFloat() / h
++                            transformOrigin = TransformOrigin(0f, 0f)
++                            compositingStrategy = CompositingStrategy.Offscreen
++                        }
++                    }
++                }.drawBehind {
++                    @Suppress("UNUSED_VARIABLE")
++                    val redraw = tick // read so every step redraws
++                    val p = pal
++                    val c = cfg
++                    shader.setFloatUniform("resolution", size.width, size.height)
++                    shader.setFloatUniform("bias", c.biasMilli / 1000f)
++                    shader.setFloatUniform("noise", c.noise * (size.width / max(1f, screenWidth)))
++                    shader.setFloatUniform("power", c.powerTenths / 10f)
++                    shader.setFloatUniform("count", p.count.toFloat())
++                    shader.setFloatUniform("pts", state.pos.copyOf())
++                    shader.setFloatUniform("cols", state.cur.copyOf())
++                    drawRect(brush)
++                },
++    )
++}
+diff --git a/app/src/main/java/me/spica27/spicamusic/ui/widget/VerseFlowTheme.kt b/app/src/main/java/me/spica27/spicamusic/ui/widget/VerseFlowTheme.kt
+index 0b1854d..d6c43a0 100644
+--- a/app/src/main/java/me/spica27/spicamusic/ui/widget/VerseFlowTheme.kt
++++ b/app/src/main/java/me/spica27/spicamusic/ui/widget/VerseFlowTheme.kt
+@@ -386,7 +386,7 @@ fun buildVerseTheme(
+ // Palette extraction + remember helpers
+ // ---------------------------------------------------------------------------------------------
+ 
+-private suspend fun extractVersePalette(
++internal suspend fun extractVersePalette(
+     context: android.content.Context,
+     uri: Uri?,
+ ): VersePalette? =
+diff --git a/app/src/main/res/values-zh-rTW/strings.xml b/app/src/main/res/values-zh-rTW/strings.xml
+index 45d1302..17ebc12 100644
+--- a/app/src/main/res/values-zh-rTW/strings.xml
++++ b/app/src/main/res/values-zh-rTW/strings.xml
+@@ -725,6 +725,29 @@
+   <string name="bg_blur_cover_desc">僅對封面做模糊處理，最省電</string>
+   <string name="bg_verse_flow">Verse 流光</string>
+   <string name="bg_verse_flow_desc">隨封面變色的漸層背景，文字顏色同步變化，與 Verse 播放器一致</string>
++  <string name="bg_smooth">流暢漸層</string>
++  <string name="bg_smooth_desc">隨封面顏色流動的柔和漸層，並同步改變播放器文字和歌詞顏色</string>
++  <string name="smooth_color_ui">播放器介面取色</string>
++  <string name="smooth_color_ui_desc">文字、圖示、滑桿和歌詞使用封面顏色</string>
++  <string name="smooth_freeze">凍結背景</string>
++  <string name="smooth_freeze_desc">停止動畫（省電），顏色仍會隨歌曲變化</string>
++  <string name="smooth_speed">速度</string>
++  <string name="smooth_speed_desc">顏色流動的速度，0 = 靜止</string>
++  <string name="smooth_transition">換色速度</string>
++  <string name="smooth_transition_desc">切歌時顏色變化的快慢</string>
++  <string name="smooth_frame_limit">幀率上限</string>
++  <string name="smooth_frame_limit_desc">越低越省電</string>
++  <string name="smooth_bias">柔和度（bias）</string>
++  <string name="smooth_bias_desc">越高越柔和，顏色混合更多</string>
++  <string name="smooth_power">混合強度</string>
++  <string name="smooth_power_desc">越高色塊越集中，越低混合越寬</string>
++  <string name="smooth_noise">顆粒（noise）</string>
++  <string name="smooth_noise_desc">加入細微顆粒，減少色帶</string>
++  <string name="smooth_render_scale">渲染比例</string>
++  <string name="smooth_render_scale_desc">越低越省資源，越高越清晰</string>
++  <string name="smooth_dim">壓暗</string>
++  <string name="smooth_dim_desc">壓暗背景，讓文字更清晰</string>
++  <string name="smooth_reset">重設流暢漸層</string>
+   <string name="verse_mode">外觀</string>
+   <string name="verse_mode_desc">自動跟隨封面，淺色或深色則強制指定</string>
+   <string name="verse_mode_auto">自動</string>
+diff --git a/app/src/main/res/values-zh/strings.xml b/app/src/main/res/values-zh/strings.xml
+index e406f80..726c3ed 100644
+--- a/app/src/main/res/values-zh/strings.xml
++++ b/app/src/main/res/values-zh/strings.xml
+@@ -727,6 +727,29 @@
+   <string name="bg_blur_cover_desc">仅对封面做模糊处理，最省电</string>
+   <string name="bg_verse_flow">Verse 流光</string>
+   <string name="bg_verse_flow_desc">随封面变色的渐变背景，文字颜色同步变化，与 Verse 播放器一致</string>
++  <string name="bg_smooth">流畅渐变</string>
++  <string name="bg_smooth_desc">随封面颜色流动的柔和渐变，并同步改变播放器文字和歌词颜色</string>
++  <string name="smooth_color_ui">播放器界面取色</string>
++  <string name="smooth_color_ui_desc">文字、图标、滑块和歌词使用封面颜色</string>
++  <string name="smooth_freeze">冻结背景</string>
++  <string name="smooth_freeze_desc">停止动画（省电），颜色仍会随歌曲变化</string>
++  <string name="smooth_speed">速度</string>
++  <string name="smooth_speed_desc">颜色流动的速度，0 = 静止</string>
++  <string name="smooth_transition">换色速度</string>
++  <string name="smooth_transition_desc">切歌时颜色变化的快慢</string>
++  <string name="smooth_frame_limit">帧率上限</string>
++  <string name="smooth_frame_limit_desc">越低越省电</string>
++  <string name="smooth_bias">柔和度（bias）</string>
++  <string name="smooth_bias_desc">越高越柔和，颜色混合更多</string>
++  <string name="smooth_power">混合强度</string>
++  <string name="smooth_power_desc">越高色块越集中，越低混合越宽</string>
++  <string name="smooth_noise">颗粒（noise）</string>
++  <string name="smooth_noise_desc">添加细微颗粒，减少色带</string>
++  <string name="smooth_render_scale">渲染比例</string>
++  <string name="smooth_render_scale_desc">越低越省资源，越高越清晰</string>
++  <string name="smooth_dim">压暗</string>
++  <string name="smooth_dim_desc">压暗背景，让文字更清晰</string>
++  <string name="smooth_reset">重置流畅渐变</string>
+   <string name="verse_mode">外观</string>
+   <string name="verse_mode_desc">自动跟随封面，浅色或深色则强制指定</string>
+   <string name="verse_mode_auto">自动</string>
+diff --git a/app/src/main/res/values/strings.xml b/app/src/main/res/values/strings.xml
+index 1d9cc70..7457bcb 100644
+--- a/app/src/main/res/values/strings.xml
++++ b/app/src/main/res/values/strings.xml
+@@ -727,6 +727,29 @@
+   <string name="bg_blur_cover_desc">Simply blurs the album art. Easiest on battery</string>
+   <string name="bg_verse_flow">Verse Flow</string>
+   <string name="bg_verse_flow_desc">Album-tinted gradient with matching text colors, like the Verse player</string>
++  <string name="bg_smooth">Smooth</string>
++  <string name="bg_smooth_desc">Soft gradient that flows with the album colors, and recolors the player text and lyrics</string>
++  <string name="smooth_color_ui">Color player UI from art</string>
++  <string name="smooth_color_ui_desc">Text, icons, sliders and lyrics use the album colors</string>
++  <string name="smooth_freeze">Freeze background</string>
++  <string name="smooth_freeze_desc">Stops the movement (saves battery). Colors still change with the song</string>
++  <string name="smooth_speed">Speed</string>
++  <string name="smooth_speed_desc">How fast the colors drift. 0 = still</string>
++  <string name="smooth_transition">Color change speed</string>
++  <string name="smooth_transition_desc">How fast colors change when the song changes</string>
++  <string name="smooth_frame_limit">Frame limit</string>
++  <string name="smooth_frame_limit_desc">Lower = saves battery</string>
++  <string name="smooth_bias">Softness (bias)</string>
++  <string name="smooth_bias_desc">Higher = softer, more mixed colors</string>
++  <string name="smooth_power">Blend power</string>
++  <string name="smooth_power_desc">Higher = tighter color areas, lower = wider blending</string>
++  <string name="smooth_noise">Grain (noise)</string>
++  <string name="smooth_noise_desc">Adds fine grain, prevents color banding</string>
++  <string name="smooth_render_scale">Render scale</string>
++  <string name="smooth_render_scale_desc">Lower = lighter on the phone, higher = sharper</string>
++  <string name="smooth_dim">Dim</string>
++  <string name="smooth_dim_desc">Darkens the background so text stays readable</string>
++  <string name="smooth_reset">Reset Smooth</string>
+   <string name="verse_mode">Appearance</string>
+   <string name="verse_mode_desc">Auto follows the cover. Light or Dark forces it</string>
+   <string name="verse_mode_auto">Auto</string>
+diff --git a/common/src/main/java/me/spica27/spicamusic/common/entity/DynamicSpectrumBackground.kt b/common/src/main/java/me/spica27/spicamusic/common/entity/DynamicSpectrumBackground.kt
+index ed23cbe..8941c52 100644
+--- a/common/src/main/java/me/spica27/spicamusic/common/entity/DynamicSpectrumBackground.kt
++++ b/common/src/main/java/me/spica27/spicamusic/common/entity/DynamicSpectrumBackground.kt
+@@ -37,6 +37,12 @@ sealed class DynamicSpectrumBackground(
+         "Verse Flow",
+     )
+ 
++    /** "Smooth": ColorfulX-style gradient from the album colours, with its own settings. */
++    object Smooth : DynamicSpectrumBackground(
++        "smooth",
++        "Smooth",
++    )
++
+     object OFF : DynamicSpectrumBackground(
+         "off",
+         "关闭",
+@@ -51,6 +57,7 @@ sealed class DynamicSpectrumBackground(
+             is FluidWarp -> "动态流体封面"
+             is BlurCover -> "模糊封面"
+             is VerseFlow -> "Verse Flow"
++            is Smooth -> "Smooth"
+             is OFF -> "关闭"
+         }
+     }
+@@ -64,13 +71,14 @@ sealed class DynamicSpectrumBackground(
+                 FluidWarp.value -> FluidWarp
+                 BlurCover.value -> BlurCover
+                 VerseFlow.value -> VerseFlow
++                Smooth.value -> Smooth
+                 OFF.value -> OFF
+                 else -> OFF
+             }
+         }
+ 
+         val presets: List<DynamicSpectrumBackground>
+-            get() = listOf(VerseFlow, TopGlow, LiquidAurora, EffectShader, FluidWarp, BlurCover, OFF)
++            get() = listOf(VerseFlow, Smooth, TopGlow, LiquidAurora, EffectShader, FluidWarp, BlurCover, OFF)
+     }
+ 
+ }
+\ No newline at end of file
+diff --git a/core-preferences/src/main/java/me/spica27/spicamusic/core/preferences/PreferencesManager.kt b/core-preferences/src/main/java/me/spica27/spicamusic/core/preferences/PreferencesManager.kt
+index f87db96..947a545 100644
+--- a/core-preferences/src/main/java/me/spica27/spicamusic/core/preferences/PreferencesManager.kt
++++ b/core-preferences/src/main/java/me/spica27/spicamusic/core/preferences/PreferencesManager.kt
+@@ -64,6 +64,20 @@ class PreferencesManager(
+         val VERSE_MESH_MOTION = intPreferencesKey("verse_mesh_motion")
+         val VERSE_MESH_COLOR = intPreferencesKey("verse_mesh_color")
+         val VERSE_MESH_ANIMATED = booleanPreferencesKey("verse_mesh_animated")
++        // ---- Smooth background (ColorfulX style) ----
++        val SMOOTH_COLOR_UI = booleanPreferencesKey("smooth_color_ui")
++        val SMOOTH_FREEZE = booleanPreferencesKey("smooth_freeze")
++        val SMOOTH_SPEED = intPreferencesKey("smooth_speed")
++        val SMOOTH_BIAS = intPreferencesKey("smooth_bias")
++        val SMOOTH_NOISE = intPreferencesKey("smooth_noise")
++        val SMOOTH_TRANSITION = intPreferencesKey("smooth_transition")
++        val SMOOTH_POWER = intPreferencesKey("smooth_power")
++        val SMOOTH_FRAME_LIMIT = intPreferencesKey("smooth_frame_limit")
++        val SMOOTH_RENDER_SCALE = intPreferencesKey("smooth_render_scale")
++        val SMOOTH_DIM = intPreferencesKey("smooth_dim")
++        val SMOOTH_THEME_MODE = stringPreferencesKey("smooth_theme_mode")
++        val SMOOTH_SATURATION = intPreferencesKey("smooth_saturation")
++
+         val DYNAMIC_COVER_TYPE = stringPreferencesKey("dynamic_cover_type")
+         val PROGRESS_BAR_STYLE = stringPreferencesKey("progress_bar_style")
+         val PLAYER_STYLE = stringPreferencesKey("player_style")
+diff --git a/feature-settings-domain/src/main/java/me/spica27/spicamusic/feature/settings/domain/SettingsUseCases.kt b/feature-settings-domain/src/main/java/me/spica27/spicamusic/feature/settings/domain/SettingsUseCases.kt
+index 6405722..172b825 100644
+--- a/feature-settings-domain/src/main/java/me/spica27/spicamusic/feature/settings/domain/SettingsUseCases.kt
++++ b/feature-settings-domain/src/main/java/me/spica27/spicamusic/feature/settings/domain/SettingsUseCases.kt
+@@ -27,6 +27,18 @@ class SettingsUseCases(
+         val VERSE_MESH_MOTION = PreferencesManager.Keys.VERSE_MESH_MOTION
+         val VERSE_MESH_COLOR = PreferencesManager.Keys.VERSE_MESH_COLOR
+         val VERSE_MESH_ANIMATED = PreferencesManager.Keys.VERSE_MESH_ANIMATED
++        val SMOOTH_COLOR_UI = PreferencesManager.Keys.SMOOTH_COLOR_UI
++        val SMOOTH_FREEZE = PreferencesManager.Keys.SMOOTH_FREEZE
++        val SMOOTH_SPEED = PreferencesManager.Keys.SMOOTH_SPEED
++        val SMOOTH_BIAS = PreferencesManager.Keys.SMOOTH_BIAS
++        val SMOOTH_NOISE = PreferencesManager.Keys.SMOOTH_NOISE
++        val SMOOTH_TRANSITION = PreferencesManager.Keys.SMOOTH_TRANSITION
++        val SMOOTH_POWER = PreferencesManager.Keys.SMOOTH_POWER
++        val SMOOTH_FRAME_LIMIT = PreferencesManager.Keys.SMOOTH_FRAME_LIMIT
++        val SMOOTH_RENDER_SCALE = PreferencesManager.Keys.SMOOTH_RENDER_SCALE
++        val SMOOTH_DIM = PreferencesManager.Keys.SMOOTH_DIM
++        val SMOOTH_THEME_MODE = PreferencesManager.Keys.SMOOTH_THEME_MODE
++        val SMOOTH_SATURATION = PreferencesManager.Keys.SMOOTH_SATURATION
+         val DYNAMIC_COVER_TYPE = PreferencesManager.Keys.DYNAMIC_COVER_TYPE
+         val PROGRESS_BAR_STYLE = PreferencesManager.Keys.PROGRESS_BAR_STYLE
+         val PLAYER_STYLE = PreferencesManager.Keys.PLAYER_STYLE
