@@ -1273,6 +1273,8 @@
   <string name="bp_info_style">樣式</string>
   <string name="bp_info_cols">三欄</string>
   <string name="bp_info_line">單行</string>
+  <string name="bp_particles">粒子拖尾</string>
+  <string name="bp_particles_desc">進度線發光點後方的小粒子</string>
   <string name="bp_h_info">資訊欄高度</string>
   <string name="bp_t_info">資訊欄文字</string>
   <string name="bp_settings_title">氣泡播放器</string>

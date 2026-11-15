@@ -185,6 +185,7 @@ internal fun BubbleSettingsSheet(
             }
 
             LyricsSettingsSection(stringResource(R.string.bp_sec_seek))
+            Toggle(R.string.bp_particles, R.string.bp_particles_desc, BubbleSetting.ParticleTrail)
             Slide(R.string.bp_seek_height, BubbleSetting.SeekHeight, 24..96)
             Slide(R.string.bp_seek_thickness, BubbleSetting.SeekThickness, 1..14)
             Slide(R.string.bp_seek_width, BubbleSetting.SeekWidth, 30..100) { "$it%" }

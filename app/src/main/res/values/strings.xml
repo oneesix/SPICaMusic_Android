@@ -1274,6 +1274,8 @@
   <string name="bp_info_style">Style</string>
   <string name="bp_info_cols">3 columns</string>
   <string name="bp_info_line">One line</string>
+  <string name="bp_particles">Particle trail</string>
+  <string name="bp_particles_desc">Small particles behind the glowing head of the progress line</string>
   <string name="bp_h_info">Info bar height</string>
   <string name="bp_t_info">Info bar text</string>
   <string name="bp_settings_title">Bubble player</string>

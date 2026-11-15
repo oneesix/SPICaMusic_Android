@@ -555,6 +555,7 @@ internal fun BubblePlayerPage(
                                 seekHeight = tuning.seekHeightDp.dp,
                                 seekThickness = tuning.seekThicknessDp.dp,
                                 seekWidthFraction = tuning.seekWidthPercent / 100f,
+                                showParticles = tuning.particleTrail == 1,
                                 animationsEnabled = isPlaying && !LocalReducedMotion.current,
                                 onSeek = onValueChange,
                                 onSeekFinished = onValueChangeFinished,
@@ -866,6 +867,7 @@ private fun BubbleProgressBar(
     seekHeight: Dp,
     seekThickness: Dp,
     seekWidthFraction: Float,
+    showParticles: Boolean,
     animationsEnabled: Boolean,
     onSeek: (Float) -> Unit,
     onSeekFinished: () -> Unit,
@@ -900,6 +902,7 @@ private fun BubbleProgressBar(
                 onProgressChange = onSeek,
                 onProgressChangeFinished = onSeekFinished,
                 animationsEnabled = animationsEnabled,
+                showParticles = showParticles,
                 trackThickness = seekThickness,
                 modifier = Modifier.fillMaxWidth(seekWidthFraction.coerceIn(0.3f, 1f)).height(seekHeight),
             )
