@@ -26,6 +26,8 @@ fun Song.toMediaItem(): MediaItem =
                 .setSubtitle(artist)
                 .setAlbumTitle(album.takeIf { it.isNotBlank() })
                 .setReleaseYear(year.takeIf { it > 0 })
+                .setDiscNumber(discNumber.takeIf { it > 0 })
+                .setTrackNumber(trackNumber.takeIf { it > 0 })
                 .setExtras(Bundle().apply {
                     putLong("mediaStoreId", mediaStoreId)
                     putString("path", path)

@@ -138,9 +138,33 @@ internal fun BubbleSettingsSheet(
             LyricsSettingsSection(stringResource(R.string.bp_sec_text))
             Slide(R.string.bp_t_time, BubbleSetting.TimeText, 140..320, 5, spText)
             Slide(R.string.bp_t_next, BubbleSetting.NextText, 100..180, 5, spText)
+            Slide(R.string.bp_t_time_label, BubbleSetting.TimeLabel, 80..160, 5, spText)
+            Slide(R.string.bp_t_next_label, BubbleSetting.NextLabel, 80..160, 5, spText)
             Slide(R.string.bp_t_lyrics, BubbleSetting.LyricsText, 110..220, 5, spText)
             Slide(R.string.bp_t_title, BubbleSetting.TitleText, 120..220, 5, spText)
             Slide(R.string.bp_t_artist, BubbleSetting.ArtistText, 100..180, 5, spText)
+
+            LyricsSettingsSection(stringResource(R.string.bp_sec_info))
+            LyricsSettingsChips(
+                label = stringResource(R.string.bp_info_pos),
+                description = "",
+                options = listOf(0, 1, 2),
+                selected = tuning.infoBarPos,
+                optionLabel = {
+                    stringResource(
+                        when (it) {
+                            0 -> R.string.bp_info_above
+                            1 -> R.string.bp_info_below
+                            else -> R.string.bp_info_off
+                        },
+                    )
+                },
+                onSelect = { onChange(tuning.withValue(BubbleSetting.InfoBarPos, it)) },
+            )
+            if (tuning.infoBarPos != 2) {
+                Slide(R.string.bp_h_info, BubbleSetting.InfoBarHeight, 28..64)
+                Slide(R.string.bp_t_info, BubbleSetting.InfoText, 90..180, 5, spText)
+            }
 
             LyricsSettingsSection(stringResource(R.string.bp_sec_blur))
             Toggle(R.string.bp_blur_on, R.string.bp_blur_on_desc, BubbleSetting.BlurEnabled)

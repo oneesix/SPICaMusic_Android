@@ -134,6 +134,8 @@ internal fun BubblePlayerPage(
     onLyricsClick: () -> Unit,
     modifier: Modifier = Modifier,
     coverSwipeModifier: Modifier = Modifier,
+    /** Swipe down on the top bars collapses the player (replaces the old handle strip). */
+    dragModifier: Modifier = Modifier,
 ) {
     val item = currentMediaItem()
     val metadata = item?.mediaMetadata
@@ -144,6 +146,16 @@ internal fun BubblePlayerPage(
     val albumTitle = metadata?.albumTitle?.toString()?.takeIf { it.isNotBlank() }
     val year = metadata?.releaseYear ?: metadata?.recordingYear
     val infoText = listOfNotNull(year?.toString(), albumTitle).joinToString(" \u2022 ").takeIf { it.isNotEmpty() }
+
+    val discNumber = metadata?.discNumber?.takeIf { it > 0 }
+    val trackNumber = metadata?.trackNumber?.takeIf { it > 0 }
+    val discTrackText =
+        listOfNotNull(
+            discNumber?.let { stringResource(R.string.song_disc_format, it) },
+            trackNumber?.let { stringResource(R.string.song_track_format, it) },
+        ).joinToString(" \u00B7 ").takeIf { it.isNotEmpty() }
+    val yearText = year?.toString()
+    val showInfoBar = tuning.infoBarPos != 2 && (yearText != null || albumTitle != null || discTrackText != null)
 
     val onSurface = MaterialTheme.colorScheme.onSurface
     val surface = MaterialTheme.colorScheme.surface
@@ -185,6 +197,7 @@ internal fun BubblePlayerPage(
     val topGlass = lyricsGlassSurfaceOrNull(hazeState, CircleShape, surface)
     val titleGlass = lyricsGlassSurfaceOrNull(hazeState, CircleShape, surface)
     val lyricsGlass = lyricsGlassSurfaceOrNull(hazeState, CircleShape, surface)
+    val infoBarGlass = lyricsGlassSurfaceOrNull(hazeState, CircleShape, surface)
     val progressGlass =
         lyricsGlassSurfaceOrNull(hazeState, RoundedCornerShape(22.dp), surface)
     val highlightTuning =
@@ -213,6 +226,19 @@ internal fun BubblePlayerPage(
         }
     }
 
+    // Second top bar: year | album | disc / track. Above or below the top bar (setting).
+    val infoBar: @Composable () -> Unit = {
+        BubbleInfoBar(
+            year = yearText,
+            album = albumTitle,
+            discTrack = discTrackText,
+            heightDp = tuning.infoBarHeightDp,
+            textTenths = tuning.infoTextTenths,
+            background = infoBarGlass ?: Modifier.clip(CircleShape).then(glassBlur).background(barFill),
+            modifier = Modifier.padding(top = 6.dp).then(dragModifier),
+        )
+    }
+
     var showSettings by remember { mutableStateOf(false) }
     val haptic = LocalHapticFeedback.current
     val openSettings = {
@@ -231,11 +257,14 @@ internal fun BubblePlayerPage(
                     .fillMaxSize()
                     .padding(horizontal = SideInset),
         ) {
+            if (showInfoBar && tuning.infoBarPos == 0) infoBar()
+
             // Top bar.
             Row(
                 modifier =
                     Modifier
                         .padding(top = 6.dp)
+                        .then(dragModifier)
                         .fillMaxWidth()
                         .height(tuning.topBarHeightDp.dp)
                         .then(topGlass ?: Modifier.clip(CircleShape).then(glassBlur).background(barFill))
@@ -266,28 +295,50 @@ internal fun BubblePlayerPage(
                             .padding(horizontal = 8.dp),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
-                    Box(modifier = Modifier.weight(1f), contentAlignment = Alignment.Center) {
+                    Column(
+                        modifier = Modifier.weight(1f),
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.Center,
+                    ) {
+                        Text(
+                            text = stringResource(R.string.bp_total_listening),
+                            fontSize = (tuning.timeLabelTenths / 10f).sp,
+                            lineHeight = (tuning.timeLabelTenths / 10f * 1.2f).sp,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                            textAlign = TextAlign.Center,
+                        )
                         Text(
                             text = formatTime(listenedMs),
                             fontSize = (tuning.timeTextTenths / 10f).sp,
+                            lineHeight = (tuning.timeTextTenths / 10f * 1.15f).sp,
                             fontWeight = FontWeight.ExtraBold,
                             color = onSurface,
                             maxLines = 1,
                         )
                     }
-                    Box(
-                        modifier =
-                            Modifier
-                                .width(1.dp)
-                                .height(34.dp)
-                                .background(MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.55f)),
-                    )
-                    Box(modifier = Modifier.weight(1f), contentAlignment = Alignment.Center) {
+                    Column(
+                        modifier = Modifier.weight(1f),
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.Center,
+                    ) {
                         if (nextTitle != null) {
                             Text(
-                                text = stringResource(R.string.bp_next, nextTitle),
-                                fontSize = (tuning.nextTextTenths / 10f).sp,
+                                text = stringResource(R.string.bp_upcoming_song),
+                                fontSize = (tuning.nextLabelTenths / 10f).sp,
+                                lineHeight = (tuning.nextLabelTenths / 10f * 1.2f).sp,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                                textAlign = TextAlign.Center,
+                            )
+                            Text(
+                                text = nextTitle,
+                                fontSize = (tuning.nextTextTenths / 10f).sp,
+                                lineHeight = (tuning.nextTextTenths / 10f * 1.15f).sp,
+                                fontWeight = FontWeight.SemiBold,
+                                color = onSurface,
                                 maxLines = 1,
                                 overflow = TextOverflow.Ellipsis,
                                 textAlign = TextAlign.Center,
@@ -312,6 +363,8 @@ internal fun BubblePlayerPage(
                     )
                 }
             }
+
+            if (showInfoBar && tuning.infoBarPos == 1) infoBar()
 
             // Album in the middle.
             BoxWithConstraints(
@@ -664,6 +717,43 @@ private fun BubbleCircle(
         contentAlignment = Alignment.Center,
     ) {
         content()
+    }
+}
+
+/** Second top bar: year, album and disc / track in three columns, no divider strips. */
+@Composable
+private fun BubbleInfoBar(
+    year: String?,
+    album: String?,
+    discTrack: String?,
+    heightDp: Int,
+    textTenths: Int,
+    background: Modifier,
+    modifier: Modifier = Modifier,
+) {
+    val cells = listOfNotNull(year?.let { it to 0.7f }, album?.let { it to 1.6f }, discTrack?.let { it to 1.1f })
+    Row(
+        modifier =
+            modifier
+                .fillMaxWidth()
+                .height(heightDp.dp)
+                .then(background)
+                .clip(CircleShape)
+                .padding(horizontal = 14.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        cells.forEach { (text, weight) ->
+            Text(
+                text = text,
+                fontSize = (textTenths / 10f).sp,
+                fontWeight = FontWeight.SemiBold,
+                color = MaterialTheme.colorScheme.onSurface,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                textAlign = TextAlign.Center,
+                modifier = Modifier.weight(weight).padding(horizontal = 4.dp),
+            )
+        }
     }
 }
 

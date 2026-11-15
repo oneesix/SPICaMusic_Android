@@ -1261,6 +1261,17 @@
   <string name="player_style_bubble">氣泡</string>
   <string name="player_style_bubble_desc">懸浮欄，專輯置中。長按播放鍵 2 秒開啟設定</string>
   <string name="bp_next">下一首：%1$s</string>
+  <string name="bp_total_listening">總收聽時長：</string>
+  <string name="bp_upcoming_song">即將播放：</string>
+  <string name="bp_t_time_label">總收聽時長標籤</string>
+  <string name="bp_t_next_label">即將播放標籤</string>
+  <string name="bp_sec_info">年份、專輯、碟號欄</string>
+  <string name="bp_info_pos">位置</string>
+  <string name="bp_info_above">頂欄上方</string>
+  <string name="bp_info_below">頂欄下方</string>
+  <string name="bp_info_off">隱藏</string>
+  <string name="bp_h_info">資訊欄高度</string>
+  <string name="bp_t_info">資訊欄文字</string>
   <string name="bp_settings_title">氣泡播放器</string>
   <string name="bp_sec_order">底部欄順序</string>
   <string name="bp_bar_progress">進度欄</string>

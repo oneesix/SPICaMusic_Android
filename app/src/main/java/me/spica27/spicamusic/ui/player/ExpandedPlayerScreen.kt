@@ -316,7 +316,14 @@ fun ExpandedPlayerScreen(
     initialPage: Int = DEFAULT_PAGE, // 初始页面索引
     animationsEnabled: Boolean = true,
     dragHandle: @Composable () -> Unit = {},
+    /** Swipe-down gesture of the sheet; Bubble style puts it on its top bars instead of the handle. */
+    dragModifier: Modifier = Modifier,
 ) {
+    val stylePrefs: PreferencesManager = koinInject()
+    val currentStyle by stylePrefs
+        .getString(PreferencesManager.Keys.PLAYER_STYLE, PillPlayerTuning.STYLE_CLASSIC)
+        .collectAsStateWithLifecycle(initialValue = PillPlayerTuning.STYLE_CLASSIC)
+    val bubbleStyleActive = currentStyle == PillPlayerTuning.STYLE_BUBBLE
     val backStack = LocalBackStack.current
     var playerSurface by remember { mutableStateOf(PlayerSurface.Player) }
     val isPlaying by viewModel.isPlaying.collectAsStateWithLifecycle()
@@ -605,7 +612,7 @@ fun ExpandedPlayerScreen(
                                             .statusBarsPadding(),
                                     horizontalAlignment = Alignment.CenterHorizontally,
                                 ) {
-                                    dragHandle()
+                                    if (!bubbleStyleActive) dragHandle()
                                     ShowOnIdleContent(
                                         modifier = Modifier.weight(1f),
                                         visible = isPlayerPageRevealed,
@@ -684,6 +691,7 @@ fun ExpandedPlayerScreen(
                                                     onDragActive = { surfaceDragging = it },
                                                 ),
                                             onCollapse = onCollapse,
+                                            dragModifier = if (bubbleStyleActive) dragModifier else Modifier,
                                         )
                                         }
                                     }
@@ -862,6 +870,7 @@ private fun PlayerPage(
     coverSwipeModifier: Modifier = Modifier,
     /** Collapses the full-screen player (used by the pill style's back button). */
     onCollapse: () -> Unit = {},
+    dragModifier: Modifier = Modifier,
 ) {
     // 读取动态封面设置
     val preferencesManager: PreferencesManager = koinInject()
@@ -914,6 +923,7 @@ private fun PlayerPage(
             onLyricsClick = onLyricsClick,
             modifier = modifier,
             coverSwipeModifier = coverSwipeModifier,
+            dragModifier = dragModifier,
         )
         return
     }

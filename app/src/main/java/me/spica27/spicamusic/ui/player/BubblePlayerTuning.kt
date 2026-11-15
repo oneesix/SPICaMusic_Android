@@ -36,6 +36,11 @@ internal object BubbleSetting {
     const val SeekHeight = 29
     const val SeekThickness = 30
     const val SeekWidth = 31
+    const val InfoBarPos = 32
+    const val InfoBarHeight = 33
+    const val InfoText = 34
+    const val TimeLabel = 35
+    const val NextLabel = 36
 }
 
 /**
@@ -78,6 +83,13 @@ data class BubblePlayerTuning(
     val seekHeightDp: Int = 40,
     val seekThicknessDp: Int = 3,
     val seekWidthPercent: Int = 100,
+    /** Year / album / disc bar: 0 above the top bar, 1 below the top bar, 2 hidden. */
+    val infoBarPos: Int = 0,
+    val infoBarHeightDp: Int = 38,
+    val infoTextTenths: Int = 125,
+    /** Size of the small "Total listening:" and "Upcoming song:" labels in the top bar. */
+    val timeLabelTenths: Int = 105,
+    val nextLabelTenths: Int = 105,
 ) {
     fun toList(): List<Int> =
         listOf(
@@ -113,6 +125,11 @@ data class BubblePlayerTuning(
             seekHeightDp,
             seekThicknessDp,
             seekWidthPercent,
+            infoBarPos,
+            infoBarHeightDp,
+            infoTextTenths,
+            timeLabelTenths,
+            nextLabelTenths,
         )
 
     fun encode(): String = toList().joinToString(",")
@@ -166,6 +183,7 @@ data class BubblePlayerTuning(
                 g(12), g(13), g(14), g(15), g(16), g(17), g(18), g(19), g(20), g(21), g(22), g(23),
                 g(24), g(25), g(26), g(27), g(28),
                 g(29), g(30), g(31),
+                g(32), g(33), g(34), g(35), g(36),
             )
         }
 

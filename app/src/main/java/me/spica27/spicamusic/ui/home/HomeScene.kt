@@ -123,6 +123,7 @@ fun HomeScreen() {
                 initialPage = initialPlayerPage,
                 animationsEnabled = active,
                 dragHandle = { PlayerSheetHandle(collapse, dragModifier) },
+                dragModifier = dragModifier,
             )
         },
     ) { padding ->

@@ -1262,6 +1262,17 @@
   <string name="player_style_bubble">Bubble</string>
   <string name="player_style_bubble_desc">Floating bars with the album in the middle. Hold play for 2 seconds for settings</string>
   <string name="bp_next">next: %1$s</string>
+  <string name="bp_total_listening">Total listening:</string>
+  <string name="bp_upcoming_song">Upcoming song:</string>
+  <string name="bp_t_time_label">Total listening label</string>
+  <string name="bp_t_next_label">Upcoming song label</string>
+  <string name="bp_sec_info">Year / album / disc bar</string>
+  <string name="bp_info_pos">Position</string>
+  <string name="bp_info_above">Above top bar</string>
+  <string name="bp_info_below">Below top bar</string>
+  <string name="bp_info_off">Hidden</string>
+  <string name="bp_h_info">Info bar height</string>
+  <string name="bp_t_info">Info bar text</string>
   <string name="bp_settings_title">Bubble player</string>
   <string name="bp_sec_order">Bottom bars order</string>
   <string name="bp_bar_progress">Progress bar</string>
