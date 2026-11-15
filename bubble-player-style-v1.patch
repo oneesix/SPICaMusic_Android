@@ -1,0 +1,1458 @@
+diff --git a/app/src/main/java/me/spica27/spicamusic/ui/player/BubblePlayerPage.kt b/app/src/main/java/me/spica27/spicamusic/ui/player/BubblePlayerPage.kt
+new file mode 100644
+index 0000000..80739ed
+--- /dev/null
++++ b/app/src/main/java/me/spica27/spicamusic/ui/player/BubblePlayerPage.kt
+@@ -0,0 +1,801 @@
++package me.spica27.spicamusic.ui.player
++
++import android.os.Build
++import android.os.SystemClock
++import androidx.compose.animation.AnimatedContent
++import androidx.compose.animation.togetherWith
++import androidx.compose.foundation.background
++import androidx.compose.foundation.clickable
++import androidx.compose.foundation.gestures.awaitEachGesture
++import androidx.compose.foundation.gestures.awaitFirstDown
++import androidx.compose.foundation.gestures.detectHorizontalDragGestures
++import androidx.compose.foundation.gestures.detectTapGestures
++import androidx.compose.foundation.gestures.waitForUpOrCancellation
++import androidx.compose.foundation.layout.Arrangement
++import androidx.compose.foundation.layout.Box
++import androidx.compose.foundation.layout.BoxWithConstraints
++import androidx.compose.foundation.layout.Column
++import androidx.compose.foundation.layout.Row
++import androidx.compose.foundation.layout.fillMaxHeight
++import androidx.compose.foundation.layout.fillMaxSize
++import androidx.compose.foundation.layout.fillMaxWidth
++import androidx.compose.foundation.layout.height
++import androidx.compose.foundation.layout.navigationBarsPadding
++import androidx.compose.foundation.layout.offset
++import androidx.compose.foundation.layout.padding
++import androidx.compose.foundation.layout.size
++import androidx.compose.foundation.layout.width
++import androidx.compose.foundation.shape.CircleShape
++import androidx.compose.foundation.shape.RoundedCornerShape
++import androidx.compose.material.icons.Icons
++import androidx.compose.material.icons.automirrored.filled.Sort
++import androidx.compose.material.icons.filled.ChevronLeft
++import androidx.compose.material.icons.rounded.FastForward
++import androidx.compose.material.icons.rounded.FastRewind
++import androidx.compose.material.icons.rounded.Favorite
++import androidx.compose.material.icons.rounded.FavoriteBorder
++import androidx.compose.material.icons.rounded.Pause
++import androidx.compose.material.icons.rounded.PlayArrow
++import androidx.compose.material.icons.rounded.Repeat
++import androidx.compose.material.icons.rounded.RepeatOne
++import androidx.compose.material.icons.rounded.Shuffle
++import androidx.compose.material3.Icon
++import androidx.compose.material3.MaterialTheme
++import androidx.compose.material3.Text
++import androidx.compose.runtime.Composable
++import androidx.compose.runtime.LaunchedEffect
++import androidx.compose.runtime.getValue
++import androidx.compose.runtime.mutableLongStateOf
++import androidx.compose.runtime.mutableStateOf
++import androidx.compose.runtime.remember
++import androidx.compose.runtime.rememberUpdatedState
++import androidx.compose.runtime.setValue
++import androidx.compose.ui.Alignment
++import androidx.compose.ui.Modifier
++import androidx.compose.ui.draw.clip
++import androidx.compose.ui.graphics.Color
++import androidx.compose.ui.graphics.lerp
++import androidx.compose.ui.hapticfeedback.HapticFeedbackType
++import androidx.compose.ui.input.pointer.pointerInput
++import androidx.compose.ui.platform.LocalHapticFeedback
++import androidx.compose.ui.res.stringResource
++import androidx.compose.ui.semantics.Role
++import androidx.compose.ui.semantics.onClick
++import androidx.compose.ui.semantics.onLongClick
++import androidx.compose.ui.semantics.role
++import androidx.compose.ui.semantics.semantics
++import androidx.compose.ui.text.font.FontWeight
++import androidx.compose.ui.text.style.TextAlign
++import androidx.compose.ui.text.style.TextOverflow
++import androidx.compose.ui.unit.Dp
++import androidx.compose.ui.unit.dp
++import androidx.compose.ui.unit.sp
++import androidx.media3.common.MediaItem
++import com.kyant.backdrop.Backdrop
++import com.kyant.backdrop.backdrops.layerBackdrop
++import com.kyant.backdrop.backdrops.rememberLayerBackdrop
++import dev.chrisbanes.haze.ExperimentalHazeApi
++import dev.chrisbanes.haze.HazeInput
++import dev.chrisbanes.haze.HazePerformanceMode
++import dev.chrisbanes.haze.HazeState
++import dev.chrisbanes.haze.blur.HazeBlurStyle
++import dev.chrisbanes.haze.blur.HazeColorEffect
++import dev.chrisbanes.haze.blur.hazeBlur
++import kotlinx.coroutines.delay
++import me.spica27.spicamusic.R
++import me.spica27.spicamusic.artwork.artwork
++import me.spica27.spicamusic.player.api.PlayMode
++import me.spica27.spicamusic.ui.glass.LocalLiquidGlassV2Config
++import me.spica27.spicamusic.ui.glass.liquidGlassV2Surface
++import me.spica27.spicamusic.ui.widget.AudioCover
++import me.spica27.spicamusic.ui.widget.clickHighlight
++import me.spica27.spicamusic.ui.widget.materialSharedAxisYIn
++import me.spica27.spicamusic.ui.widget.materialSharedAxisYOut
++import kotlin.math.min
++
++private val SideInset = 20.dp
++private const val HOLD_MS = 2000L
++private const val PANEL_PADDING_DP = 12
++private const val INFO_BAR_EXTRA_DP = 34
++
++/**
++ * Bubble player style: a floating top bar (back, time listened | next song, queue), the album in the
++ * middle with previous / play / next inside it, and three floating bars at the bottom (progress,
++ * mix / title / like, one lyrics line). Holding the play button for 2 seconds opens the Bubble settings.
++ * Every circle button has its own liquid glass when the app's liquid glass setting is on.
++ */
++@OptIn(ExperimentalHazeApi::class)
++@Composable
++internal fun BubblePlayerPage(
++    currentMediaItem: () -> MediaItem?,
++    nextTitle: String?,
++    seekPositionProvider: () -> Float,
++    realPositionProvider: () -> Float,
++    duration: Long,
++    isPlaying: Boolean,
++    isLike: Boolean,
++    playMode: PlayMode,
++    sampleRate: Int,
++    bitRate: Int,
++    isLossless: Boolean,
++    hazeState: HazeState,
++    tuning: BubblePlayerTuning,
++    onTuningChange: (BubblePlayerTuning) -> Unit,
++    onValueChange: (Float) -> Unit,
++    onValueChangeFinished: () -> Unit,
++    onPlayPauseClick: () -> Unit,
++    onPreviousClick: () -> Unit,
++    onNextClick: () -> Unit,
++    onPlayModeClick: () -> Unit,
++    onFavoriteClick: () -> Unit,
++    onCollapse: () -> Unit,
++    onPlaylistClick: () -> Unit,
++    onLyricsClick: () -> Unit,
++    modifier: Modifier = Modifier,
++    coverSwipeModifier: Modifier = Modifier,
++) {
++    val item = currentMediaItem()
++    val metadata = item?.mediaMetadata
++    val artist =
++        metadata?.artist?.toString()?.takeIf { it.isNotBlank() }
++            ?: stringResource(R.string.unknown_artist)
++    val title = metadata?.title?.toString() ?: stringResource(R.string.unknown_song)
++    val albumTitle = metadata?.albumTitle?.toString()?.takeIf { it.isNotBlank() }
++    val year = metadata?.releaseYear ?: metadata?.recordingYear
++    val infoText = listOfNotNull(year?.toString(), albumTitle).joinToString(" \u2022 ").takeIf { it.isNotEmpty() }
++
++    val onSurface = MaterialTheme.colorScheme.onSurface
++    val surface = MaterialTheme.colorScheme.surface
++
++    // Blur on: translucent fill over the blurred background. Blur off: a solid colour, never transparent.
++    val blurOn = tuning.blurEnabled == 1
++    val barFill = if (blurOn) onSurface.copy(alpha = 0.14f) else lerp(surface, onSurface, 0.18f)
++    val circleFill = if (blurOn) onSurface.copy(alpha = 0.16f) else lerp(surface, onSurface, 0.28f)
++    val blurAmount = tuning.blurAmountDp
++    val blurStyle =
++        remember(blurAmount) {
++            HazeBlurStyle {
++                blurRadius(blurAmount.dp)
++                noiseFactor(0f)
++                backgroundColor(Color.Transparent)
++                colorEffects(emptyList())
++                fallbackColorEffect(HazeColorEffect.tint(Color.Transparent))
++                alpha(1f)
++            }
++        }
++    val glassBlur: Modifier =
++        if (blurOn && blurAmount > 0) {
++            Modifier.hazeBlur(
++                input = HazeInput.Sources(hazeState),
++                style = blurStyle,
++                performanceMode =
++                    if (tuning.blurOptimize == 1) {
++                        HazePerformanceMode.Fixed(tuning.blurQuality / 100f)
++                    } else {
++                        HazePerformanceMode.Balanced
++                    },
++                expandLayerBounds = false,
++            )
++        } else {
++            Modifier
++        }
++
++    // Time listened to this song: counts only while playing, restarts when the song changes.
++    val mediaId = item?.mediaId
++    var listenedMs by remember(mediaId) { mutableLongStateOf(0L) }
++    LaunchedEffect(mediaId, isPlaying) {
++        if (isPlaying) {
++            var last = SystemClock.elapsedRealtime()
++            while (true) {
++                delay(250)
++                val now = SystemClock.elapsedRealtime()
++                listenedMs += now - last
++                last = now
++            }
++        }
++    }
++
++    var showSettings by remember { mutableStateOf(false) }
++    val haptic = LocalHapticFeedback.current
++    val openSettings = {
++        haptic.performHapticFeedback(HapticFeedbackType.LongPress)
++        showSettings = true
++    }
++
++    BoxWithConstraints(modifier = modifier.navigationBarsPadding()) {
++        val backgroundPad = if (tuning.albumBackground == 1) PANEL_PADDING_DP else 0
++        // The width slider may reach the left and right padding of the page (the panel counts too).
++        val albumMaxWidth = (maxWidth.value - 2 * SideInset.value).toInt() - 2 * backgroundPad
++
++        Column(
++            modifier =
++                Modifier
++                    .fillMaxSize()
++                    .padding(horizontal = SideInset),
++        ) {
++            // Top bar.
++            Row(
++                modifier =
++                    Modifier
++                        .padding(top = 6.dp)
++                        .fillMaxWidth()
++                        .height(tuning.topBarHeightDp.dp)
++                        .clip(CircleShape)
++                        .then(glassBlur)
++                        .background(barFill)
++                        .padding(6.dp),
++                verticalAlignment = Alignment.CenterVertically,
++            ) {
++                val circle = (tuning.topBarHeightDp - 12).coerceAtLeast(24).dp
++                BubbleCircle(
++                    size = circle,
++                    hazeState = hazeState,
++                    blur = glassBlur,
++                    fill = circleFill,
++                    description = stringResource(R.string.back),
++                    onClick = onCollapse,
++                ) {
++                    Icon(
++                        imageVector = Icons.Filled.ChevronLeft,
++                        contentDescription = null,
++                        tint = onSurface,
++                        modifier = Modifier.size(circle * 0.6f),
++                    )
++                }
++                Row(
++                    modifier =
++                        Modifier
++                            .weight(1f)
++                            .padding(horizontal = 8.dp),
++                    verticalAlignment = Alignment.CenterVertically,
++                ) {
++                    Box(modifier = Modifier.weight(1f), contentAlignment = Alignment.Center) {
++                        Text(
++                            text = formatTime(listenedMs),
++                            fontSize = (tuning.timeTextTenths / 10f).sp,
++                            fontWeight = FontWeight.ExtraBold,
++                            color = onSurface,
++                            maxLines = 1,
++                        )
++                    }
++                    Box(
++                        modifier =
++                            Modifier
++                                .width(1.dp)
++                                .height(34.dp)
++                                .background(MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.55f)),
++                    )
++                    Box(modifier = Modifier.weight(1f), contentAlignment = Alignment.Center) {
++                        if (nextTitle != null) {
++                            Text(
++                                text = stringResource(R.string.bp_next, nextTitle),
++                                fontSize = (tuning.nextTextTenths / 10f).sp,
++                                color = MaterialTheme.colorScheme.onSurfaceVariant,
++                                maxLines = 1,
++                                overflow = TextOverflow.Ellipsis,
++                                textAlign = TextAlign.Center,
++                                modifier = Modifier.padding(horizontal = 6.dp),
++                            )
++                        }
++                    }
++                }
++                BubbleCircle(
++                    size = circle,
++                    hazeState = hazeState,
++                    blur = glassBlur,
++                    fill = circleFill,
++                    description = stringResource(R.string.queue),
++                    onClick = onPlaylistClick,
++                ) {
++                    Icon(
++                        imageVector = Icons.AutoMirrored.Filled.Sort,
++                        contentDescription = null,
++                        tint = onSurface,
++                        modifier = Modifier.size(circle * 0.55f),
++                    )
++                }
++            }
++
++            // Album in the middle.
++            BoxWithConstraints(
++                modifier =
++                    Modifier
++                        .weight(1f)
++                        .fillMaxWidth()
++                        .padding(vertical = 10.dp),
++                contentAlignment = Alignment.Center,
++            ) {
++                val panelOn = tuning.albumBackground == 1
++                val infoOn = panelOn && tuning.yearInfo == 1 && infoText != null
++                val pad = if (panelOn) PANEL_PADDING_DP else 0
++                val infoExtra = if (infoOn) INFO_BAR_EXTRA_DP else 0
++                val albumWidth = min(tuning.albumWidthDp.toFloat(), (maxWidth.value - 2 * pad).coerceAtLeast(120f))
++                val albumHeight =
++                    min(
++                        tuning.albumHeightDp.toFloat(),
++                        (maxHeight.value - 2 * pad - infoExtra).coerceAtLeast(120f),
++                    )
++                val radius = min(tuning.cornerDp.toFloat(), min(albumWidth, albumHeight) / 2f)
++                val albumBackdrop = rememberLayerBackdrop()
++                val v2Enabled = LocalLiquidGlassV2Config.current.enabled
++
++                Column(
++                    modifier =
++                        Modifier
++                            .then(coverSwipeModifier)
++                            .then(
++                                if (panelOn) {
++                                    Modifier
++                                        .clip(RoundedCornerShape((radius + pad).dp))
++                                        .then(glassBlur)
++                                        .background(barFill)
++                                        .padding(pad.dp)
++                                } else {
++                                    Modifier
++                                },
++                            ),
++                    horizontalAlignment = Alignment.CenterHorizontally,
++                ) {
++                    if (infoOn) {
++                        Box(
++                            modifier =
++                                Modifier
++                                    .width(albumWidth.dp)
++                                    .height(26.dp)
++                                    .clip(RoundedCornerShape(radius.dp))
++                                    .background(onSurface.copy(alpha = 0.12f)),
++                            contentAlignment = Alignment.Center,
++                        ) {
++                            Text(
++                                text = infoText.orEmpty(),
++                                fontSize = 12.5.sp,
++                                fontWeight = FontWeight.Bold,
++                                color = onSurface,
++                                maxLines = 1,
++                                overflow = TextOverflow.Ellipsis,
++                                modifier = Modifier.padding(horizontal = 12.dp),
++                            )
++                        }
++                        Box(modifier = Modifier.height(8.dp))
++                    }
++                    Box(modifier = Modifier.size(width = albumWidth.dp, height = albumHeight.dp)) {
++                        // The cover is recorded as its own layer, so the buttons on it can refract it.
++                        Box(
++                            modifier =
++                                Modifier
++                                    .fillMaxSize()
++                                    .clip(RoundedCornerShape(radius.dp))
++                                    .then(if (v2Enabled) Modifier.layerBackdrop(albumBackdrop) else Modifier),
++                        ) {
++                            AnimatedContent(
++                                targetState = item,
++                                modifier = Modifier.fillMaxSize(),
++                                transitionSpec = {
++                                    materialSharedAxisYIn(true) togetherWith materialSharedAxisYOut(true)
++                                },
++                                contentKey = { it?.mediaId ?: "-1" },
++                                label = "bubbleCover",
++                            ) { mediaItem ->
++                                AudioCover(
++                                    artwork = mediaItem?.mediaMetadata?.artwork(),
++                                    modifier =
++                                        Modifier
++                                            .fillMaxSize()
++                                            .background(MaterialTheme.colorScheme.surfaceContainerHigh)
++                                            .clickHighlight(onClick = onLyricsClick),
++                                )
++                            }
++                        }
++                        Row(
++                            modifier =
++                                Modifier
++                                    .align(Alignment.BottomCenter)
++                                    .offset(x = tuning.buttonShiftDp.dp, y = (-tuning.buttonBottomDp).dp),
++                            horizontalArrangement = Arrangement.spacedBy(tuning.buttonGapDp.dp),
++                            verticalAlignment = Alignment.CenterVertically,
++                        ) {
++                            AlbumGlassButton(
++                                size = tuning.skipSizeDp.dp,
++                                backdrop = albumBackdrop,
++                                description = stringResource(R.string.previous_track),
++                                onTap = onPreviousClick,
++                            ) {
++                                Icon(
++                                    imageVector = Icons.Rounded.FastRewind,
++                                    contentDescription = null,
++                                    tint = Color.White,
++                                    modifier = Modifier.size((tuning.skipSizeDp * 0.56f).dp),
++                                )
++                            }
++                            AlbumGlassButton(
++                                size = tuning.playSizeDp.dp,
++                                backdrop = albumBackdrop,
++                                description =
++                                    if (isPlaying) stringResource(R.string.pause) else stringResource(R.string.play),
++                                onTap = onPlayPauseClick,
++                                onHold = openSettings,
++                            ) {
++                                Icon(
++                                    imageVector = if (isPlaying) Icons.Rounded.Pause else Icons.Rounded.PlayArrow,
++                                    contentDescription = null,
++                                    tint = Color.White,
++                                    modifier = Modifier.size((tuning.playSizeDp * 0.56f).dp),
++                                )
++                            }
++                            AlbumGlassButton(
++                                size = tuning.skipSizeDp.dp,
++                                backdrop = albumBackdrop,
++                                description = stringResource(R.string.next_track),
++                                onTap = onNextClick,
++                            ) {
++                                Icon(
++                                    imageVector = Icons.Rounded.FastForward,
++                                    contentDescription = null,
++                                    tint = Color.White,
++                                    modifier = Modifier.size((tuning.skipSizeDp * 0.56f).dp),
++                                )
++                            }
++                        }
++                    }
++                }
++            }
++
++            // Three bottom bars, in the order from the settings.
++            Column(
++                modifier = Modifier.padding(bottom = 10.dp),
++                verticalArrangement = Arrangement.spacedBy(10.dp),
++            ) {
++                for (bar in tuning.barOrder) {
++                    when (bar) {
++                        BubblePlayerTuning.BAR_PROGRESS ->
++                            BubbleProgressBar(
++                                height = tuning.progressHeightDp.dp,
++                                blur = glassBlur,
++                                fill = barFill,
++                                progress =
++                                    if (duration > 0) (seekPositionProvider() / duration).coerceIn(0f, 1f) else 0f,
++                                playedMs = realPositionProvider().toLong(),
++                                durationMs = duration,
++                                qualityText = qualityText(sampleRate, bitRate, isLossless),
++                                textSizeSp = 12.5f,
++                                onSeek = onValueChange,
++                                onSeekFinished = onValueChangeFinished,
++                            )
++
++                        BubblePlayerTuning.BAR_TITLE ->
++                            Row(
++                                modifier = Modifier.fillMaxWidth(),
++                                verticalAlignment = Alignment.CenterVertically,
++                                horizontalArrangement = Arrangement.spacedBy(10.dp),
++                            ) {
++                                val size = tuning.titleBarHeightDp.dp
++                                BubbleCircle(
++                                    size = size,
++                                    hazeState = hazeState,
++                                    blur = glassBlur,
++                                    fill = circleFill,
++                                    description = stringResource(R.string.play_mode),
++                                    onClick = onPlayModeClick,
++                                ) {
++                                    AnimatedContent(
++                                        targetState = playMode,
++                                        label = "bubblePlayMode",
++                                    ) { mode ->
++                                        Icon(
++                                            imageVector =
++                                                when (mode) {
++                                                    PlayMode.LOOP -> Icons.Rounded.Repeat
++                                                    PlayMode.LIST -> Icons.Rounded.RepeatOne
++                                                    PlayMode.SHUFFLE -> Icons.Rounded.Shuffle
++                                                },
++                                            contentDescription = null,
++                                            tint = onSurface,
++                                            modifier = Modifier.size(size * 0.43f),
++                                        )
++                                    }
++                                }
++                                Column(
++                                    modifier =
++                                        Modifier
++                                            .weight(1f)
++                                            .height(size)
++                                            .clip(CircleShape)
++                                            .then(glassBlur)
++                                            .background(barFill)
++                                            .padding(horizontal = 16.dp),
++                                    verticalArrangement = Arrangement.Center,
++                                    horizontalAlignment = Alignment.CenterHorizontally,
++                                ) {
++                                    Text(
++                                        text = title,
++                                        fontSize = (tuning.titleTextTenths / 10f).sp,
++                                        fontWeight = FontWeight.ExtraBold,
++                                        color = onSurface,
++                                        maxLines = 1,
++                                        overflow = TextOverflow.Ellipsis,
++                                        textAlign = TextAlign.Center,
++                                    )
++                                    Text(
++                                        text = artist,
++                                        fontSize = (tuning.artistTextTenths / 10f).sp,
++                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
++                                        maxLines = 1,
++                                        overflow = TextOverflow.Ellipsis,
++                                        textAlign = TextAlign.Center,
++                                    )
++                                }
++                                BubbleCircle(
++                                    size = size,
++                                    hazeState = hazeState,
++                                    blur = glassBlur,
++                                    fill = circleFill,
++                                    description = stringResource(R.string.favorite),
++                                    onClick = onFavoriteClick,
++                                ) {
++                                    Icon(
++                                        imageVector =
++                                            if (isLike) Icons.Rounded.Favorite else Icons.Rounded.FavoriteBorder,
++                                        contentDescription = null,
++                                        tint = if (isLike) Color(0xffcf1322) else onSurface,
++                                        modifier = Modifier.size(size * 0.43f),
++                                    )
++                                }
++                            }
++
++                        else ->
++                            // One lyrics line. Only the text animates when the line changes, never the bar.
++                            Box(
++                                modifier =
++                                    Modifier
++                                        .fillMaxWidth()
++                                        .height(tuning.lyricsBarHeightDp.dp)
++                                        .clip(CircleShape)
++                                        .then(glassBlur)
++                                        .background(barFill),
++                                contentAlignment = Alignment.Center,
++                            ) {
++                                MiniLyric(
++                                    onClick = onLyricsClick,
++                                    textSize = (tuning.lyricsTextTenths / 10f).sp,
++                                    modifier = Modifier.fillMaxSize(),
++                                )
++                            }
++                    }
++                }
++            }
++        }
++
++        if (showSettings) {
++            BubbleSettingsSheet(
++                tuning = tuning,
++                albumMaxWidthDp = albumMaxWidth,
++                onChange = onTuningChange,
++                onDismiss = { showSettings = false },
++            )
++        }
++    }
++}
++
++@Composable
++private fun qualityText(
++    sampleRate: Int,
++    bitRate: Int,
++    isLossless: Boolean,
++): String =
++    buildList {
++        if (sampleRate > 0) add("${sampleRate / 1000}kHz")
++        if (bitRate > 0) add("${bitRate / 1000}kbps")
++        if (isLossless) add(stringResource(R.string.lossless))
++        if (bitRate >= 320000 && !isLossless) add(stringResource(R.string.high_quality))
++    }.joinToString(" \u00b7 ")
++
++/**
++ * Circle button on a bar. With liquid glass on it has its own glass surface (same engine and settings
++ * as the lyrics bars); otherwise it is a blurred or solid fill.
++ */
++@Composable
++private fun BubbleCircle(
++    size: Dp,
++    hazeState: HazeState,
++    blur: Modifier,
++    fill: Color,
++    description: String,
++    onClick: () -> Unit,
++    content: @Composable () -> Unit,
++) {
++    val liquid = lyricsGlassSurfaceOrNull(hazeState, CircleShape, MaterialTheme.colorScheme.surface)
++    Box(
++        modifier =
++            Modifier
++                .size(size)
++                .then(
++                    if (liquid != null) {
++                        liquid
++                    } else {
++                        Modifier
++                            .clip(CircleShape)
++                            .then(blur)
++                            .background(fill)
++                    },
++                ).clip(CircleShape)
++                .semantics { role = Role.Button }
++                .clickable(onClickLabel = description, role = Role.Button, onClick = onClick),
++        contentAlignment = Alignment.Center,
++    ) {
++        content()
++    }
++}
++
++/**
++ * Round button on the album. It has its own liquid glass that refracts the cover; with liquid glass off
++ * it is a dark translucent circle. Passing [onHold] makes a 2 second hold call it instead of a tap.
++ */
++@Composable
++private fun AlbumGlassButton(
++    size: Dp,
++    backdrop: Backdrop,
++    description: String,
++    onTap: () -> Unit,
++    onHold: (() -> Unit)? = null,
++    content: @Composable () -> Unit,
++) {
++    val v2 = LocalLiquidGlassV2Config.current
++    val glass =
++        if (v2.enabled && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
++            Modifier.liquidGlassV2Surface(
++                backdrop = backdrop,
++                tuning = v2.tuning,
++                shape = CircleShape,
++                surfaceColor = MaterialTheme.colorScheme.surface,
++            )
++        } else {
++            Modifier.clip(CircleShape).background(Color.Black.copy(alpha = 0.35f))
++        }
++    val tap by rememberUpdatedState(onTap)
++    val hold by rememberUpdatedState(onHold)
++    val input =
++        if (onHold != null) {
++            Modifier
++                .semantics {
++                    role = Role.Button
++                    onClick(label = description) {
++                        tap()
++                        true
++                    }
++                    onLongClick(label = null) {
++                        hold?.invoke()
++                        true
++                    }
++                }.pointerInput(Unit) {
++                    awaitEachGesture {
++                        awaitFirstDown()
++                        var released = false
++                        val up =
++                            withTimeoutOrNull(HOLD_MS) {
++                                val result = waitForUpOrCancellation()
++                                released = true
++                                result
++                            }
++                        if (up != null) {
++                            up.consume()
++                            tap()
++                        } else if (!released) {
++                            // Held for 2 seconds: open the settings, then wait for the finger to lift.
++                            hold?.invoke()
++                            waitForUpOrCancellation()?.consume()
++                        }
++                    }
++                }
++        } else {
++            Modifier.clickable(onClickLabel = description, role = Role.Button, onClick = onTap)
++        }
++    Box(
++        modifier =
++            Modifier
++                .size(size)
++                .then(glass)
++                .clip(CircleShape)
++                .then(input),
++        contentAlignment = Alignment.Center,
++    ) {
++        content()
++    }
++}
++
++/** Progress line with time played (left), file info (middle) and time left (right). */
++@Composable
++private fun BubbleProgressBar(
++    height: Dp,
++    blur: Modifier,
++    fill: Color,
++    progress: Float,
++    playedMs: Long,
++    durationMs: Long,
++    qualityText: String,
++    textSizeSp: Float,
++    onSeek: (Float) -> Unit,
++    onSeekFinished: () -> Unit,
++) {
++    val onSurface = MaterialTheme.colorScheme.onSurface
++    val muted = MaterialTheme.colorScheme.onSurfaceVariant
++    Column(
++        modifier =
++            Modifier
++                .fillMaxWidth()
++                .height(height)
++                .clip(RoundedCornerShape(22.dp))
++                .then(blur)
++                .background(fill)
++                .padding(horizontal = 16.dp),
++        verticalArrangement = Arrangement.Center,
++    ) {
++        Box(
++            modifier =
++                Modifier
++                    .fillMaxWidth()
++                    .height(24.dp)
++                    .pointerInput(durationMs) {
++                        detectTapGestures { offset ->
++                            onSeek((offset.x / size.width).coerceIn(0f, 1f))
++                            onSeekFinished()
++                        }
++                    }.pointerInput(durationMs) {
++                        detectHorizontalDragGestures(
++                            onDragEnd = onSeekFinished,
++                            onDragCancel = onSeekFinished,
++                        ) { change, _ ->
++                            change.consume()
++                            onSeek((change.position.x / size.width).coerceIn(0f, 1f))
++                        }
++                    },
++            contentAlignment = Alignment.Center,
++        ) {
++            Box(
++                modifier =
++                    Modifier
++                        .fillMaxWidth()
++                        .height(8.dp)
++                        .clip(CircleShape)
++                        .background(onSurface.copy(alpha = 0.18f)),
++            ) {
++                Box(
++                    modifier =
++                        Modifier
++                            .fillMaxHeight()
++                            .fillMaxWidth(progress)
++                            .clip(CircleShape)
++                            .background(MaterialTheme.colorScheme.primary),
++                )
++            }
++        }
++        Row(
++            modifier = Modifier.fillMaxWidth(),
++            verticalAlignment = Alignment.CenterVertically,
++        ) {
++            val timeStyle = (textSizeSp - 0.5f).sp
++            Text(
++                text = formatTime(playedMs),
++                fontSize = timeStyle,
++                fontWeight = FontWeight.SemiBold,
++                color = onSurface,
++                maxLines = 1,
++            )
++            Text(
++                text = qualityText,
++                fontSize = timeStyle,
++                color = muted,
++                maxLines = 1,
++                overflow = TextOverflow.Ellipsis,
++                textAlign = TextAlign.Center,
++                modifier = Modifier.weight(1f).padding(horizontal = 8.dp),
++            )
++            Text(
++                text = "-" + formatTime((durationMs - playedMs).coerceAtLeast(0L)),
++                fontSize = timeStyle,
++                fontWeight = FontWeight.SemiBold,
++                color = onSurface,
++                maxLines = 1,
++            )
++        }
++    }
++}
+diff --git a/app/src/main/java/me/spica27/spicamusic/ui/player/BubblePlayerTuning.kt b/app/src/main/java/me/spica27/spicamusic/ui/player/BubblePlayerTuning.kt
+new file mode 100644
+index 0000000..a4c2baa
+--- /dev/null
++++ b/app/src/main/java/me/spica27/spicamusic/ui/player/BubblePlayerTuning.kt
+@@ -0,0 +1,146 @@
++package me.spica27.spicamusic.ui.player
++
++import androidx.compose.runtime.Immutable
++
++/** Index of every Bubble setting inside [BubblePlayerTuning.toList]. New settings are only appended. */
++internal object BubbleSetting {
++    const val AlbumWidth = 0
++    const val AlbumHeight = 1
++    const val Corner = 2
++    const val AlbumBackground = 3
++    const val YearInfo = 4
++    const val PlaySize = 5
++    const val SkipSize = 6
++    const val ButtonGap = 7
++    const val ButtonBottom = 8
++    const val ButtonShift = 9
++    const val TopBarHeight = 10
++    const val ProgressHeight = 11
++    const val TitleBarHeight = 12
++    const val LyricsBarHeight = 13
++    const val TimeText = 14
++    const val NextText = 15
++    const val LyricsText = 16
++    const val TitleText = 17
++    const val ArtistText = 18
++    const val BlurEnabled = 19
++    const val BlurAmount = 20
++    const val BlurOptimize = 21
++    const val BlurQuality = 22
++    const val BarOrder = 23
++}
++
++/**
++ * Layout values of the Bubble player style. Sizes are dp, text sizes are sp x 10, switches are 0/1.
++ * [barOrderCode] holds the order of the three bottom bars as three digits (0 progress, 1 title, 2 lyrics).
++ */
++@Immutable
++data class BubblePlayerTuning(
++    val albumWidthDp: Int = 260,
++    val albumHeightDp: Int = 260,
++    val cornerDp: Int = 28,
++    val albumBackground: Int = 0,
++    val yearInfo: Int = 0,
++    val playSizeDp: Int = 56,
++    val skipSizeDp: Int = 40,
++    val buttonGapDp: Int = 12,
++    val buttonBottomDp: Int = 16,
++    val buttonShiftDp: Int = 0,
++    val topBarHeightDp: Int = 58,
++    val progressHeightDp: Int = 70,
++    val titleBarHeightDp: Int = 56,
++    val lyricsBarHeightDp: Int = 44,
++    val timeTextTenths: Int = 220,
++    val nextTextTenths: Int = 125,
++    val lyricsTextTenths: Int = 140,
++    val titleTextTenths: Int = 150,
++    val artistTextTenths: Int = 125,
++    val blurEnabled: Int = 1,
++    val blurAmountDp: Int = 14,
++    val blurOptimize: Int = 0,
++    val blurQuality: Int = 45,
++    val barOrderCode: Int = DEFAULT_ORDER_CODE,
++) {
++    fun toList(): List<Int> =
++        listOf(
++            albumWidthDp,
++            albumHeightDp,
++            cornerDp,
++            albumBackground,
++            yearInfo,
++            playSizeDp,
++            skipSizeDp,
++            buttonGapDp,
++            buttonBottomDp,
++            buttonShiftDp,
++            topBarHeightDp,
++            progressHeightDp,
++            titleBarHeightDp,
++            lyricsBarHeightDp,
++            timeTextTenths,
++            nextTextTenths,
++            lyricsTextTenths,
++            titleTextTenths,
++            artistTextTenths,
++            blurEnabled,
++            blurAmountDp,
++            blurOptimize,
++            blurQuality,
++            barOrderCode,
++        )
++
++    fun encode(): String = toList().joinToString(",")
++
++    /** Returns a copy with one setting changed (see [BubbleSetting]). */
++    fun withValue(
++        index: Int,
++        value: Int,
++    ): BubblePlayerTuning = fromList(toList().toMutableList().also { it[index] = value })
++
++    /** The three bottom bars from top to bottom: 0 progress, 1 title, 2 lyrics. */
++    val barOrder: List<Int>
++        get() = decodeOrder(barOrderCode)
++
++    /** Moves one bottom bar up (delta -1) or down (delta 1). */
++    fun withMovedBar(
++        bar: Int,
++        delta: Int,
++    ): BubblePlayerTuning {
++        val order = barOrder.toMutableList()
++        val from = order.indexOf(bar)
++        val to = from + delta
++        if (from < 0 || to !in order.indices) return this
++        val moved = order.removeAt(from)
++        order.add(to, moved)
++        return copy(barOrderCode = encodeOrder(order))
++    }
++
++    companion object {
++        const val BAR_PROGRESS = 0
++        const val BAR_TITLE = 1
++        const val BAR_LYRICS = 2
++        const val DEFAULT_ORDER_CODE = 12 // digits 0, 1, 2
++
++        val Default = BubblePlayerTuning()
++
++        private fun encodeOrder(order: List<Int>): Int = order[0] * 100 + order[1] * 10 + order[2]
++
++        private fun decodeOrder(code: Int): List<Int> {
++            val order = listOf(code / 100 % 10, code / 10 % 10, code % 10)
++            return if (order.toSet() == setOf(0, 1, 2)) order else listOf(0, 1, 2)
++        }
++
++        /** Missing entries (older saved text) fall back to the defaults, so adding settings never resets old ones. */
++        fun fromList(v: List<Int>): BubblePlayerTuning {
++            val d = Default.toList()
++
++            fun g(i: Int) = v.getOrNull(i) ?: d[i]
++            return BubblePlayerTuning(
++                g(0), g(1), g(2), g(3), g(4), g(5), g(6), g(7), g(8), g(9), g(10), g(11),
++                g(12), g(13), g(14), g(15), g(16), g(17), g(18), g(19), g(20), g(21), g(22), g(23),
++            )
++        }
++
++        fun decode(text: String): BubblePlayerTuning = fromList(text.split(',').mapNotNull { it.trim().toIntOrNull() })
++    }
++}
+diff --git a/app/src/main/java/me/spica27/spicamusic/ui/player/BubbleSettingsSheet.kt b/app/src/main/java/me/spica27/spicamusic/ui/player/BubbleSettingsSheet.kt
+new file mode 100644
+index 0000000..b5d2518
+--- /dev/null
++++ b/app/src/main/java/me/spica27/spicamusic/ui/player/BubbleSettingsSheet.kt
+@@ -0,0 +1,177 @@
++package me.spica27.spicamusic.ui.player
++
++import androidx.compose.foundation.layout.Column
++import androidx.compose.foundation.layout.Row
++import androidx.compose.foundation.layout.fillMaxWidth
++import androidx.compose.foundation.layout.padding
++import androidx.compose.foundation.rememberScrollState
++import androidx.compose.foundation.verticalScroll
++import androidx.compose.material.icons.Icons
++import androidx.compose.material.icons.rounded.KeyboardArrowDown
++import androidx.compose.material.icons.rounded.KeyboardArrowUp
++import androidx.compose.material3.ExperimentalMaterial3Api
++import androidx.compose.material3.Icon
++import androidx.compose.material3.IconButton
++import androidx.compose.material3.MaterialTheme
++import androidx.compose.material3.ModalBottomSheet
++import androidx.compose.material3.Text
++import androidx.compose.material3.rememberModalBottomSheetState
++import androidx.compose.runtime.Composable
++import androidx.compose.ui.Alignment
++import androidx.compose.ui.Modifier
++import androidx.compose.ui.graphics.Color
++import androidx.compose.ui.res.stringResource
++import androidx.compose.ui.unit.dp
++import me.spica27.spicamusic.R
++import me.spica27.spicamusic.ui.widget.LyricsSettingsResetButton
++import me.spica27.spicamusic.ui.widget.LyricsSettingsSection
++import me.spica27.spicamusic.ui.widget.LyricsSettingsSlider
++import me.spica27.spicamusic.ui.widget.LyricsSettingsToggle
++import java.util.Locale
++
++/**
++ * Settings of the Bubble player. Opened by holding the play button for 2 seconds. The page behind stays
++ * visible (no dimming), so every change shows right away.
++ */
++@OptIn(ExperimentalMaterial3Api::class)
++@Composable
++internal fun BubbleSettingsSheet(
++    tuning: BubblePlayerTuning,
++    albumMaxWidthDp: Int,
++    onChange: (BubblePlayerTuning) -> Unit,
++    onDismiss: () -> Unit,
++) {
++    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = false)
++    val values = tuning.toList()
++
++    @Composable
++    fun Slide(
++        label: Int,
++        index: Int,
++        range: IntRange,
++        step: Int = 1,
++        text: (Int) -> String = { "$it dp" },
++    ) = LyricsSettingsSlider(
++        label = stringResource(label),
++        description = "",
++        value = values[index],
++        range = range,
++        step = step,
++        valueText = text,
++        onValueChange = { onChange(tuning.withValue(index, it)) },
++    )
++
++    @Composable
++    fun Toggle(
++        label: Int,
++        description: Int,
++        index: Int,
++    ) = LyricsSettingsToggle(
++        label = stringResource(label),
++        description = stringResource(description),
++        checked = values[index] == 1,
++        onCheckedChange = { onChange(tuning.withValue(index, if (it) 1 else 0)) },
++    )
++
++    val spText: (Int) -> String = { String.format(Locale.US, "%.1f sp", it / 10f) }
++
++    ModalBottomSheet(
++        onDismissRequest = onDismiss,
++        sheetState = sheetState,
++        scrimColor = Color.Transparent,
++    ) {
++        Column(
++            modifier =
++                Modifier
++                    .verticalScroll(rememberScrollState())
++                    .padding(horizontal = 20.dp)
++                    .padding(bottom = 32.dp),
++        ) {
++            Text(
++                text = stringResource(R.string.bp_settings_title),
++                style = MaterialTheme.typography.titleLarge,
++                color = MaterialTheme.colorScheme.onSurface,
++            )
++
++            LyricsSettingsSection(stringResource(R.string.bp_sec_order))
++            tuning.barOrder.forEachIndexed { position, bar ->
++                Row(
++                    modifier = Modifier.fillMaxWidth(),
++                    verticalAlignment = Alignment.CenterVertically,
++                ) {
++                    Text(
++                        text =
++                            "${position + 1}. " +
++                                stringResource(
++                                    when (bar) {
++                                        BubblePlayerTuning.BAR_PROGRESS -> R.string.bp_bar_progress
++                                        BubblePlayerTuning.BAR_TITLE -> R.string.bp_bar_title
++                                        else -> R.string.bp_bar_lyrics
++                                    },
++                                ),
++                        style = MaterialTheme.typography.bodyLarge,
++                        color = MaterialTheme.colorScheme.onSurface,
++                        modifier = Modifier.weight(1f),
++                    )
++                    IconButton(
++                        onClick = { onChange(tuning.withMovedBar(bar, -1)) },
++                        enabled = position > 0,
++                    ) {
++                        Icon(Icons.Rounded.KeyboardArrowUp, contentDescription = stringResource(R.string.bp_move_up))
++                    }
++                    IconButton(
++                        onClick = { onChange(tuning.withMovedBar(bar, 1)) },
++                        enabled = position < 2,
++                    ) {
++                        Icon(Icons.Rounded.KeyboardArrowDown, contentDescription = stringResource(R.string.bp_move_down))
++                    }
++                }
++            }
++
++            LyricsSettingsSection(stringResource(R.string.bp_sec_heights))
++            Slide(R.string.bp_h_top, BubbleSetting.TopBarHeight, 44..90)
++            Slide(R.string.bp_h_progress, BubbleSetting.ProgressHeight, 52..110)
++            Slide(R.string.bp_h_title, BubbleSetting.TitleBarHeight, 44..90)
++            Slide(R.string.bp_h_lyrics, BubbleSetting.LyricsBarHeight, 32..80)
++
++            LyricsSettingsSection(stringResource(R.string.bp_sec_text))
++            Slide(R.string.bp_t_time, BubbleSetting.TimeText, 140..320, 5, spText)
++            Slide(R.string.bp_t_next, BubbleSetting.NextText, 100..180, 5, spText)
++            Slide(R.string.bp_t_lyrics, BubbleSetting.LyricsText, 110..220, 5, spText)
++            Slide(R.string.bp_t_title, BubbleSetting.TitleText, 120..220, 5, spText)
++            Slide(R.string.bp_t_artist, BubbleSetting.ArtistText, 100..180, 5, spText)
++
++            LyricsSettingsSection(stringResource(R.string.bp_sec_blur))
++            Toggle(R.string.bp_blur_on, R.string.bp_blur_on_desc, BubbleSetting.BlurEnabled)
++            if (tuning.blurEnabled == 1) {
++                Slide(R.string.bp_blur_amount, BubbleSetting.BlurAmount, 0..40)
++                Toggle(R.string.bp_blur_optimize, R.string.bp_blur_optimize_desc, BubbleSetting.BlurOptimize)
++                if (tuning.blurOptimize == 1) {
++                    Slide(R.string.bp_blur_quality, BubbleSetting.BlurQuality, 5..100, 5) { "$it%" }
++                }
++            }
++
++            LyricsSettingsSection(stringResource(R.string.bp_sec_album))
++            Toggle(R.string.bp_album_bg, R.string.bp_album_bg_desc, BubbleSetting.AlbumBackground)
++            if (tuning.albumBackground == 1) {
++                Toggle(R.string.bp_album_info, R.string.bp_album_info_desc, BubbleSetting.YearInfo)
++            }
++            // The width can reach the left and right padding of the page.
++            Slide(R.string.bp_album_width, BubbleSetting.AlbumWidth, 120..albumMaxWidthDp.coerceAtLeast(121))
++            Slide(R.string.bp_album_height, BubbleSetting.AlbumHeight, 120..460)
++            Slide(R.string.bp_album_corner, BubbleSetting.Corner, 0..130)
++
++            LyricsSettingsSection(stringResource(R.string.bp_sec_buttons))
++            Slide(R.string.bp_play_size, BubbleSetting.PlaySize, 32..96)
++            Slide(R.string.bp_skip_size, BubbleSetting.SkipSize, 24..72)
++            Slide(R.string.bp_btn_gap, BubbleSetting.ButtonGap, 0..40)
++            Slide(R.string.bp_btn_bottom, BubbleSetting.ButtonBottom, 0..120)
++            Slide(R.string.bp_btn_shift, BubbleSetting.ButtonShift, -100..100)
++
++            LyricsSettingsResetButton(
++                text = stringResource(R.string.bp_reset),
++                onClick = { onChange(BubblePlayerTuning.Default) },
++            )
++        }
++    }
++}
+diff --git a/app/src/main/java/me/spica27/spicamusic/ui/player/ExpandedPlayerScreen.kt b/app/src/main/java/me/spica27/spicamusic/ui/player/ExpandedPlayerScreen.kt
+index 45cb137..b27322e 100644
+--- a/app/src/main/java/me/spica27/spicamusic/ui/player/ExpandedPlayerScreen.kt
++++ b/app/src/main/java/me/spica27/spicamusic/ui/player/ExpandedPlayerScreen.kt
+@@ -66,6 +66,7 @@ import androidx.compose.material3.LocalContentColor
+ import androidx.compose.material3.MaterialTheme
+ import androidx.compose.material3.Text
+ import androidx.compose.runtime.Composable
++import androidx.compose.runtime.CompositionLocalProvider
+ import androidx.compose.runtime.DisposableEffect
+ import androidx.compose.runtime.Immutable
+ import androidx.compose.runtime.LaunchedEffect
+@@ -619,6 +620,9 @@ fun ExpandedPlayerScreen(
+                                         enter = Nav3Transitions.expand().targetContentEnter,
+                                         skipFirstEnter = playerPageRevealedOnce,
+                                     ) {
++                                        CompositionLocalProvider(
++                                            LocalLyricsGlassBackdrop provides (if (lyricsGlassV2) playerBgBackdrop else null),
++                                        ) {
+                                         PlayerPage(
+                                             playerViewModel = viewModel,
+                                             hazeState = hazeState,
+@@ -688,6 +692,7 @@ fun ExpandedPlayerScreen(
+                                                 ),
+                                             onCollapse = onCollapse,
+                                         )
++                                        }
+                                     }
+                                 }
+                             } else {
+@@ -881,6 +886,52 @@ private fun PlayerPage(
+     val pillTuningValue by preferencesManager
+         .getString(PreferencesManager.Keys.PILL_PLAYER_TUNING, PillPlayerTuning.Default.encode())
+         .collectAsStateWithLifecycle(initialValue = PillPlayerTuning.Default.encode())
++    val bubbleTuningValue by preferencesManager
++        .getString(PreferencesManager.Keys.BUBBLE_PLAYER_TUNING, BubblePlayerTuning.Default.encode())
++        .collectAsStateWithLifecycle(initialValue = BubblePlayerTuning.Default.encode())
++    if (playerStyleValue == PillPlayerTuning.STYLE_BUBBLE) {
++        val bubbleTuning = remember(bubbleTuningValue) { BubblePlayerTuning.decode(bubbleTuningValue) }
++        val bubbleScope = rememberCoroutineScope()
++        val queueItems by playerViewModel.currentPlaylist.collectAsStateWithLifecycle()
++        val queueIndex by playerViewModel.currentMediaItemIndex.collectAsStateWithLifecycle()
++        val nextTitle =
++            remember(queueItems, queueIndex) {
++                if (queueIndex >= 0) queueItems.getOrNull(queueIndex + 1)?.mediaMetadata?.title?.toString() else null
++            }
++        BubblePlayerPage(
++            currentMediaItem = currentMediaItem,
++            nextTitle = nextTitle,
++            seekPositionProvider = seekPositionProvider,
++            realPositionProvider = realPositionProvider,
++            duration = duration,
++            isPlaying = isPlaying,
++            isLike = isLike,
++            playMode = playMode,
++            sampleRate = audioQualityInfo.sampleRate,
++            bitRate = audioQualityInfo.bitRate,
++            isLossless = audioQualityInfo.isLossless,
++            hazeState = hazeState,
++            tuning = bubbleTuning,
++            onTuningChange = { changed ->
++                bubbleScope.launch {
++                    preferencesManager.setString(PreferencesManager.Keys.BUBBLE_PLAYER_TUNING, changed.encode())
++                }
++            },
++            onValueChange = onValueChange,
++            onValueChangeFinished = onValueChangeFinished,
++            onPlayPauseClick = onPlayPauseClick,
++            onPreviousClick = onPreviousClick,
++            onNextClick = onNextClick,
++            onPlayModeClick = onPlayModeClick,
++            onFavoriteClick = onFavoriteClick,
++            onCollapse = onCollapse,
++            onPlaylistClick = onPlaylistClick,
++            onLyricsClick = onLyricsClick,
++            modifier = modifier,
++            coverSwipeModifier = coverSwipeModifier,
++        )
++        return
++    }
+     if (playerStyleValue == PillPlayerTuning.STYLE_PILL) {
+         val pillTuning = remember(pillTuningValue) { PillPlayerTuning.decode(pillTuningValue) }
+         PillPlayerPage(
+diff --git a/app/src/main/java/me/spica27/spicamusic/ui/player/MiniLyric.kt b/app/src/main/java/me/spica27/spicamusic/ui/player/MiniLyric.kt
+index e6f7bfa..ea934a9 100644
+--- a/app/src/main/java/me/spica27/spicamusic/ui/player/MiniLyric.kt
++++ b/app/src/main/java/me/spica27/spicamusic/ui/player/MiniLyric.kt
+@@ -22,6 +22,7 @@ import androidx.compose.ui.draw.clip
+ import androidx.compose.ui.res.stringResource
+ import androidx.compose.ui.text.style.TextAlign
+ import androidx.compose.ui.text.style.TextOverflow
++import androidx.compose.ui.unit.TextUnit
+ import androidx.compose.ui.unit.dp
+ import androidx.lifecycle.Lifecycle
+ import androidx.lifecycle.compose.LocalLifecycleOwner
+@@ -50,6 +51,8 @@ private const val LOADING_PLACEHOLDER = "· · ·"
+ fun MiniLyric(
+     onClick: () -> Unit,
+     modifier: Modifier = Modifier,
++    /** Overrides the font size of the line (the Bubble player's text size setting); unspecified = default. */
++    textSize: TextUnit = TextUnit.Unspecified,
+ ) {
+     // Activity 作用域共享实例：与全屏歌词模式同源，
+     // 全屏歌词内切换歌词源 / 调整偏移量后 mini 歌词同步生效
+@@ -139,7 +142,10 @@ fun MiniLyric(
+             val isPlaceholder = line == null || line == LOADING_PLACEHOLDER
+             Text(
+                 text = line ?: stringResource(if (uiState.lyricsSuppressed) R.string.lyrics_no_match else R.string.no_lyrics),
+-                style = MaterialTheme.typography.bodyMedium,
++                style =
++                    MaterialTheme.typography.bodyMedium.let {
++                        if (textSize == TextUnit.Unspecified) it else it.copy(fontSize = textSize)
++                    },
+                 color =
+                     if (isPlaceholder) {
+                         MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.9f)
+diff --git a/app/src/main/java/me/spica27/spicamusic/ui/player/PillPlayerTuning.kt b/app/src/main/java/me/spica27/spicamusic/ui/player/PillPlayerTuning.kt
+index ba6a369..4271eb7 100644
+--- a/app/src/main/java/me/spica27/spicamusic/ui/player/PillPlayerTuning.kt
++++ b/app/src/main/java/me/spica27/spicamusic/ui/player/PillPlayerTuning.kt
+@@ -35,6 +35,7 @@ data class PillPlayerTuning(
+     companion object {
+         const val STYLE_CLASSIC = "classic"
+         const val STYLE_PILL = "pill"
++        const val STYLE_BUBBLE = "bubble"
+ 
+         val Default = PillPlayerTuning()
+ 
+diff --git a/app/src/main/java/me/spica27/spicamusic/ui/settings/SettingsScene.kt b/app/src/main/java/me/spica27/spicamusic/ui/settings/SettingsScene.kt
+index 24fbdd2..93bdc46 100644
+--- a/app/src/main/java/me/spica27/spicamusic/ui/settings/SettingsScene.kt
++++ b/app/src/main/java/me/spica27/spicamusic/ui/settings/SettingsScene.kt
+@@ -1288,11 +1288,14 @@ private fun rememberPlayerStyleOptions(): ImmutableList<SettingsOption> {
+     val classicDesc = stringResource(R.string.player_style_classic_desc)
+     val pill = stringResource(R.string.player_style_pill)
+     val pillDesc = stringResource(R.string.player_style_pill_desc)
+-    return remember(classic, classicDesc, pill, pillDesc) {
++    val bubble = stringResource(R.string.player_style_bubble)
++    val bubbleDesc = stringResource(R.string.player_style_bubble_desc)
++    return remember(classic, classicDesc, pill, pillDesc, bubble, bubbleDesc) {
+         ImmutableList.copyOf(
+             listOf(
+                 SettingsOption(PillPlayerTuning.STYLE_CLASSIC, classic, classicDesc, Icons.Default.Album),
+                 SettingsOption(PillPlayerTuning.STYLE_PILL, pill, pillDesc, Icons.Default.ViewAgenda),
++                SettingsOption(PillPlayerTuning.STYLE_BUBBLE, bubble, bubbleDesc, Icons.Default.BlurOn),
+             ),
+         )
+     }
+diff --git a/app/src/main/res/values-zh-rTW/strings.xml b/app/src/main/res/values-zh-rTW/strings.xml
+index 45d1302..9ee767a 100644
+--- a/app/src/main/res/values-zh-rTW/strings.xml
++++ b/app/src/main/res/values-zh-rTW/strings.xml
+@@ -1267,4 +1267,47 @@
+   <string name="pill_skip_side">上下首邊距</string>
+   <string name="pill_skip_height">上下首高度</string>
+   <string name="pill_reset">重設膠囊播放器</string>
++  <string name="player_style_bubble">氣泡</string>
++  <string name="player_style_bubble_desc">懸浮欄，專輯置中。長按播放鍵 2 秒開啟設定</string>
++  <string name="bp_next">下一首：%1$s</string>
++  <string name="bp_settings_title">氣泡播放器</string>
++  <string name="bp_sec_order">底部欄順序</string>
++  <string name="bp_bar_progress">進度欄</string>
++  <string name="bp_bar_title">混合 / 標題 / 喜歡欄</string>
++  <string name="bp_bar_lyrics">歌詞欄</string>
++  <string name="bp_move_up">上移</string>
++  <string name="bp_move_down">下移</string>
++  <string name="bp_sec_heights">欄高度</string>
++  <string name="bp_h_top">頂欄高度</string>
++  <string name="bp_h_progress">進度欄高度</string>
++  <string name="bp_h_title">混合 / 標題 / 喜歡欄高度</string>
++  <string name="bp_h_lyrics">歌詞欄高度</string>
++  <string name="bp_sec_text">文字大小</string>
++  <string name="bp_t_time">計時文字</string>
++  <string name="bp_t_next">下一首文字</string>
++  <string name="bp_t_lyrics">歌詞文字</string>
++  <string name="bp_t_title">標題文字</string>
++  <string name="bp_t_artist">藝人文字</string>
++  <string name="bp_sec_blur">模糊</string>
++  <string name="bp_blur_on">欄模糊</string>
++  <string name="bp_blur_on_desc">關閉後使用純色填充，不再透明</string>
++  <string name="bp_blur_amount">模糊強度</string>
++  <string name="bp_blur_optimize">優化模糊</string>
++  <string name="bp_blur_optimize_desc">以較低解析度繪製模糊，更省電</string>
++  <string name="bp_blur_quality">模糊品質</string>
++  <string name="bp_sec_album">專輯封面</string>
++  <string name="bp_album_bg">專輯背景</string>
++  <string name="bp_album_bg_desc">專輯後方的欄樣式面板</string>
++  <string name="bp_album_info">年份和專輯資訊</string>
++  <string name="bp_album_info_desc">在封面上方的欄中顯示 年份 • 專輯</string>
++  <string name="bp_album_width">寬度</string>
++  <string name="bp_album_height">高度</string>
++  <string name="bp_album_corner">圓角</string>
++  <string name="bp_sec_buttons">上一首 / 播放 / 下一首按鈕</string>
++  <string name="bp_play_size">播放 / 暫停大小</string>
++  <string name="bp_skip_size">上一首 / 下一首大小</string>
++  <string name="bp_btn_gap">按鈕間距</string>
++  <string name="bp_btn_bottom">離底部距離</string>
++  <string name="bp_btn_shift">左右偏移</string>
++  <string name="bp_reset">重設氣泡播放器</string>
+ </resources>
+diff --git a/app/src/main/res/values-zh/strings.xml b/app/src/main/res/values-zh/strings.xml
+index e406f80..7cf5bdf 100644
+--- a/app/src/main/res/values-zh/strings.xml
++++ b/app/src/main/res/values-zh/strings.xml
+@@ -1268,4 +1268,47 @@
+   <string name="pill_skip_side">上下曲边距</string>
+   <string name="pill_skip_height">上下曲高度</string>
+   <string name="pill_reset">重置胶囊播放器</string>
++  <string name="player_style_bubble">气泡</string>
++  <string name="player_style_bubble_desc">悬浮栏，专辑居中。长按播放键 2 秒打开设置</string>
++  <string name="bp_next">下一首：%1$s</string>
++  <string name="bp_settings_title">气泡播放器</string>
++  <string name="bp_sec_order">底部栏顺序</string>
++  <string name="bp_bar_progress">进度栏</string>
++  <string name="bp_bar_title">混合 / 标题 / 喜欢栏</string>
++  <string name="bp_bar_lyrics">歌词栏</string>
++  <string name="bp_move_up">上移</string>
++  <string name="bp_move_down">下移</string>
++  <string name="bp_sec_heights">栏高度</string>
++  <string name="bp_h_top">顶栏高度</string>
++  <string name="bp_h_progress">进度栏高度</string>
++  <string name="bp_h_title">混合 / 标题 / 喜欢栏高度</string>
++  <string name="bp_h_lyrics">歌词栏高度</string>
++  <string name="bp_sec_text">文字大小</string>
++  <string name="bp_t_time">计时文字</string>
++  <string name="bp_t_next">下一首文字</string>
++  <string name="bp_t_lyrics">歌词文字</string>
++  <string name="bp_t_title">标题文字</string>
++  <string name="bp_t_artist">艺人文字</string>
++  <string name="bp_sec_blur">模糊</string>
++  <string name="bp_blur_on">栏模糊</string>
++  <string name="bp_blur_on_desc">关闭后使用纯色填充，不再透明</string>
++  <string name="bp_blur_amount">模糊强度</string>
++  <string name="bp_blur_optimize">优化模糊</string>
++  <string name="bp_blur_optimize_desc">以较低分辨率绘制模糊，更省电</string>
++  <string name="bp_blur_quality">模糊质量</string>
++  <string name="bp_sec_album">专辑封面</string>
++  <string name="bp_album_bg">专辑背景</string>
++  <string name="bp_album_bg_desc">专辑后方的栏样式面板</string>
++  <string name="bp_album_info">年份和专辑信息</string>
++  <string name="bp_album_info_desc">在封面上方的栏中显示 年份 • 专辑</string>
++  <string name="bp_album_width">宽度</string>
++  <string name="bp_album_height">高度</string>
++  <string name="bp_album_corner">圆角</string>
++  <string name="bp_sec_buttons">上一首 / 播放 / 下一首按钮</string>
++  <string name="bp_play_size">播放 / 暂停大小</string>
++  <string name="bp_skip_size">上一首 / 下一首大小</string>
++  <string name="bp_btn_gap">按钮间距</string>
++  <string name="bp_btn_bottom">离底部距离</string>
++  <string name="bp_btn_shift">左右偏移</string>
++  <string name="bp_reset">重置气泡播放器</string>
+ </resources>
+diff --git a/app/src/main/res/values/strings.xml b/app/src/main/res/values/strings.xml
+index 1d9cc70..d37f8d4 100644
+--- a/app/src/main/res/values/strings.xml
++++ b/app/src/main/res/values/strings.xml
+@@ -1268,4 +1268,47 @@
+   <string name="pill_skip_side">Skip side</string>
+   <string name="pill_skip_height">Skip height</string>
+   <string name="pill_reset">Reset pill player</string>
++  <string name="player_style_bubble">Bubble</string>
++  <string name="player_style_bubble_desc">Floating bars with the album in the middle. Hold play for 2 seconds for settings</string>
++  <string name="bp_next">next: %1$s</string>
++  <string name="bp_settings_title">Bubble player</string>
++  <string name="bp_sec_order">Bottom bars order</string>
++  <string name="bp_bar_progress">Progress bar</string>
++  <string name="bp_bar_title">Mix / title / like bar</string>
++  <string name="bp_bar_lyrics">Lyrics bar</string>
++  <string name="bp_move_up">Move up</string>
++  <string name="bp_move_down">Move down</string>
++  <string name="bp_sec_heights">Bar heights</string>
++  <string name="bp_h_top">Top bar height</string>
++  <string name="bp_h_progress">Progress bar height</string>
++  <string name="bp_h_title">Mix / title / like bar height</string>
++  <string name="bp_h_lyrics">Lyrics bar height</string>
++  <string name="bp_sec_text">Text sizes</string>
++  <string name="bp_t_time">Time counter</string>
++  <string name="bp_t_next">Next text</string>
++  <string name="bp_t_lyrics">Lyrics text</string>
++  <string name="bp_t_title">Title text</string>
++  <string name="bp_t_artist">Artist text</string>
++  <string name="bp_sec_blur">Blur</string>
++  <string name="bp_blur_on">Bar blur</string>
++  <string name="bp_blur_on_desc">Off gives a solid fill instead of a transparent one</string>
++  <string name="bp_blur_amount">Blur amount</string>
++  <string name="bp_blur_optimize">Optimize blur</string>
++  <string name="bp_blur_optimize_desc">Draws the blur at a lower resolution to save power</string>
++  <string name="bp_blur_quality">Blur quality</string>
++  <string name="bp_sec_album">Album art</string>
++  <string name="bp_album_bg">Album background</string>
++  <string name="bp_album_bg_desc">A bar-style panel behind the album</string>
++  <string name="bp_album_info">Year and album info</string>
++  <string name="bp_album_info_desc">Shows year • album in a bar above the cover</string>
++  <string name="bp_album_width">Width</string>
++  <string name="bp_album_height">Height</string>
++  <string name="bp_album_corner">Corner radius</string>
++  <string name="bp_sec_buttons">Previous / play / next buttons</string>
++  <string name="bp_play_size">Play / pause size</string>
++  <string name="bp_skip_size">Previous / next size</string>
++  <string name="bp_btn_gap">Gap between buttons</string>
++  <string name="bp_btn_bottom">Distance from bottom</string>
++  <string name="bp_btn_shift">Left / right shift</string>
++  <string name="bp_reset">Reset Bubble player</string>
+ </resources>
+diff --git a/core-preferences/src/main/java/me/spica27/spicamusic/core/preferences/PreferencesManager.kt b/core-preferences/src/main/java/me/spica27/spicamusic/core/preferences/PreferencesManager.kt
+index f87db96..f31fda1 100644
+--- a/core-preferences/src/main/java/me/spica27/spicamusic/core/preferences/PreferencesManager.kt
++++ b/core-preferences/src/main/java/me/spica27/spicamusic/core/preferences/PreferencesManager.kt
+@@ -68,6 +68,7 @@ class PreferencesManager(
+         val PROGRESS_BAR_STYLE = stringPreferencesKey("progress_bar_style")
+         val PLAYER_STYLE = stringPreferencesKey("player_style")
+         val PILL_PLAYER_TUNING = stringPreferencesKey("pill_player_tuning")
++        val BUBBLE_PLAYER_TUNING = stringPreferencesKey("bubble_player_tuning")
+         val EQ_ENABLED = booleanPreferencesKey("eq_enabled")
+         val EQ_BANDS = stringPreferencesKey("eq_bands")
+         val LOUDNESS_NORMALIZATION_ENABLED = booleanPreferencesKey("loudness_normalization_enabled")
