@@ -152,6 +152,11 @@ internal fun BubbleSettingsSheet(
                 }
             }
 
+            LyricsSettingsSection(stringResource(R.string.bp_sec_seek))
+            Slide(R.string.bp_seek_height, BubbleSetting.SeekHeight, 24..96)
+            Slide(R.string.bp_seek_thickness, BubbleSetting.SeekThickness, 1..14)
+            Slide(R.string.bp_seek_width, BubbleSetting.SeekWidth, 30..100) { "$it%" }
+
             LyricsSettingsSection(stringResource(R.string.bp_sec_album))
             Toggle(R.string.bp_album_bg, R.string.bp_album_bg_desc, BubbleSetting.AlbumBackground)
             if (tuning.albumBackground == 1) {

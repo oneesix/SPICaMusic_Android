@@ -8,15 +8,12 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
-import androidx.compose.foundation.gestures.detectHorizontalDragGestures
-import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.gestures.waitForUpOrCancellation
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -89,7 +86,9 @@ import me.spica27.spicamusic.ui.glass.LocalLiquidGlassV2Config
 import me.spica27.spicamusic.ui.glass.liquidGlassV2Surface
 import me.spica27.spicamusic.ui.home.page.AlbumStyleTuning
 import me.spica27.spicamusic.ui.home.page.albumHighlight
+import me.spica27.spicamusic.ui.theme.LocalReducedMotion
 import me.spica27.spicamusic.ui.widget.AudioCover
+import me.spica27.spicamusic.ui.widget.audio_seekbar.GlowParticleSeekBar
 import me.spica27.spicamusic.ui.widget.clickHighlight
 import me.spica27.spicamusic.ui.widget.materialSharedAxisYIn
 import me.spica27.spicamusic.ui.widget.materialSharedAxisYOut
@@ -498,6 +497,10 @@ internal fun BubblePlayerPage(
                                 durationMs = duration,
                                 qualityText = qualityText(sampleRate, bitRate, isLossless),
                                 textSizeSp = 12.5f,
+                                seekHeight = tuning.seekHeightDp.dp,
+                                seekThickness = tuning.seekThicknessDp.dp,
+                                seekWidthFraction = tuning.seekWidthPercent / 100f,
+                                animationsEnabled = isPlaying && !LocalReducedMotion.current,
                                 onSeek = onValueChange,
                                 onSeekFinished = onValueChangeFinished,
                             )
@@ -752,6 +755,10 @@ private fun BubbleProgressBar(
     durationMs: Long,
     qualityText: String,
     textSizeSp: Float,
+    seekHeight: Dp,
+    seekThickness: Dp,
+    seekWidthFraction: Float,
+    animationsEnabled: Boolean,
     onSeek: (Float) -> Unit,
     onSeekFinished: () -> Unit,
 ) {
@@ -767,44 +774,19 @@ private fun BubbleProgressBar(
                 .padding(horizontal = 16.dp),
         verticalArrangement = Arrangement.Center,
     ) {
+        // The app's glow particles progress bar (same drawing as the player's progress bar style).
         Box(
-            modifier =
-                Modifier
-                    .fillMaxWidth()
-                    .height(24.dp)
-                    .pointerInput(durationMs) {
-                        detectTapGestures { offset ->
-                            onSeek((offset.x / size.width).coerceIn(0f, 1f))
-                            onSeekFinished()
-                        }
-                    }.pointerInput(durationMs) {
-                        detectHorizontalDragGestures(
-                            onDragEnd = onSeekFinished,
-                            onDragCancel = onSeekFinished,
-                        ) { change, _ ->
-                            change.consume()
-                            onSeek((change.position.x / size.width).coerceIn(0f, 1f))
-                        }
-                    },
+            modifier = Modifier.fillMaxWidth(),
             contentAlignment = Alignment.Center,
         ) {
-            Box(
-                modifier =
-                    Modifier
-                        .fillMaxWidth()
-                        .height(8.dp)
-                        .clip(CircleShape)
-                        .background(onSurface.copy(alpha = 0.18f)),
-            ) {
-                Box(
-                    modifier =
-                        Modifier
-                            .fillMaxHeight()
-                            .fillMaxWidth(progress)
-                            .clip(CircleShape)
-                            .background(MaterialTheme.colorScheme.primary),
-                )
-            }
+            GlowParticleSeekBar(
+                progress = progress,
+                onProgressChange = onSeek,
+                onProgressChangeFinished = onSeekFinished,
+                animationsEnabled = animationsEnabled,
+                trackThickness = seekThickness,
+                modifier = Modifier.fillMaxWidth(seekWidthFraction.coerceIn(0.3f, 1f)).height(seekHeight),
+            )
         }
         Row(
             modifier = Modifier.fillMaxWidth(),

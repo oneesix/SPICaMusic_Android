@@ -44,6 +44,7 @@ import androidx.compose.ui.graphics.nativeCanvas
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.tooling.preview.Preview
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.Lifecycle
@@ -100,6 +101,8 @@ fun GlowParticleSeekBar(
     showParticles: Boolean = true,
     glowColor: Color = MaterialTheme.colorScheme.primary,
     trackColor: Color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.16f),
+    /** Thickness of the line (the default is the original look). */
+    trackThickness: Dp = 3.dp,
 ) {
     val interactionSource = remember { MutableInteractionSource() }
     val dragged by interactionSource.collectIsDraggedAsState()
@@ -163,7 +166,7 @@ fun GlowParticleSeekBar(
                 val emphasis = interaction.value
                 val opacity = if (enabled) 1f else 0.38f
                 val color = glowColor.copy(alpha = glowColor.alpha * opacity)
-                val stroke = (3f + emphasis * 1.2f).dp.toPx()
+                val stroke = (trackThickness.value + emphasis * 1.2f).dp.toPx()
                 val timeNanos = elapsedTime.value
                 val animationPhase = (timeNanos % GLOW_PERIOD_NANOS).toFloat() / GLOW_PERIOD_NANOS
                 if (showParticles) {

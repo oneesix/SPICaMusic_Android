@@ -33,6 +33,9 @@ internal object BubbleSetting {
     const val HlAlpha = 26
     const val HlAngle = 27
     const val HlFalloff = 28
+    const val SeekHeight = 29
+    const val SeekThickness = 30
+    const val SeekWidth = 31
 }
 
 /**
@@ -71,6 +74,10 @@ data class BubblePlayerTuning(
     val hlAlphaPercent: Int = 50,
     val hlAngle: Int = 45,
     val hlFalloffTenths: Int = 20,
+    /** Progress bar (glow particles) size: area height dp, line thickness dp, width in percent of the bar. */
+    val seekHeightDp: Int = 40,
+    val seekThicknessDp: Int = 3,
+    val seekWidthPercent: Int = 100,
 ) {
     fun toList(): List<Int> =
         listOf(
@@ -103,6 +110,9 @@ data class BubblePlayerTuning(
             hlAlphaPercent,
             hlAngle,
             hlFalloffTenths,
+            seekHeightDp,
+            seekThicknessDp,
+            seekWidthPercent,
         )
 
     fun encode(): String = toList().joinToString(",")
@@ -155,6 +165,7 @@ data class BubblePlayerTuning(
                 g(0), g(1), g(2), g(3), g(4), g(5), g(6), g(7), g(8), g(9), g(10), g(11),
                 g(12), g(13), g(14), g(15), g(16), g(17), g(18), g(19), g(20), g(21), g(22), g(23),
                 g(24), g(25), g(26), g(27), g(28),
+                g(29), g(30), g(31),
             )
         }
 

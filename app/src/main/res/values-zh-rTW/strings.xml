@@ -1308,4 +1308,8 @@
   <string name="bp_hl_alpha">高光不透明度</string>
   <string name="bp_hl_angle">高光角度</string>
   <string name="bp_hl_falloff">高光衰減</string>
+  <string name="bp_sec_seek">進度條</string>
+  <string name="bp_seek_height">進度條高度</string>
+  <string name="bp_seek_thickness">線條粗細</string>
+  <string name="bp_seek_width">進度條寬度</string>
 </resources>

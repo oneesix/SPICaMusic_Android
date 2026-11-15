@@ -1309,4 +1309,8 @@
   <string name="bp_hl_alpha">Highlight opacity</string>
   <string name="bp_hl_angle">Highlight angle</string>
   <string name="bp_hl_falloff">Highlight falloff</string>
+  <string name="bp_sec_seek">Progress bar</string>
+  <string name="bp_seek_height">Bar height</string>
+  <string name="bp_seek_thickness">Line thickness</string>
+  <string name="bp_seek_width">Bar width</string>
 </resources>
