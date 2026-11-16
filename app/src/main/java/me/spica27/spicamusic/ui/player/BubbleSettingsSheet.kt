@@ -209,6 +209,8 @@ internal fun BubbleSettingsSheet(
                 if (tuning.fillBlurOptimize == 1) {
                     Slide(R.string.bp_fill_blur_quality, BubbleSetting.FillBlurQuality, 5..100, 5) { "$it%" }
                 }
+                Slide(R.string.bp_fill_reach_top, BubbleSetting.FillReachTop, 0..50) { "$it%" }
+                Slide(R.string.bp_fill_reach_bottom, BubbleSetting.FillReachBottom, 0..50) { "$it%" }
             }
 
             LyricsSettingsSection(stringResource(R.string.bp_sec_hl))

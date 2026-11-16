@@ -48,6 +48,8 @@ internal object BubbleSetting {
     const val FillBlurAmount = 41
     const val FillBlurOptimize = 42
     const val FillBlurQuality = 43
+    const val FillReachTop = 44
+    const val FillReachBottom = 45
 }
 
 /**
@@ -109,6 +111,9 @@ data class BubblePlayerTuning(
     val fillBlurAmountDp: Int = 24,
     val fillBlurOptimize: Int = 0,
     val fillBlurQuality: Int = 45,
+    /** How far the blur reaches into the full artwork from its top and bottom edge, percent of its height. */
+    val fillReachTopPercent: Int = 35,
+    val fillReachBottomPercent: Int = 35,
 ) {
     fun toList(): List<Int> =
         listOf(
@@ -156,6 +161,8 @@ data class BubblePlayerTuning(
             fillBlurAmountDp,
             fillBlurOptimize,
             fillBlurQuality,
+            fillReachTopPercent,
+            fillReachBottomPercent,
         )
 
     fun encode(): String = toList().joinToString(",")
@@ -210,7 +217,7 @@ data class BubblePlayerTuning(
                 g(24), g(25), g(26), g(27), g(28),
                 g(29), g(30), g(31),
                 g(32), g(33), g(34), g(35), g(36), g(37), g(38),
-                g(39), g(40), g(41), g(42), g(43),
+                g(39), g(40), g(41), g(42), g(43), g(44), g(45),
             )
         }
 

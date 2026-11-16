@@ -1364,4 +1364,6 @@
   <string name="bp_fill_blur_optimize">优化填充模糊</string>
   <string name="bp_fill_blur_optimize_desc">降低模糊质量以省电并保持流畅。</string>
   <string name="bp_fill_blur_quality">填充模糊质量</string>
+  <string name="bp_fill_reach_top">填充模糊顶部延伸</string>
+  <string name="bp_fill_reach_bottom">填充模糊底部延伸</string>
 </resources>

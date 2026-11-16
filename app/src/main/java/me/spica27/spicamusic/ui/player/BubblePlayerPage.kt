@@ -86,6 +86,7 @@ import dev.chrisbanes.haze.HazeState
 import dev.chrisbanes.haze.blur.HazeBlurStyle
 import dev.chrisbanes.haze.blur.HazeColorEffect
 import dev.chrisbanes.haze.blur.hazeBlur
+import dev.chrisbanes.haze.hazeSource
 import kotlinx.coroutines.delay
 import me.spica27.spicamusic.R
 import me.spica27.spicamusic.artwork.artwork
@@ -477,7 +478,6 @@ internal fun BubblePlayerPage(
                             FullArtworkFill(
                                 artwork = item?.mediaMetadata?.artwork(),
                                 side = boxW.dp,
-                                tuning = tuning,
                                 hazeState = hazeState,
                             )
                         }
@@ -486,7 +486,7 @@ internal fun BubblePlayerPage(
                             modifier =
                                 Modifier
                                     .fillMaxSize()
-                                    .then(if (fullOn) Modifier.fullArtworkFade() else Modifier)
+                                    .then(if (fullOn) Modifier.hazeSource(hazeState) else Modifier)
                                     .clip(RoundedCornerShape(radius.dp))
                                     .then(if (v2Enabled) Modifier.layerBackdrop(albumBackdrop) else Modifier)
                                     .albumHighlight(highlightTuning, radius.toInt()),
@@ -516,6 +516,9 @@ internal fun BubblePlayerPage(
                                     modifier = Modifier.fillMaxSize().clickHighlight(onClick = onLyricsClick),
                                 )
                             }
+                        }
+                        if (fullOn) {
+                            FullArtworkBlur(side = boxW.dp, tuning = tuning, hazeState = hazeState)
                         }
                         Row(
                             modifier =

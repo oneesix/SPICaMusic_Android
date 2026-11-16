@@ -1364,4 +1364,6 @@
   <string name="bp_fill_blur_optimize">Optimize fill blur</string>
   <string name="bp_fill_blur_optimize_desc">Lower the blur quality to save battery and keep it smooth.</string>
   <string name="bp_fill_blur_quality">Fill blur quality</string>
+  <string name="bp_fill_reach_top">Fill blur reach (top)</string>
+  <string name="bp_fill_reach_bottom">Fill blur reach (bottom)</string>
 </resources>
