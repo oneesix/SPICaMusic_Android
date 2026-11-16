@@ -21,7 +21,6 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.requiredSize
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.wrapContentSize
 import androidx.compose.foundation.layout.width
@@ -481,8 +480,7 @@ internal fun BubblePlayerPage(
                             modifier =
                                 if (fullOn) {
                                     Modifier
-                                        .requiredSize(width = boxW.dp, height = (boxH * 3).dp)
-                                        .offset(y = (-boxH).dp)
+                                        .freeBox(width = boxW.dp, height = (boxH * 3).dp, y = (-boxH).dp)
                                         .then(if (fullArtBackdrop != null) Modifier.layerBackdrop(fullArtBackdrop) else Modifier)
                                 } else {
                                     Modifier.fillMaxSize()

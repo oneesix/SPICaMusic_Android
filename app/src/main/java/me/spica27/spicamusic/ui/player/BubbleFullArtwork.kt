@@ -7,6 +7,7 @@ import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.requiredSize
+import androidx.compose.foundation.layout.wrapContentSize
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -39,6 +40,19 @@ import dev.chrisbanes.haze.blur.hazeBlur
 import dev.chrisbanes.haze.hazeSource
 import me.spica27.spicamusic.artwork.MusicArtwork
 import me.spica27.spicamusic.ui.widget.AudioCover
+
+/**
+ * A box of exactly [width] x [height] whose top edge sits [y] below the parent's top edge, even when it is
+ * bigger than the parent. A plain requiredSize would be centered in the parent instead.
+ */
+internal fun Modifier.freeBox(
+    width: Dp,
+    height: Dp,
+    y: Dp,
+): Modifier =
+    wrapContentSize(Alignment.TopStart, unbounded = true)
+        .requiredSize(width = width, height = height)
+        .offset(y = y)
 
 /**
  * Liquid glass V2 only: records the full artwork picture (copies, album and blur layers), so the glass bars
@@ -146,8 +160,7 @@ private fun BlurBand(
     Box(
         modifier =
             Modifier
-                .requiredSize(width = width, height = height)
-                .offset(y = y)
+                .freeBox(width = width, height = height, y = y)
                 .hazeBlur(
                     input = HazeInput.Sources(hazeState),
                     style = style,
