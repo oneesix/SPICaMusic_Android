@@ -22,6 +22,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.CompositingStrategy
 import androidx.compose.ui.graphics.ShaderBrush
 import androidx.compose.ui.graphics.TransformOrigin
+import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.layout.layout
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.Constraints
@@ -106,62 +107,17 @@ internal fun rgbToLab(r255: Float, g255: Float, b255: Float): FloatArray {
     return floatArrayOf(116f * f(y) - 16f, 500f * (f(x) - f(y)), 200f * (f(y) - f(z)))
 }
 
-private val DefaultSmoothColors =
-    listOf(
-        intArrayOf(125, 20, 8),
-        intArrayOf(143, 26, 9),
-        intArrayOf(255, 170, 60),
-        intArrayOf(74, 11, 4),
-    )
-
-internal fun buildSmoothPalette(
-    palette: CoverPalette?,
-    saturation: Float,
-    dark: Boolean,
-    vivid: Boolean = false,
-): SmoothPalette {
-    val source = palette?.clusters?.take(6)?.map { it.rgb } ?: DefaultSmoothColors
-    val colors = if (source.size >= 4) source else List(4) { source[it % source.size] }
+/** Gradient points from the Smooth engine theme: top, middle, bottom, glow and a middle/glow mix. */
+internal fun buildSmoothPalette(theme: SmoothTheme): SmoothPalette {
+    val colors = listOf(theme.top, theme.mid, theme.bot, theme.glow, lerp(theme.mid, theme.glow, 0.5f))
     val lab = FloatArray(SLOTS * 3)
-    val rgb = ArrayList<Color>()
-    // saturation: push the colour away from (or towards) its own grey
-    val raw =
-        colors.map { c ->
-            val gray = 0.299f * c[0] + 0.587f * c[1] + 0.114f * c[2]
-            rgbToLab(
-                (gray + (c[0] - gray) * saturation).coerceIn(0f, 255f),
-                (gray + (c[1] - gray) * saturation).coerceIn(0f, 255f),
-                (gray + (c[2] - gray) * saturation).coerceIn(0f, 255f),
-            )
-        }
-    // vivid: light or dark is picked from the cover's average lightness
-    val useDark = if (vivid) raw.map { it[0] }.average() < 62.0 else dark
-    raw.forEachIndexed { i, rawLab ->
-        // light / dark look: same hue, lightness moved into a light or a dark band
-        val l = if (vivid) toneLabVivid(rawLab, useDark) else toneLab(rawLab, useDark)
+    colors.forEachIndexed { i, c ->
+        val l = rgbToLab(c.red * 255f, c.green * 255f, c.blue * 255f)
         lab[i * 3] = l[0]
         lab[i * 3 + 1] = l[1]
         lab[i * 3 + 2] = l[2]
-        val toned = labToRgb(l[0], l[1], l[2])
-        rgb.add(Color(toned[0].roundToInt().coerceIn(0, 255), toned[1].roundToInt().coerceIn(0, 255), toned[2].roundToInt().coerceIn(0, 255)))
     }
-    // vivid: text colour = the cover colour that contrasts most with the finished background
-    var accent: FloatArray? = null
-    if (vivid && raw.isNotEmpty()) {
-        val count = colors.size.coerceAtMost(SLOTS)
-        var bgL = 0f
-        for (i in 0 until count) bgL += lab[i * 3]
-        bgL /= count.coerceAtLeast(1)
-        var best = -1f
-        for (r in raw) {
-            val score = hypot(r[1], r[2]) * (1f + abs(r[0] - bgL) / 50f)
-            if (score > best) {
-                best = score
-                accent = r
-            }
-        }
-    }
-    return SmoothPalette(lab, colors.size.coerceAtMost(SLOTS), rgb, useDark, accent)
+    return SmoothPalette(lab, colors.size, colors, theme.dark)
 }
 
 private fun snapColors(
@@ -259,25 +215,18 @@ private const val SMOOTH_SHADER =
     """
 
 /**
- * Smooth background. [dark] picks the look: a deep gradient (dark) or a pastel gradient (light).
+ * Smooth background: the gradient of the Smooth engine [theme] (deep for dark covers, pastel for light ones).
  * [enabled] = false (app in background / animations off) behaves like [SmoothSettings.freeze].
  * Needs Android 13+ (AGSL); older versions get a static album-colour gradient.
  */
 @Composable
 fun SmoothBackground(
-    coverUri: Uri?,
+    theme: SmoothTheme,
     settings: SmoothSettings,
     enabled: Boolean,
-    dark: Boolean,
     modifier: Modifier = Modifier,
 ) {
-    val context = LocalContext.current
-    var coverPalette by remember(coverUri) { mutableStateOf<CoverPalette?>(null) }
-    LaunchedEffect(coverUri) { coverPalette = extractCoverPalette(context, coverUri) }
-    val palette =
-        remember(coverPalette, settings.saturationPercent, settings.themeMode, dark) {
-            buildSmoothPalette(coverPalette, settings.saturationPercent / 100f, dark, settings.themeMode == SmoothThemeMode.VIVID)
-        }
+    val palette = remember(theme) { buildSmoothPalette(theme) }
     // the Vivid look has no extra dim
     val dim = if (settings.themeMode == SmoothThemeMode.VIVID) 0f else settings.dimPercent.coerceIn(0, 70) / 100f
 

@@ -20,6 +20,8 @@ import com.skydoves.landscapist.core.Landscapist
 import com.skydoves.landscapist.image.LocalLandscapist
 import dev.chrisbanes.haze.rememberHazeState
 import me.spica27.spicamusic.common.entity.ThemeColorStyle
+import me.spica27.spicamusic.ui.settings.SettingsViewModel
+import me.spica27.spicamusic.ui.widget.SmoothAppScope
 import me.spica27.spicamusic.core.preferences.LyricsStyleSettings
 import me.spica27.spicamusic.core.preferences.PreferencesManager
 import me.spica27.spicamusic.ui.adaptive.LocalPaneInfo
@@ -52,6 +54,7 @@ import me.spica27.spicamusic.ui.widget.rememberAppFontFamily
 import me.spica27.spicamusic.utils.Nav3Transitions
 import org.koin.compose.koinInject
 import org.koin.compose.viewmodel.koinActivityViewModel
+import org.koin.compose.viewmodel.koinViewModel
 
 @Composable
 fun AppScaffold() {
@@ -84,6 +87,8 @@ fun AppScaffold() {
 
     val lyricsStyle by preferencesManager.lyricsStyle.collectAsStateWithLifecycle(LyricsStyleSettings())
     val playerViewModel: PlayerViewModel = koinActivityViewModel()
+    val settingsViewModel: SettingsViewModel = koinViewModel()
+    val smoothSettings by settingsViewModel.smooth.collectAsStateWithLifecycle()
     val color by playerViewModel.playerThemeColor.collectAsStateWithLifecycle()
     val keepScreenOn by
         preferencesManager
@@ -121,6 +126,12 @@ fun AppScaffold() {
         themeColorStyle = ThemeColorStyle.fromString(themeColorStyleValue),
         fontFamily = appFontFamily,
     ) {
+        val currentMediaItem by playerViewModel.currentMediaItem.collectAsStateWithLifecycle()
+        SmoothAppScope(
+            enabled = themeColorStyleValue == ThemeColorStyle.Dynamic.value,
+            settings = smoothSettings,
+            artworkUri = currentMediaItem?.mediaMetadata?.artworkUri,
+        ) {
         CompositionLocalProvider(
             LocalLiquidGlassConfig provides LiquidGlassConfig(enabled = liquidGlassEnabled, tuning = liquidGlassTuning),
             LocalLiquidGlassV2Config provides LiquidGlassV2Config(enabled = liquidGlassV2Enabled, tuning = liquidGlassV2Tuning),
@@ -155,6 +166,7 @@ fun AppScaffold() {
                     sharedTransitionScope = this,
                 )
             }
+        }
         }
     }
 }

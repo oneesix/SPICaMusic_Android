@@ -1103,7 +1103,9 @@ private fun rememberColorStyleOptions(): ImmutableList<SettingsOption> {
     val texturedDesc = stringResource(R.string.color_style_textured_desc)
     val flatLabel = stringResource(R.string.theme_color_style_flat)
     val flatDesc = stringResource(R.string.color_style_flat_desc)
-    return remember(texturedLabel, texturedDesc, flatLabel, flatDesc) {
+    val dynamicLabel = stringResource(R.string.theme_color_style_dynamic)
+    val dynamicDesc = stringResource(R.string.color_style_dynamic_desc)
+    return remember(texturedLabel, texturedDesc, flatLabel, flatDesc, dynamicLabel, dynamicDesc) {
         ImmutableList.copyOf(
             listOf(
                 SettingsOption(
@@ -1117,6 +1119,12 @@ private fun rememberColorStyleOptions(): ImmutableList<SettingsOption> {
                     flatLabel,
                     flatDesc,
                     Icons.Default.Layers,
+                ),
+                SettingsOption(
+                    ThemeColorStyle.Dynamic.value,
+                    dynamicLabel,
+                    dynamicDesc,
+                    Icons.Default.Album,
                 ),
             ),
         )

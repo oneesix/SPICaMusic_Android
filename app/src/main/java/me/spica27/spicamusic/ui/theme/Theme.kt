@@ -77,7 +77,8 @@ fun SPICaMusicTheme(
 ) {
     val colorScheme =
         when (themeColorStyle) {
-            ThemeColorStyle.Textured -> {
+            // Dynamic 使用与 Textured 相同的底色，颜色由 SmoothAppScope（Smooth 引擎）另行覆盖。
+            ThemeColorStyle.Textured, ThemeColorStyle.Dynamic -> {
                 val targetScheme =
                     rememberDynamicColorScheme(
                         seedColor = themeColor,

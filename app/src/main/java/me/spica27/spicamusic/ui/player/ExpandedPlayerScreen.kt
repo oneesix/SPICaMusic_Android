@@ -144,7 +144,8 @@ import me.spica27.spicamusic.ui.widget.SmoothThemeScope
 import me.spica27.spicamusic.ui.widget.buildBlurPlusTheme
 import me.spica27.spicamusic.ui.widget.resolveBlurPlusDark
 import me.spica27.spicamusic.ui.widget.resolveBlurPlusFlat
-import me.spica27.spicamusic.ui.widget.resolveSmoothDark
+import me.spica27.spicamusic.ui.widget.LocalSmoothArtistColor
+import me.spica27.spicamusic.ui.widget.rememberCoverPalette
 import me.spica27.spicamusic.ui.widget.rememberSmoothTheme
 import me.spica27.spicamusic.ui.widget.ShowOnIdleContent
 import me.spica27.spicamusic.ui.widget.audio_seekbar.AudioDynamicWaveSlider
@@ -509,15 +510,11 @@ fun ExpandedPlayerScreen(
     val smoothSettings by settingsViewModel.smooth.collectAsStateWithLifecycle()
     val isSmooth = backgroundValue == DynamicSpectrumBackground.Smooth.value
     val appDark = MaterialTheme.colorScheme.surface.luminance() < 0.5f
-    val smoothDark = resolveSmoothDark(smoothSettings.colorUi, smoothSettings.themeMode, appDark)
     val useAlbumTheme = isSmooth && smoothSettings.colorUi
-    val smoothTheme =
-        rememberSmoothTheme(
-            coverUri = if (useAlbumTheme) currentMediaItem?.mediaMetadata?.artworkUri else null,
-            settings = smoothSettings,
-            appDark = appDark,
-            enabled = useAlbumTheme,
-        )
+    // One engine for the gradient and the text: the gradient always follows the cover, the text only when
+    // "Color player UI" is on.
+    val smoothPalette = rememberCoverPalette(if (isSmooth) currentMediaItem?.mediaMetadata?.artworkUri else null)
+    val smoothTheme = rememberSmoothTheme(smoothPalette, smoothSettings, appDark)
     // Blur Plus: with "Color player UI" on, the UI takes the cover's colour (Appearance + Color style apply).
     val blurPlusSettings by settingsViewModel.blurPlus.collectAsStateWithLifecycle()
     val appColorStyleValue by settingsViewModel.themeColorStyle.collectAsStateWithLifecycle()
@@ -541,7 +538,7 @@ fun ExpandedPlayerScreen(
         )
     val lyricsScrimColor = MaterialTheme.colorScheme.scrim.copy(alpha = 0.14f)
 
-    PlayerThemeScope(theme = smoothTheme ?: blurPlusTheme, flat = isBlurPlus && blurPlusFlat) {
+    PlayerThemeScope(theme = (if (useAlbumTheme) smoothTheme else null) ?: blurPlusTheme, flat = isBlurPlus && blurPlusFlat) {
         Box(
             modifier =
                 modifier
@@ -561,10 +558,9 @@ fun ExpandedPlayerScreen(
                     // 仅在页面可见且应用在前台时启用动态背景。
                     if (isSmooth) {
                         SmoothBackground(
-                            coverUri = currentMediaItem?.mediaMetadata?.artworkUri,
+                            theme = smoothTheme,
                             settings = smoothSettings,
                             enabled = animationsEnabled && isAppInForeground,
-                            dark = smoothDark,
                             modifier =
                                 Modifier
                                     .fillMaxSize()
@@ -1486,7 +1482,7 @@ private fun SongInfo(
                             onClick = { onArtistClick?.invoke(artist) },
                         ),
                 style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                color = LocalSmoothArtistColor.current ?: MaterialTheme.colorScheme.onSurfaceVariant,
                 maxLines = 1,
                 textAlign = TextAlign.Center,
             )
