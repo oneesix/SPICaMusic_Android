@@ -1,0 +1,449 @@
+diff --git a/app/src/main/java/me/spica27/spicamusic/ui/player/BubbleFullArtwork.kt b/app/src/main/java/me/spica27/spicamusic/ui/player/BubbleFullArtwork.kt
+index 552224e..e4acb13 100644
+--- a/app/src/main/java/me/spica27/spicamusic/ui/player/BubbleFullArtwork.kt
++++ b/app/src/main/java/me/spica27/spicamusic/ui/player/BubbleFullArtwork.kt
+@@ -30,42 +30,96 @@ import dev.chrisbanes.haze.ExperimentalHazeApi
+ import dev.chrisbanes.haze.HazeInput
+ import dev.chrisbanes.haze.HazePerformanceMode
+ import dev.chrisbanes.haze.HazeProgressive
++import dev.chrisbanes.haze.HazeState
+ import dev.chrisbanes.haze.blur.HazeBlurStyle
+ import dev.chrisbanes.haze.blur.HazeColorEffect
+ import dev.chrisbanes.haze.blur.hazeBlur
+ import dev.chrisbanes.haze.hazeSource
+-import dev.chrisbanes.haze.rememberHazeState
+ import me.spica27.spicamusic.artwork.MusicArtwork
+ import me.spica27.spicamusic.ui.widget.AudioCover
+ 
+ /**
+- * Full artwork mode: above and below the square album, a flipped copy of the same cover continues the
+- * picture. Haze blurs it with a progressive blur (the same one the queue uses): no blur at the album edge,
+- * full blur far from it. Amount, optimize and quality come from the Bubble settings.
++ * Full artwork mode, part 1 (drawn BEFORE the album): the flipped copies above and below the square album.
++ * They are Haze sources of the shared [hazeState], as is the album itself, so the top copy, the album and
++ * the bottom copy act as one picture. The blur comes from [FullArtworkBlur], drawn after the album.
+  * Draws outside the parent box on purpose, so the parent must not clip.
+  */
+ @Composable
+ internal fun FullArtworkFill(
+     artwork: MusicArtwork?,
+     side: Dp,
+-    tuning: BubblePlayerTuning,
++    hazeState: HazeState,
+ ) {
+-    MirrorFill(artwork, side, tuning, above = true)
+-    MirrorFill(artwork, side, tuning, above = false)
++    MirrorCopy(artwork, side, hazeState, above = true)
++    MirrorCopy(artwork, side, hazeState, above = false)
+ }
+ 
+-@OptIn(ExperimentalHazeApi::class)
+ @Composable
+-private fun MirrorFill(
++private fun MirrorCopy(
+     artwork: MusicArtwork?,
+     side: Dp,
+-    tuning: BubblePlayerTuning,
++    hazeState: HazeState,
+     above: Boolean,
+ ) {
+-    val haze = rememberHazeState()
++    Box(
++        modifier =
++            Modifier
++                .requiredSize(side)
++                .offset(y = if (above) -side else side),
++    ) {
++        Box(
++            modifier =
++                Modifier
++                    .fillMaxSize()
++                    .hazeSource(hazeState)
++                    .graphicsLayer { scaleY = -1f },
++        ) {
++            AudioCover(artwork = artwork, modifier = Modifier.fillMaxSize())
++        }
++    }
++}
++
++/**
++ * Full artwork mode, part 2 (drawn AFTER the album, before the buttons): two progressive blur layers over
++ * the shared source. The top one is fully blurred at the top and fades out inside the album, the bottom one
++ * the other way round, so the main cover blurs into the copies with no seam. Amount, optimize and quality
++ * come from the Bubble settings.
++ */
++@OptIn(ExperimentalHazeApi::class)
++@Composable
++internal fun FullArtworkBlur(
++    side: Dp,
++    tuning: BubblePlayerTuning,
++    hazeState: HazeState,
++) {
+     val amount = tuning.fillBlurAmountDp
++    if (amount <= 0) return
++    val mode =
++        if (tuning.fillBlurOptimize == 1) {
++            HazePerformanceMode.Fixed(tuning.fillBlurQuality / 100f)
++        } else {
++            HazePerformanceMode.Balanced
++        }
++    // How far each blur reaches into the album comes from the Bubble settings (percent of its height).
++    val reachTop = side * (tuning.fillReachTopPercent / 100f)
++    val reachBottom = side * (tuning.fillReachBottomPercent / 100f)
++    BlurBand(hazeState, amount, mode, height = side + reachTop, y = -side, top = true, width = side)
++    BlurBand(hazeState, amount, mode, height = side + reachBottom, y = side - reachBottom, top = false, width = side)
++}
++
++@OptIn(ExperimentalHazeApi::class)
++@Composable
++private fun BlurBand(
++    hazeState: HazeState,
++    amount: Int,
++    mode: HazePerformanceMode,
++    height: Dp,
++    y: Dp,
++    top: Boolean,
++    width: Dp,
++) {
+     val style =
+-        remember(amount, above) {
++        remember(amount, top) {
+             HazeBlurStyle {
+                 blurRadius(amount.dp)
+                 noiseFactor(0f)
+@@ -73,50 +127,26 @@ private fun MirrorFill(
+                 colorEffects(emptyList())
+                 fallbackColorEffect(HazeColorEffect.tint(Color.Transparent))
+                 alpha(1f)
+-                // Sharp next to the album, fully blurred at the far end.
+                 progressive(
+                     HazeProgressive.verticalGradient(
+-                        startIntensity = if (above) 1f else 0f,
+-                        endIntensity = if (above) 0f else 1f,
++                        startIntensity = if (top) 1f else 0f,
++                        endIntensity = if (top) 0f else 1f,
+                     ),
+                 )
+             }
+         }
+-    val mode =
+-        if (tuning.fillBlurOptimize == 1) {
+-            HazePerformanceMode.Fixed(tuning.fillBlurQuality / 100f)
+-        } else {
+-            HazePerformanceMode.Balanced
+-        }
+     Box(
+         modifier =
+             Modifier
+-                .requiredSize(side)
+-                .offset(y = if (above) -side else side),
+-    ) {
+-        Box(
+-            modifier =
+-                Modifier
+-                    .fillMaxSize()
+-                    .hazeSource(haze)
+-                    .graphicsLayer { scaleY = -1f },
+-        ) {
+-            AudioCover(artwork = artwork, modifier = Modifier.fillMaxSize())
+-        }
+-        if (amount > 0) {
+-            Box(
+-                modifier =
+-                    Modifier
+-                        .fillMaxSize()
+-                        .hazeBlur(
+-                            input = HazeInput.Sources(haze),
+-                            style = style,
+-                            performanceMode = mode,
+-                            expandLayerBounds = false,
+-                        ),
+-            )
+-        }
+-    }
++                .requiredSize(width = width, height = height)
++                .offset(y = y)
++                .hazeBlur(
++                    input = HazeInput.Sources(hazeState),
++                    style = style,
++                    performanceMode = mode,
++                    expandLayerBounds = false,
++                ),
++    )
+ }
+ 
+ /**
+diff --git a/app/src/main/java/me/spica27/spicamusic/ui/player/BubblePlayerPage.kt b/app/src/main/java/me/spica27/spicamusic/ui/player/BubblePlayerPage.kt
+index f4fd3c3..5eccb22 100644
+--- a/app/src/main/java/me/spica27/spicamusic/ui/player/BubblePlayerPage.kt
++++ b/app/src/main/java/me/spica27/spicamusic/ui/player/BubblePlayerPage.kt
+@@ -86,6 +86,7 @@ import dev.chrisbanes.haze.HazeState
+ import dev.chrisbanes.haze.blur.HazeBlurStyle
+ import dev.chrisbanes.haze.blur.HazeColorEffect
+ import dev.chrisbanes.haze.blur.hazeBlur
++import dev.chrisbanes.haze.hazeSource
+ import kotlinx.coroutines.delay
+ import me.spica27.spicamusic.R
+ import me.spica27.spicamusic.artwork.artwork
+@@ -477,7 +478,7 @@ internal fun BubblePlayerPage(
+                             FullArtworkFill(
+                                 artwork = item?.mediaMetadata?.artwork(),
+                                 side = boxW.dp,
+-                                tuning = tuning,
++                                hazeState = hazeState,
+                             )
+                         }
+                         // The cover is recorded as its own layer, so the buttons on it can refract it.
+@@ -485,6 +486,7 @@ internal fun BubblePlayerPage(
+                             modifier =
+                                 Modifier
+                                     .fillMaxSize()
++                                    .then(if (fullOn) Modifier.hazeSource(hazeState) else Modifier)
+                                     .clip(RoundedCornerShape(radius.dp))
+                                     .then(if (v2Enabled) Modifier.layerBackdrop(albumBackdrop) else Modifier)
+                                     .albumHighlight(highlightTuning, radius.toInt()),
+@@ -515,6 +517,9 @@ internal fun BubblePlayerPage(
+                                 )
+                             }
+                         }
++                        if (fullOn) {
++                            FullArtworkBlur(side = boxW.dp, tuning = tuning, hazeState = hazeState)
++                        }
+                         Row(
+                             modifier =
+                                 Modifier
+diff --git a/app/src/main/java/me/spica27/spicamusic/ui/player/BubblePlayerTuning.kt b/app/src/main/java/me/spica27/spicamusic/ui/player/BubblePlayerTuning.kt
+index c907c23..93f21f9 100644
+--- a/app/src/main/java/me/spica27/spicamusic/ui/player/BubblePlayerTuning.kt
++++ b/app/src/main/java/me/spica27/spicamusic/ui/player/BubblePlayerTuning.kt
+@@ -48,6 +48,8 @@ internal object BubbleSetting {
+     const val FillBlurAmount = 41
+     const val FillBlurOptimize = 42
+     const val FillBlurQuality = 43
++    const val FillReachTop = 44
++    const val FillReachBottom = 45
+ }
+ 
+ /**
+@@ -109,6 +111,9 @@ data class BubblePlayerTuning(
+     val fillBlurAmountDp: Int = 24,
+     val fillBlurOptimize: Int = 0,
+     val fillBlurQuality: Int = 45,
++    /** How far the blur reaches into the full artwork from its top and bottom edge, percent of its height. */
++    val fillReachTopPercent: Int = 35,
++    val fillReachBottomPercent: Int = 35,
+ ) {
+     fun toList(): List<Int> =
+         listOf(
+@@ -156,6 +161,8 @@ data class BubblePlayerTuning(
+             fillBlurAmountDp,
+             fillBlurOptimize,
+             fillBlurQuality,
++            fillReachTopPercent,
++            fillReachBottomPercent,
+         )
+ 
+     fun encode(): String = toList().joinToString(",")
+@@ -210,7 +217,7 @@ data class BubblePlayerTuning(
+                 g(24), g(25), g(26), g(27), g(28),
+                 g(29), g(30), g(31),
+                 g(32), g(33), g(34), g(35), g(36), g(37), g(38),
+-                g(39), g(40), g(41), g(42), g(43),
++                g(39), g(40), g(41), g(42), g(43), g(44), g(45),
+             )
+         }
+ 
+diff --git a/app/src/main/java/me/spica27/spicamusic/ui/player/BubbleSettingsSheet.kt b/app/src/main/java/me/spica27/spicamusic/ui/player/BubbleSettingsSheet.kt
+index 8d70d46..1d378ca 100644
+--- a/app/src/main/java/me/spica27/spicamusic/ui/player/BubbleSettingsSheet.kt
++++ b/app/src/main/java/me/spica27/spicamusic/ui/player/BubbleSettingsSheet.kt
+@@ -209,6 +209,8 @@ internal fun BubbleSettingsSheet(
+                 if (tuning.fillBlurOptimize == 1) {
+                     Slide(R.string.bp_fill_blur_quality, BubbleSetting.FillBlurQuality, 5..100, 5) { "$it%" }
+                 }
++                Slide(R.string.bp_fill_reach_top, BubbleSetting.FillReachTop, 0..50) { "$it%" }
++                Slide(R.string.bp_fill_reach_bottom, BubbleSetting.FillReachBottom, 0..50) { "$it%" }
+             }
+ 
+             LyricsSettingsSection(stringResource(R.string.bp_sec_hl))
+diff --git a/app/src/main/java/me/spica27/spicamusic/ui/player/ExpandedPlayerScreen.kt b/app/src/main/java/me/spica27/spicamusic/ui/player/ExpandedPlayerScreen.kt
+index abe4ac3..e15b378 100644
+--- a/app/src/main/java/me/spica27/spicamusic/ui/player/ExpandedPlayerScreen.kt
++++ b/app/src/main/java/me/spica27/spicamusic/ui/player/ExpandedPlayerScreen.kt
+@@ -329,6 +329,10 @@ fun ExpandedPlayerScreen(
+         .getString(PreferencesManager.Keys.PLAYER_STYLE, PillPlayerTuning.STYLE_CLASSIC)
+         .collectAsStateWithLifecycle(initialValue = PillPlayerTuning.STYLE_CLASSIC)
+     val bubbleStyleActive = currentStyle == PillPlayerTuning.STYLE_BUBBLE
++    val bubbleTuningRaw by stylePrefs
++        .getString(PreferencesManager.Keys.BUBBLE_PLAYER_TUNING, BubblePlayerTuning.Default.encode())
++        .collectAsStateWithLifecycle(initialValue = BubblePlayerTuning.Default.encode())
++    val bubbleFullArtwork = remember(bubbleTuningRaw) { BubblePlayerTuning.decode(bubbleTuningRaw).fullArtwork == 1 }
+     val backStack = LocalBackStack.current
+     var playerSurface by remember { mutableStateOf(PlayerSurface.Player) }
+     val isPlaying by viewModel.isPlaying.collectAsStateWithLifecycle()
+@@ -422,6 +426,16 @@ fun ExpandedPlayerScreen(
+             playerSurface == PlayerSurface.Lyrics || surfaceDragging || surfaceProgress.value > 0.001f
+         }
+     }
++    // Bubble full artwork draws its own blurred background on the player page, so the dynamic background
++    // is not rendered there. It stays for the lyrics and the queue.
++    val playerBackgroundHidden by remember {
++        derivedStateOf {
++            bubbleStyleActive && bubbleFullArtwork &&
++                playerSurface == PlayerSurface.Player && !surfaceDragging &&
++                surfaceProgress.value < 0.001f &&
++                pagerState.currentPage == DEFAULT_PAGE && pagerState.currentPageOffsetFraction == 0f
++        }
++    }
+     val surfaceReducedMotion = LocalReducedMotion.current
+     LaunchedEffect(playerSurface) {
+         val target = if (playerSurface == PlayerSurface.Lyrics) 1f else 0f
+@@ -540,63 +554,65 @@ fun ExpandedPlayerScreen(
+                         .fillMaxSize()
+                         .then(if (lyricsGlassV2) Modifier.layerBackdrop(playerBgBackdrop) else Modifier),
+             ) {
+-                // 仅在页面可见且应用在前台时启用动态背景。
+-                if (isSmooth) {
+-                    SmoothBackground(
+-                        coverUri = currentMediaItem?.mediaMetadata?.artworkUri,
+-                        settings = smoothSettings,
+-                        enabled = animationsEnabled && isAppInForeground,
+-                        dark = smoothDark,
+-                        modifier =
+-                            Modifier
+-                                .fillMaxSize()
+-                                .hazeSource(hazeState),
+-                    )
+-                } else if (isBlurPlus) {
+-                    BlurPlusBackground(
+-                        coverUri = currentMediaItem?.mediaMetadata?.artworkUri,
+-                        settings = blurPlusSettings,
+-                        dark = blurPlusDark,
+-                        modifier =
+-                            Modifier
+-                                .fillMaxSize()
+-                                .hazeSource(hazeState),
+-                    )
+-                } else {
+-                    FluidMusicBackground(
+-                        modifier =
+-                            Modifier
+-                                .fillMaxSize()
+-                                // 队列顶栏在关闭玻璃时仍需采样动态背景，用于渐变模糊。
+-                                .hazeSource(hazeState),
+-                        coverColor = coverColor,
+-                        isDarkMode = MaterialTheme.colorScheme.surface.luminance() < 0.5f,
+-                        coverUri = { currentMediaItem?.mediaMetadata?.artworkUri },
+-                        enabled = animationsEnabled && isAppInForeground,
+-                    )
+-                }
++                if (!playerBackgroundHidden) {
++                    // 仅在页面可见且应用在前台时启用动态背景。
++                    if (isSmooth) {
++                        SmoothBackground(
++                            coverUri = currentMediaItem?.mediaMetadata?.artworkUri,
++                            settings = smoothSettings,
++                            enabled = animationsEnabled && isAppInForeground,
++                            dark = smoothDark,
++                            modifier =
++                                Modifier
++                                    .fillMaxSize()
++                                    .hazeSource(hazeState),
++                        )
++                    } else if (isBlurPlus) {
++                        BlurPlusBackground(
++                            coverUri = currentMediaItem?.mediaMetadata?.artworkUri,
++                            settings = blurPlusSettings,
++                            dark = blurPlusDark,
++                            modifier =
++                                Modifier
++                                    .fillMaxSize()
++                                    .hazeSource(hazeState),
++                        )
++                    } else {
++                        FluidMusicBackground(
++                            modifier =
++                                Modifier
++                                    .fillMaxSize()
++                                    // 队列顶栏在关闭玻璃时仍需采样动态背景，用于渐变模糊。
++                                    .hazeSource(hazeState),
++                            coverColor = coverColor,
++                            isDarkMode = MaterialTheme.colorScheme.surface.luminance() < 0.5f,
++                            coverUri = { currentMediaItem?.mediaMetadata?.artworkUri },
++                            enabled = animationsEnabled && isAppInForeground,
++                        )
++                    }
+ 
+-                // 歌词模式只压暗同一份动态背景，不创建第二个背景实例。
+-                Box(
+-                    modifier =
+-                        Modifier
+-                            .fillMaxSize()
+-                            // The source must wrap the dimming (alpha + colour) so the blurred header
+-                            // is dimmed exactly like the rest of the lyrics page.
+-                            .hazeSource(hazeState, zIndex = 0.5f)
+-                            .graphicsLayer { alpha = lyricsScrimAlpha.value }
+-                            .background(lyricsScrimColor),
+-                )
+-                // Smooth > Lyrics dim: extra darkening on the lyrics screen only.
+-                if (isSmooth && smoothSettings.lyricsDimPercent > 0) {
++                    // 歌词模式只压暗同一份动态背景，不创建第二个背景实例。
+                     Box(
+                         modifier =
+                             Modifier
+                                 .fillMaxSize()
+-                                .hazeSource(hazeState, zIndex = 0.55f)
++                                // The source must wrap the dimming (alpha + colour) so the blurred header
++                                // is dimmed exactly like the rest of the lyrics page.
++                                .hazeSource(hazeState, zIndex = 0.5f)
+                                 .graphicsLayer { alpha = lyricsScrimAlpha.value }
+-                                .background(Color.Black.copy(alpha = smoothSettings.lyricsDimPercent / 100f)),
++                                .background(lyricsScrimColor),
+                     )
++                    // Smooth > Lyrics dim: extra darkening on the lyrics screen only.
++                    if (isSmooth && smoothSettings.lyricsDimPercent > 0) {
++                        Box(
++                            modifier =
++                                Modifier
++                                    .fillMaxSize()
++                                    .hazeSource(hazeState, zIndex = 0.55f)
++                                    .graphicsLayer { alpha = lyricsScrimAlpha.value }
++                                    .background(Color.Black.copy(alpha = smoothSettings.lyricsDimPercent / 100f)),
++                        )
++                    }
+                 }
+             }
+ 
+diff --git a/app/src/main/res/values-zh-rTW/strings.xml b/app/src/main/res/values-zh-rTW/strings.xml
+index 00a5b63..3638318 100644
+--- a/app/src/main/res/values-zh-rTW/strings.xml
++++ b/app/src/main/res/values-zh-rTW/strings.xml
+@@ -1363,4 +1363,6 @@
+   <string name="bp_fill_blur_optimize">最佳化填充模糊</string>
+   <string name="bp_fill_blur_optimize_desc">降低模糊品質以省電並保持流暢。</string>
+   <string name="bp_fill_blur_quality">填充模糊品質</string>
++  <string name="bp_fill_reach_top">填充模糊頂部延伸</string>
++  <string name="bp_fill_reach_bottom">填充模糊底部延伸</string>
+ </resources>
+diff --git a/app/src/main/res/values-zh/strings.xml b/app/src/main/res/values-zh/strings.xml
+index b35ee0c..3102570 100644
+--- a/app/src/main/res/values-zh/strings.xml
++++ b/app/src/main/res/values-zh/strings.xml
+@@ -1364,4 +1364,6 @@
+   <string name="bp_fill_blur_optimize">优化填充模糊</string>
+   <string name="bp_fill_blur_optimize_desc">降低模糊质量以省电并保持流畅。</string>
+   <string name="bp_fill_blur_quality">填充模糊质量</string>
++  <string name="bp_fill_reach_top">填充模糊顶部延伸</string>
++  <string name="bp_fill_reach_bottom">填充模糊底部延伸</string>
+ </resources>
+diff --git a/app/src/main/res/values/strings.xml b/app/src/main/res/values/strings.xml
+index 4b52288..4add5c4 100644
+--- a/app/src/main/res/values/strings.xml
++++ b/app/src/main/res/values/strings.xml
+@@ -1364,4 +1364,6 @@
+   <string name="bp_fill_blur_optimize">Optimize fill blur</string>
+   <string name="bp_fill_blur_optimize_desc">Lower the blur quality to save battery and keep it smooth.</string>
+   <string name="bp_fill_blur_quality">Fill blur quality</string>
++  <string name="bp_fill_reach_top">Fill blur reach (top)</string>
++  <string name="bp_fill_reach_bottom">Fill blur reach (bottom)</string>
+ </resources>
