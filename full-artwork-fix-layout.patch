@@ -1,0 +1,64 @@
+diff --git a/app/src/main/java/me/spica27/spicamusic/ui/player/BubbleFullArtwork.kt b/app/src/main/java/me/spica27/spicamusic/ui/player/BubbleFullArtwork.kt
+index abbc1f3..c21efbd 100644
+--- a/app/src/main/java/me/spica27/spicamusic/ui/player/BubbleFullArtwork.kt
++++ b/app/src/main/java/me/spica27/spicamusic/ui/player/BubbleFullArtwork.kt
+@@ -7,6 +7,7 @@ import androidx.compose.foundation.layout.aspectRatio
+ import androidx.compose.foundation.layout.fillMaxSize
+ import androidx.compose.foundation.layout.offset
+ import androidx.compose.foundation.layout.requiredSize
++import androidx.compose.foundation.layout.wrapContentSize
+ import androidx.compose.runtime.Composable
+ import androidx.compose.runtime.DisposableEffect
+ import androidx.compose.runtime.LaunchedEffect
+@@ -40,6 +41,19 @@ import dev.chrisbanes.haze.hazeSource
+ import me.spica27.spicamusic.artwork.MusicArtwork
+ import me.spica27.spicamusic.ui.widget.AudioCover
+ 
++/**
++ * A box of exactly [width] x [height] whose top edge sits [y] below the parent's top edge, even when it is
++ * bigger than the parent. A plain requiredSize would be centered in the parent instead.
++ */
++internal fun Modifier.freeBox(
++    width: Dp,
++    height: Dp,
++    y: Dp,
++): Modifier =
++    wrapContentSize(Alignment.TopStart, unbounded = true)
++        .requiredSize(width = width, height = height)
++        .offset(y = y)
++
+ /**
+  * Liquid glass V2 only: records the full artwork picture (copies, album and blur layers), so the glass bars
+  * see it instead of the player background, which is not drawn while full artwork is on.
+@@ -146,8 +160,7 @@ private fun BlurBand(
+     Box(
+         modifier =
+             Modifier
+-                .requiredSize(width = width, height = height)
+-                .offset(y = y)
++                .freeBox(width = width, height = height, y = y)
+                 .hazeBlur(
+                     input = HazeInput.Sources(hazeState),
+                     style = style,
+diff --git a/app/src/main/java/me/spica27/spicamusic/ui/player/BubblePlayerPage.kt b/app/src/main/java/me/spica27/spicamusic/ui/player/BubblePlayerPage.kt
+index 85a04b2..02e67fe 100644
+--- a/app/src/main/java/me/spica27/spicamusic/ui/player/BubblePlayerPage.kt
++++ b/app/src/main/java/me/spica27/spicamusic/ui/player/BubblePlayerPage.kt
+@@ -21,7 +21,6 @@ import androidx.compose.foundation.layout.height
+ import androidx.compose.foundation.layout.navigationBarsPadding
+ import androidx.compose.foundation.layout.offset
+ import androidx.compose.foundation.layout.padding
+-import androidx.compose.foundation.layout.requiredSize
+ import androidx.compose.foundation.layout.size
+ import androidx.compose.foundation.layout.wrapContentSize
+ import androidx.compose.foundation.layout.width
+@@ -481,8 +480,7 @@ internal fun BubblePlayerPage(
+                             modifier =
+                                 if (fullOn) {
+                                     Modifier
+-                                        .requiredSize(width = boxW.dp, height = (boxH * 3).dp)
+-                                        .offset(y = (-boxH).dp)
++                                        .freeBox(width = boxW.dp, height = (boxH * 3).dp, y = (-boxH).dp)
+                                         .then(if (fullArtBackdrop != null) Modifier.layerBackdrop(fullArtBackdrop) else Modifier)
+                                 } else {
+                                     Modifier.fillMaxSize()
