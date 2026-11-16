@@ -1,0 +1,200 @@
+diff --git a/app/src/main/java/me/spica27/spicamusic/ui/player/BubbleFullArtwork.kt b/app/src/main/java/me/spica27/spicamusic/ui/player/BubbleFullArtwork.kt
+index e4acb13..abbc1f3 100644
+--- a/app/src/main/java/me/spica27/spicamusic/ui/player/BubbleFullArtwork.kt
++++ b/app/src/main/java/me/spica27/spicamusic/ui/player/BubbleFullArtwork.kt
+@@ -13,6 +13,7 @@ import androidx.compose.runtime.LaunchedEffect
+ import androidx.compose.runtime.getValue
+ import androidx.compose.runtime.mutableFloatStateOf
+ import androidx.compose.runtime.remember
++import androidx.compose.runtime.staticCompositionLocalOf
+ import androidx.compose.runtime.setValue
+ import androidx.compose.ui.Alignment
+ import androidx.compose.ui.Modifier
+@@ -26,6 +27,7 @@ import androidx.media3.common.MediaItem
+ import androidx.media3.common.Player
+ import androidx.media3.common.VideoSize
+ import androidx.media3.exoplayer.ExoPlayer
++import com.kyant.backdrop.backdrops.LayerBackdrop
+ import dev.chrisbanes.haze.ExperimentalHazeApi
+ import dev.chrisbanes.haze.HazeInput
+ import dev.chrisbanes.haze.HazePerformanceMode
+@@ -38,6 +40,12 @@ import dev.chrisbanes.haze.hazeSource
+ import me.spica27.spicamusic.artwork.MusicArtwork
+ import me.spica27.spicamusic.ui.widget.AudioCover
+ 
++/**
++ * Liquid glass V2 only: records the full artwork picture (copies, album and blur layers), so the glass bars
++ * see it instead of the player background, which is not drawn while full artwork is on.
++ */
++internal val LocalFullArtworkBackdrop = staticCompositionLocalOf<LayerBackdrop?> { null }
++
+ /**
+  * Full artwork mode, part 1 (drawn BEFORE the album): the flipped copies above and below the square album.
+  * They are Haze sources of the shared [hazeState], as is the album itself, so the top copy, the album and
+diff --git a/app/src/main/java/me/spica27/spicamusic/ui/player/BubblePlayerPage.kt b/app/src/main/java/me/spica27/spicamusic/ui/player/BubblePlayerPage.kt
+index 5eccb22..85a04b2 100644
+--- a/app/src/main/java/me/spica27/spicamusic/ui/player/BubblePlayerPage.kt
++++ b/app/src/main/java/me/spica27/spicamusic/ui/player/BubblePlayerPage.kt
+@@ -21,6 +21,7 @@ import androidx.compose.foundation.layout.height
+ import androidx.compose.foundation.layout.navigationBarsPadding
+ import androidx.compose.foundation.layout.offset
+ import androidx.compose.foundation.layout.padding
++import androidx.compose.foundation.layout.requiredSize
+ import androidx.compose.foundation.layout.size
+ import androidx.compose.foundation.layout.wrapContentSize
+ import androidx.compose.foundation.layout.width
+@@ -474,52 +475,75 @@ internal fun BubblePlayerPage(
+                         Box(modifier = Modifier.height(8.dp))
+                     }
+                     Box(modifier = Modifier.size(width = boxW.dp, height = boxH.dp)) {
+-                        if (fullOn) {
+-                            FullArtworkFill(
+-                                artwork = item?.mediaMetadata?.artwork(),
+-                                side = boxW.dp,
+-                                hazeState = hazeState,
+-                            )
+-                        }
+-                        // The cover is recorded as its own layer, so the buttons on it can refract it.
++                        val fullArtBackdrop = LocalFullArtworkBackdrop.current
++                        // Full artwork: this wrapper is 3 albums tall (copy, album, copy) and is what the glass bars see.
+                         Box(
+                             modifier =
+-                                Modifier
+-                                    .fillMaxSize()
+-                                    .then(if (fullOn) Modifier.hazeSource(hazeState) else Modifier)
+-                                    .clip(RoundedCornerShape(radius.dp))
+-                                    .then(if (v2Enabled) Modifier.layerBackdrop(albumBackdrop) else Modifier)
+-                                    .albumHighlight(highlightTuning, radius.toInt()),
+-                        ) {
+-                            AnimatedContent(
+-                                targetState = item,
+-                                modifier = Modifier.fillMaxSize(),
+-                                transitionSpec = {
+-                                    materialSharedAxisYIn(true) togetherWith materialSharedAxisYOut(true)
++                                if (fullOn) {
++                                    Modifier
++                                        .requiredSize(width = boxW.dp, height = (boxH * 3).dp)
++                                        .offset(y = (-boxH).dp)
++                                        .then(if (fullArtBackdrop != null) Modifier.layerBackdrop(fullArtBackdrop) else Modifier)
++                                } else {
++                                    Modifier.fillMaxSize()
+                                 },
+-                                contentKey = { it?.mediaId ?: "-1" },
+-                                label = "bubbleCover",
+-                            ) { mediaItem ->
+-                                AudioCover(
+-                                    artwork = mediaItem?.mediaMetadata?.artwork(),
++                        ) {
++                            Box(
++                                modifier =
++                                    if (fullOn) {
++                                        Modifier.offset(y = boxH.dp).size(width = boxW.dp, height = boxH.dp)
++                                    } else {
++                                        Modifier.fillMaxSize()
++                                    },
++                            ) {
++                                if (fullOn) {
++                                    FullArtworkFill(
++                                        artwork = item?.mediaMetadata?.artwork(),
++                                        side = boxW.dp,
++                                        hazeState = hazeState,
++                                    )
++                                }
++                                // The cover is recorded as its own layer, so the buttons on it can refract it.
++                                Box(
+                                     modifier =
+                                         Modifier
+                                             .fillMaxSize()
+-                                            .background(MaterialTheme.colorScheme.surfaceContainerHigh)
+-                                            .clickHighlight(onClick = onLyricsClick),
+-                                )
+-                            }
+-                            artworkVideoUri?.let { videoUri ->
+-                                ArtworkVideoCover(
+-                                    uri = videoUri,
+-                                    playing = isPlaying,
+-                                    modifier = Modifier.fillMaxSize().clickHighlight(onClick = onLyricsClick),
+-                                )
++                                            .then(if (fullOn) Modifier.hazeSource(hazeState) else Modifier)
++                                            .clip(RoundedCornerShape(radius.dp))
++                                            .then(if (v2Enabled) Modifier.layerBackdrop(albumBackdrop) else Modifier)
++                                            .albumHighlight(highlightTuning, radius.toInt()),
++                                ) {
++                                    AnimatedContent(
++                                        targetState = item,
++                                        modifier = Modifier.fillMaxSize(),
++                                        transitionSpec = {
++                                            materialSharedAxisYIn(true) togetherWith materialSharedAxisYOut(true)
++                                        },
++                                        contentKey = { it?.mediaId ?: "-1" },
++                                        label = "bubbleCover",
++                                    ) { mediaItem ->
++                                        AudioCover(
++                                            artwork = mediaItem?.mediaMetadata?.artwork(),
++                                            modifier =
++                                                Modifier
++                                                    .fillMaxSize()
++                                                    .background(MaterialTheme.colorScheme.surfaceContainerHigh)
++                                                    .clickHighlight(onClick = onLyricsClick),
++                                        )
++                                    }
++                                    artworkVideoUri?.let { videoUri ->
++                                        ArtworkVideoCover(
++                                            uri = videoUri,
++                                            playing = isPlaying,
++                                            modifier = Modifier.fillMaxSize().clickHighlight(onClick = onLyricsClick),
++                                        )
++                                    }
++                                }
++                                if (fullOn) {
++                                    FullArtworkBlur(side = boxW.dp, tuning = tuning, hazeState = hazeState)
++                                }
+                             }
+                         }
+-                        if (fullOn) {
+-                            FullArtworkBlur(side = boxW.dp, tuning = tuning, hazeState = hazeState)
+-                        }
+                         Row(
+                             modifier =
+                                 Modifier
+diff --git a/app/src/main/java/me/spica27/spicamusic/ui/player/ExpandedPlayerScreen.kt b/app/src/main/java/me/spica27/spicamusic/ui/player/ExpandedPlayerScreen.kt
+index e15b378..5bd3ac4 100644
+--- a/app/src/main/java/me/spica27/spicamusic/ui/player/ExpandedPlayerScreen.kt
++++ b/app/src/main/java/me/spica27/spicamusic/ui/player/ExpandedPlayerScreen.kt
+@@ -428,7 +428,8 @@ fun ExpandedPlayerScreen(
+     }
+     // Bubble full artwork draws its own blurred background on the player page, so the dynamic background
+     // is not rendered there. It stays for the lyrics and the queue.
+-    val playerBackgroundHidden by remember {
++    // The keys matter: without them the lambda would keep the first (default) values of these two settings.
++    val playerBackgroundHidden by remember(bubbleStyleActive, bubbleFullArtwork) {
+         derivedStateOf {
+             bubbleStyleActive && bubbleFullArtwork &&
+                 playerSurface == PlayerSurface.Player && !surfaceDragging &&
+@@ -529,6 +530,8 @@ fun ExpandedPlayerScreen(
+         }
+     val hazeState = rememberHazeState()
+     val playerBgBackdrop = rememberLayerBackdrop()
++    // Liquid glass V2 samples this one instead of the player background when Bubble full artwork is on.
++    val fullArtBackdrop = rememberLayerBackdrop()
+     val lyricsGlassV2 = LocalLiquidGlassV2Config.current.enabled
+     val lyricsScrimAlpha =
+         animateFloatAsState(
+@@ -662,7 +665,16 @@ fun ExpandedPlayerScreen(
+                                         skipFirstEnter = playerPageRevealedOnce,
+                                     ) {
+                                         CompositionLocalProvider(
+-                                            LocalLyricsGlassBackdrop provides (if (lyricsGlassV2) playerBgBackdrop else null),
++                                            LocalLyricsGlassBackdrop provides
++                                                (
++                                                    if (lyricsGlassV2) {
++                                                        if (bubbleStyleActive && bubbleFullArtwork) fullArtBackdrop else playerBgBackdrop
++                                                    } else {
++                                                        null
++                                                    }
++                                                ),
++                                            LocalFullArtworkBackdrop provides
++                                                (if (lyricsGlassV2 && bubbleStyleActive && bubbleFullArtwork) fullArtBackdrop else null),
+                                         ) {
+                                         PlayerPage(
+                                             playerViewModel = viewModel,
