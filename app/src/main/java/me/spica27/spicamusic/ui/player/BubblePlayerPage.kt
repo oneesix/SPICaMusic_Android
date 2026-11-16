@@ -478,6 +478,7 @@ internal fun BubblePlayerPage(
                                 artwork = item?.mediaMetadata?.artwork(),
                                 side = boxW.dp,
                                 tuning = tuning,
+                                hazeState = hazeState,
                             )
                         }
                         // The cover is recorded as its own layer, so the buttons on it can refract it.
@@ -485,6 +486,7 @@ internal fun BubblePlayerPage(
                             modifier =
                                 Modifier
                                     .fillMaxSize()
+                                    .then(if (fullOn) Modifier.fullArtworkFade() else Modifier)
                                     .clip(RoundedCornerShape(radius.dp))
                                     .then(if (v2Enabled) Modifier.layerBackdrop(albumBackdrop) else Modifier)
                                     .albumHighlight(highlightTuning, radius.toInt()),

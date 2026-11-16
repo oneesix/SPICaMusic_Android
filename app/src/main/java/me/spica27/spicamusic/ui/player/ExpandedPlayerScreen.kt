@@ -329,6 +329,10 @@ fun ExpandedPlayerScreen(
         .getString(PreferencesManager.Keys.PLAYER_STYLE, PillPlayerTuning.STYLE_CLASSIC)
         .collectAsStateWithLifecycle(initialValue = PillPlayerTuning.STYLE_CLASSIC)
     val bubbleStyleActive = currentStyle == PillPlayerTuning.STYLE_BUBBLE
+    val bubbleTuningRaw by stylePrefs
+        .getString(PreferencesManager.Keys.BUBBLE_PLAYER_TUNING, BubblePlayerTuning.Default.encode())
+        .collectAsStateWithLifecycle(initialValue = BubblePlayerTuning.Default.encode())
+    val bubbleFullArtwork = remember(bubbleTuningRaw) { BubblePlayerTuning.decode(bubbleTuningRaw).fullArtwork == 1 }
     val backStack = LocalBackStack.current
     var playerSurface by remember { mutableStateOf(PlayerSurface.Player) }
     val isPlaying by viewModel.isPlaying.collectAsStateWithLifecycle()
@@ -420,6 +424,16 @@ fun ExpandedPlayerScreen(
     val lyricsLayerVisible by remember {
         derivedStateOf {
             playerSurface == PlayerSurface.Lyrics || surfaceDragging || surfaceProgress.value > 0.001f
+        }
+    }
+    // Bubble full artwork draws its own blurred background on the player page, so the dynamic background
+    // is not rendered there. It stays for the lyrics and the queue.
+    val playerBackgroundHidden by remember {
+        derivedStateOf {
+            bubbleStyleActive && bubbleFullArtwork &&
+                playerSurface == PlayerSurface.Player && !surfaceDragging &&
+                surfaceProgress.value < 0.001f &&
+                pagerState.currentPage == DEFAULT_PAGE && pagerState.currentPageOffsetFraction == 0f
         }
     }
     val surfaceReducedMotion = LocalReducedMotion.current
@@ -540,63 +554,65 @@ fun ExpandedPlayerScreen(
                         .fillMaxSize()
                         .then(if (lyricsGlassV2) Modifier.layerBackdrop(playerBgBackdrop) else Modifier),
             ) {
-                // 仅在页面可见且应用在前台时启用动态背景。
-                if (isSmooth) {
-                    SmoothBackground(
-                        coverUri = currentMediaItem?.mediaMetadata?.artworkUri,
-                        settings = smoothSettings,
-                        enabled = animationsEnabled && isAppInForeground,
-                        dark = smoothDark,
-                        modifier =
-                            Modifier
-                                .fillMaxSize()
-                                .hazeSource(hazeState),
-                    )
-                } else if (isBlurPlus) {
-                    BlurPlusBackground(
-                        coverUri = currentMediaItem?.mediaMetadata?.artworkUri,
-                        settings = blurPlusSettings,
-                        dark = blurPlusDark,
-                        modifier =
-                            Modifier
-                                .fillMaxSize()
-                                .hazeSource(hazeState),
-                    )
-                } else {
-                    FluidMusicBackground(
-                        modifier =
-                            Modifier
-                                .fillMaxSize()
-                                // 队列顶栏在关闭玻璃时仍需采样动态背景，用于渐变模糊。
-                                .hazeSource(hazeState),
-                        coverColor = coverColor,
-                        isDarkMode = MaterialTheme.colorScheme.surface.luminance() < 0.5f,
-                        coverUri = { currentMediaItem?.mediaMetadata?.artworkUri },
-                        enabled = animationsEnabled && isAppInForeground,
-                    )
-                }
+                if (!playerBackgroundHidden) {
+                    // 仅在页面可见且应用在前台时启用动态背景。
+                    if (isSmooth) {
+                        SmoothBackground(
+                            coverUri = currentMediaItem?.mediaMetadata?.artworkUri,
+                            settings = smoothSettings,
+                            enabled = animationsEnabled && isAppInForeground,
+                            dark = smoothDark,
+                            modifier =
+                                Modifier
+                                    .fillMaxSize()
+                                    .hazeSource(hazeState),
+                        )
+                    } else if (isBlurPlus) {
+                        BlurPlusBackground(
+                            coverUri = currentMediaItem?.mediaMetadata?.artworkUri,
+                            settings = blurPlusSettings,
+                            dark = blurPlusDark,
+                            modifier =
+                                Modifier
+                                    .fillMaxSize()
+                                    .hazeSource(hazeState),
+                        )
+                    } else {
+                        FluidMusicBackground(
+                            modifier =
+                                Modifier
+                                    .fillMaxSize()
+                                    // 队列顶栏在关闭玻璃时仍需采样动态背景，用于渐变模糊。
+                                    .hazeSource(hazeState),
+                            coverColor = coverColor,
+                            isDarkMode = MaterialTheme.colorScheme.surface.luminance() < 0.5f,
+                            coverUri = { currentMediaItem?.mediaMetadata?.artworkUri },
+                            enabled = animationsEnabled && isAppInForeground,
+                        )
+                    }
 
-                // 歌词模式只压暗同一份动态背景，不创建第二个背景实例。
-                Box(
-                    modifier =
-                        Modifier
-                            .fillMaxSize()
-                            // The source must wrap the dimming (alpha + colour) so the blurred header
-                            // is dimmed exactly like the rest of the lyrics page.
-                            .hazeSource(hazeState, zIndex = 0.5f)
-                            .graphicsLayer { alpha = lyricsScrimAlpha.value }
-                            .background(lyricsScrimColor),
-                )
-                // Smooth > Lyrics dim: extra darkening on the lyrics screen only.
-                if (isSmooth && smoothSettings.lyricsDimPercent > 0) {
+                    // 歌词模式只压暗同一份动态背景，不创建第二个背景实例。
                     Box(
                         modifier =
                             Modifier
                                 .fillMaxSize()
-                                .hazeSource(hazeState, zIndex = 0.55f)
+                                // The source must wrap the dimming (alpha + colour) so the blurred header
+                                // is dimmed exactly like the rest of the lyrics page.
+                                .hazeSource(hazeState, zIndex = 0.5f)
                                 .graphicsLayer { alpha = lyricsScrimAlpha.value }
-                                .background(Color.Black.copy(alpha = smoothSettings.lyricsDimPercent / 100f)),
+                                .background(lyricsScrimColor),
                     )
+                    // Smooth > Lyrics dim: extra darkening on the lyrics screen only.
+                    if (isSmooth && smoothSettings.lyricsDimPercent > 0) {
+                        Box(
+                            modifier =
+                                Modifier
+                                    .fillMaxSize()
+                                    .hazeSource(hazeState, zIndex = 0.55f)
+                                    .graphicsLayer { alpha = lyricsScrimAlpha.value }
+                                    .background(Color.Black.copy(alpha = smoothSettings.lyricsDimPercent / 100f)),
+                        )
+                    }
                 }
             }
 
