@@ -1,0 +1,331 @@
+diff --git a/app/src/main/java/me/spica27/spicamusic/ui/player/BubbleFullArtwork.kt b/app/src/main/java/me/spica27/spicamusic/ui/player/BubbleFullArtwork.kt
+index 552224e..755403a 100644
+--- a/app/src/main/java/me/spica27/spicamusic/ui/player/BubbleFullArtwork.kt
++++ b/app/src/main/java/me/spica27/spicamusic/ui/player/BubbleFullArtwork.kt
+@@ -3,8 +3,11 @@ package me.spica27.spicamusic.ui.player
+ import android.net.Uri
+ import android.view.TextureView
+ import androidx.compose.foundation.layout.Box
++import androidx.compose.foundation.layout.Column
+ import androidx.compose.foundation.layout.aspectRatio
+ import androidx.compose.foundation.layout.fillMaxSize
++import androidx.compose.foundation.layout.fillMaxWidth
++import androidx.compose.foundation.layout.height
+ import androidx.compose.foundation.layout.offset
+ import androidx.compose.foundation.layout.requiredSize
+ import androidx.compose.runtime.Composable
+@@ -16,7 +19,11 @@ import androidx.compose.runtime.remember
+ import androidx.compose.runtime.setValue
+ import androidx.compose.ui.Alignment
+ import androidx.compose.ui.Modifier
++import androidx.compose.ui.draw.drawWithContent
++import androidx.compose.ui.graphics.BlendMode
++import androidx.compose.ui.graphics.Brush
+ import androidx.compose.ui.graphics.Color
++import androidx.compose.ui.graphics.CompositingStrategy
+ import androidx.compose.ui.graphics.graphicsLayer
+ import androidx.compose.ui.platform.LocalContext
+ import androidx.compose.ui.unit.Dp
+@@ -29,7 +36,7 @@ import androidx.media3.exoplayer.ExoPlayer
+ import dev.chrisbanes.haze.ExperimentalHazeApi
+ import dev.chrisbanes.haze.HazeInput
+ import dev.chrisbanes.haze.HazePerformanceMode
+-import dev.chrisbanes.haze.HazeProgressive
++import dev.chrisbanes.haze.HazeState
+ import dev.chrisbanes.haze.blur.HazeBlurStyle
+ import dev.chrisbanes.haze.blur.HazeColorEffect
+ import dev.chrisbanes.haze.blur.hazeBlur
+@@ -38,34 +45,27 @@ import dev.chrisbanes.haze.rememberHazeState
+ import me.spica27.spicamusic.artwork.MusicArtwork
+ import me.spica27.spicamusic.ui.widget.AudioCover
+ 
++/** How much of the album (top and bottom) fades into the blur, as a share of its height. */
++private const val FADE_FRACTION = 0.35f
++
+ /**
+- * Full artwork mode: above and below the square album, a flipped copy of the same cover continues the
+- * picture. Haze blurs it with a progressive blur (the same one the queue uses): no blur at the album edge,
+- * full blur far from it. Amount, optimize and quality come from the Bubble settings.
+- * Draws outside the parent box on purpose, so the parent must not clip.
++ * Full artwork mode, one blur layer: a stack of three covers (flipped, normal, flipped) is blurred once
++ * by Haze. The sharp album is drawn on top and fades out at its top and bottom (see [fullArtworkFade]),
++ * so it melts into the blurred stack with no seam and no strip line. Amount, optimize and quality come
++ * from the Bubble settings. It replaces the player background (not the lyrics background). Draws outside the parent box on purpose, so the parent must not clip.
+  */
+-@Composable
+-internal fun FullArtworkFill(
+-    artwork: MusicArtwork?,
+-    side: Dp,
+-    tuning: BubblePlayerTuning,
+-) {
+-    MirrorFill(artwork, side, tuning, above = true)
+-    MirrorFill(artwork, side, tuning, above = false)
+-}
+-
+ @OptIn(ExperimentalHazeApi::class)
+ @Composable
+-private fun MirrorFill(
++internal fun FullArtworkFill(
+     artwork: MusicArtwork?,
+     side: Dp,
+     tuning: BubblePlayerTuning,
+-    above: Boolean,
++    hazeState: HazeState,
+ ) {
+     val haze = rememberHazeState()
+     val amount = tuning.fillBlurAmountDp
+     val style =
+-        remember(amount, above) {
++        remember(amount) {
+             HazeBlurStyle {
+                 blurRadius(amount.dp)
+                 noiseFactor(0f)
+@@ -73,13 +73,6 @@ private fun MirrorFill(
+                 colorEffects(emptyList())
+                 fallbackColorEffect(HazeColorEffect.tint(Color.Transparent))
+                 alpha(1f)
+-                // Sharp next to the album, fully blurred at the far end.
+-                progressive(
+-                    HazeProgressive.verticalGradient(
+-                        startIntensity = if (above) 1f else 0f,
+-                        endIntensity = if (above) 0f else 1f,
+-                    ),
+-                )
+             }
+         }
+     val mode =
+@@ -91,17 +84,15 @@ private fun MirrorFill(
+     Box(
+         modifier =
+             Modifier
+-                .requiredSize(side)
+-                .offset(y = if (above) -side else side),
++                .requiredSize(width = side, height = side * 3)
++                .offset(y = -side)
++                // The player bars blur this stack, since the dynamic background is not drawn here.
++                .hazeSource(hazeState),
+     ) {
+-        Box(
+-            modifier =
+-                Modifier
+-                    .fillMaxSize()
+-                    .hazeSource(haze)
+-                    .graphicsLayer { scaleY = -1f },
+-        ) {
+-            AudioCover(artwork = artwork, modifier = Modifier.fillMaxSize())
++        Column(modifier = Modifier.fillMaxSize().hazeSource(haze)) {
++            StackCover(artwork, side, flipped = true)
++            StackCover(artwork, side, flipped = false)
++            StackCover(artwork, side, flipped = true)
+         }
+         if (amount > 0) {
+             Box(
+@@ -119,6 +110,40 @@ private fun MirrorFill(
+     }
+ }
+ 
++@Composable
++private fun StackCover(
++    artwork: MusicArtwork?,
++    side: Dp,
++    flipped: Boolean,
++) {
++    Box(
++        modifier =
++            Modifier
++                .fillMaxWidth()
++                .height(side)
++                .graphicsLayer { if (flipped) scaleY = -1f },
++    ) {
++        AudioCover(artwork = artwork, modifier = Modifier.fillMaxSize())
++    }
++}
++
++/** Fades the album to transparent at its top and bottom edge, so the blur below shows through. */
++internal fun Modifier.fullArtworkFade(): Modifier =
++    graphicsLayer { compositingStrategy = CompositingStrategy.Offscreen }
++        .drawWithContent {
++            drawContent()
++            drawRect(
++                brush =
++                    Brush.verticalGradient(
++                        0f to Color.Transparent,
++                        FADE_FRACTION to Color.Black,
++                        1f - FADE_FRACTION to Color.Black,
++                        1f to Color.Transparent,
++                    ),
++                blendMode = BlendMode.DstIn,
++            )
++        }
++
+ /**
+  * Silent, looping video cover. It keeps the video's own shape (no zoom or crop) and plays only while the
+  * music plays. It uses its own small player, so it never touches the music player.
+diff --git a/app/src/main/java/me/spica27/spicamusic/ui/player/BubblePlayerPage.kt b/app/src/main/java/me/spica27/spicamusic/ui/player/BubblePlayerPage.kt
+index f4fd3c3..bba5e20 100644
+--- a/app/src/main/java/me/spica27/spicamusic/ui/player/BubblePlayerPage.kt
++++ b/app/src/main/java/me/spica27/spicamusic/ui/player/BubblePlayerPage.kt
+@@ -478,6 +478,7 @@ internal fun BubblePlayerPage(
+                                 artwork = item?.mediaMetadata?.artwork(),
+                                 side = boxW.dp,
+                                 tuning = tuning,
++                                hazeState = hazeState,
+                             )
+                         }
+                         // The cover is recorded as its own layer, so the buttons on it can refract it.
+@@ -485,6 +486,7 @@ internal fun BubblePlayerPage(
+                             modifier =
+                                 Modifier
+                                     .fillMaxSize()
++                                    .then(if (fullOn) Modifier.fullArtworkFade() else Modifier)
+                                     .clip(RoundedCornerShape(radius.dp))
+                                     .then(if (v2Enabled) Modifier.layerBackdrop(albumBackdrop) else Modifier)
+                                     .albumHighlight(highlightTuning, radius.toInt()),
+diff --git a/app/src/main/java/me/spica27/spicamusic/ui/player/ExpandedPlayerScreen.kt b/app/src/main/java/me/spica27/spicamusic/ui/player/ExpandedPlayerScreen.kt
+index abe4ac3..e15b378 100644
+--- a/app/src/main/java/me/spica27/spicamusic/ui/player/ExpandedPlayerScreen.kt
++++ b/app/src/main/java/me/spica27/spicamusic/ui/player/ExpandedPlayerScreen.kt
+@@ -329,6 +329,10 @@ fun ExpandedPlayerScreen(
+         .getString(PreferencesManager.Keys.PLAYER_STYLE, PillPlayerTuning.STYLE_CLASSIC)
+         .collectAsStateWithLifecycle(initialValue = PillPlayerTuning.STYLE_CLASSIC)
+     val bubbleStyleActive = currentStyle == PillPlayerTuning.STYLE_BUBBLE
++    val bubbleTuningRaw by stylePrefs
++        .getString(PreferencesManager.Keys.BUBBLE_PLAYER_TUNING, BubblePlayerTuning.Default.encode())
++        .collectAsStateWithLifecycle(initialValue = BubblePlayerTuning.Default.encode())
++    val bubbleFullArtwork = remember(bubbleTuningRaw) { BubblePlayerTuning.decode(bubbleTuningRaw).fullArtwork == 1 }
+     val backStack = LocalBackStack.current
+     var playerSurface by remember { mutableStateOf(PlayerSurface.Player) }
+     val isPlaying by viewModel.isPlaying.collectAsStateWithLifecycle()
+@@ -422,6 +426,16 @@ fun ExpandedPlayerScreen(
+             playerSurface == PlayerSurface.Lyrics || surfaceDragging || surfaceProgress.value > 0.001f
+         }
+     }
++    // Bubble full artwork draws its own blurred background on the player page, so the dynamic background
++    // is not rendered there. It stays for the lyrics and the queue.
++    val playerBackgroundHidden by remember {
++        derivedStateOf {
++            bubbleStyleActive && bubbleFullArtwork &&
++                playerSurface == PlayerSurface.Player && !surfaceDragging &&
++                surfaceProgress.value < 0.001f &&
++                pagerState.currentPage == DEFAULT_PAGE && pagerState.currentPageOffsetFraction == 0f
++        }
++    }
+     val surfaceReducedMotion = LocalReducedMotion.current
+     LaunchedEffect(playerSurface) {
+         val target = if (playerSurface == PlayerSurface.Lyrics) 1f else 0f
+@@ -540,63 +554,65 @@ fun ExpandedPlayerScreen(
+                         .fillMaxSize()
+                         .then(if (lyricsGlassV2) Modifier.layerBackdrop(playerBgBackdrop) else Modifier),
+             ) {
+-                // 仅在页面可见且应用在前台时启用动态背景。
+-                if (isSmooth) {
+-                    SmoothBackground(
+-                        coverUri = currentMediaItem?.mediaMetadata?.artworkUri,
+-                        settings = smoothSettings,
+-                        enabled = animationsEnabled && isAppInForeground,
+-                        dark = smoothDark,
+-                        modifier =
+-                            Modifier
+-                                .fillMaxSize()
+-                                .hazeSource(hazeState),
+-                    )
+-                } else if (isBlurPlus) {
+-                    BlurPlusBackground(
+-                        coverUri = currentMediaItem?.mediaMetadata?.artworkUri,
+-                        settings = blurPlusSettings,
+-                        dark = blurPlusDark,
+-                        modifier =
+-                            Modifier
+-                                .fillMaxSize()
+-                                .hazeSource(hazeState),
+-                    )
+-                } else {
+-                    FluidMusicBackground(
+-                        modifier =
+-                            Modifier
+-                                .fillMaxSize()
+-                                // 队列顶栏在关闭玻璃时仍需采样动态背景，用于渐变模糊。
+-                                .hazeSource(hazeState),
+-                        coverColor = coverColor,
+-                        isDarkMode = MaterialTheme.colorScheme.surface.luminance() < 0.5f,
+-                        coverUri = { currentMediaItem?.mediaMetadata?.artworkUri },
+-                        enabled = animationsEnabled && isAppInForeground,
+-                    )
+-                }
++                if (!playerBackgroundHidden) {
++                    // 仅在页面可见且应用在前台时启用动态背景。
++                    if (isSmooth) {
++                        SmoothBackground(
++                            coverUri = currentMediaItem?.mediaMetadata?.artworkUri,
++                            settings = smoothSettings,
++                            enabled = animationsEnabled && isAppInForeground,
++                            dark = smoothDark,
++                            modifier =
++                                Modifier
++                                    .fillMaxSize()
++                                    .hazeSource(hazeState),
++                        )
++                    } else if (isBlurPlus) {
++                        BlurPlusBackground(
++                            coverUri = currentMediaItem?.mediaMetadata?.artworkUri,
++                            settings = blurPlusSettings,
++                            dark = blurPlusDark,
++                            modifier =
++                                Modifier
++                                    .fillMaxSize()
++                                    .hazeSource(hazeState),
++                        )
++                    } else {
++                        FluidMusicBackground(
++                            modifier =
++                                Modifier
++                                    .fillMaxSize()
++                                    // 队列顶栏在关闭玻璃时仍需采样动态背景，用于渐变模糊。
++                                    .hazeSource(hazeState),
++                            coverColor = coverColor,
++                            isDarkMode = MaterialTheme.colorScheme.surface.luminance() < 0.5f,
++                            coverUri = { currentMediaItem?.mediaMetadata?.artworkUri },
++                            enabled = animationsEnabled && isAppInForeground,
++                        )
++                    }
+ 
+-                // 歌词模式只压暗同一份动态背景，不创建第二个背景实例。
+-                Box(
+-                    modifier =
+-                        Modifier
+-                            .fillMaxSize()
+-                            // The source must wrap the dimming (alpha + colour) so the blurred header
+-                            // is dimmed exactly like the rest of the lyrics page.
+-                            .hazeSource(hazeState, zIndex = 0.5f)
+-                            .graphicsLayer { alpha = lyricsScrimAlpha.value }
+-                            .background(lyricsScrimColor),
+-                )
+-                // Smooth > Lyrics dim: extra darkening on the lyrics screen only.
+-                if (isSmooth && smoothSettings.lyricsDimPercent > 0) {
++                    // 歌词模式只压暗同一份动态背景，不创建第二个背景实例。
+                     Box(
+                         modifier =
+                             Modifier
+                                 .fillMaxSize()
+-                                .hazeSource(hazeState, zIndex = 0.55f)
++                                // The source must wrap the dimming (alpha + colour) so the blurred header
++                                // is dimmed exactly like the rest of the lyrics page.
++                                .hazeSource(hazeState, zIndex = 0.5f)
+                                 .graphicsLayer { alpha = lyricsScrimAlpha.value }
+-                                .background(Color.Black.copy(alpha = smoothSettings.lyricsDimPercent / 100f)),
++                                .background(lyricsScrimColor),
+                     )
++                    // Smooth > Lyrics dim: extra darkening on the lyrics screen only.
++                    if (isSmooth && smoothSettings.lyricsDimPercent > 0) {
++                        Box(
++                            modifier =
++                                Modifier
++                                    .fillMaxSize()
++                                    .hazeSource(hazeState, zIndex = 0.55f)
++                                    .graphicsLayer { alpha = lyricsScrimAlpha.value }
++                                    .background(Color.Black.copy(alpha = smoothSettings.lyricsDimPercent / 100f)),
++                        )
++                    }
+                 }
+             }
+ 
