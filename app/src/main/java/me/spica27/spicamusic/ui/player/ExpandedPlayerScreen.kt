@@ -428,7 +428,8 @@ fun ExpandedPlayerScreen(
     }
     // Bubble full artwork draws its own blurred background on the player page, so the dynamic background
     // is not rendered there. It stays for the lyrics and the queue.
-    val playerBackgroundHidden by remember {
+    // The keys matter: without them the lambda would keep the first (default) values of these two settings.
+    val playerBackgroundHidden by remember(bubbleStyleActive, bubbleFullArtwork) {
         derivedStateOf {
             bubbleStyleActive && bubbleFullArtwork &&
                 playerSurface == PlayerSurface.Player && !surfaceDragging &&
@@ -529,6 +530,8 @@ fun ExpandedPlayerScreen(
         }
     val hazeState = rememberHazeState()
     val playerBgBackdrop = rememberLayerBackdrop()
+    // Liquid glass V2 samples this one instead of the player background when Bubble full artwork is on.
+    val fullArtBackdrop = rememberLayerBackdrop()
     val lyricsGlassV2 = LocalLiquidGlassV2Config.current.enabled
     val lyricsScrimAlpha =
         animateFloatAsState(
@@ -662,7 +665,16 @@ fun ExpandedPlayerScreen(
                                         skipFirstEnter = playerPageRevealedOnce,
                                     ) {
                                         CompositionLocalProvider(
-                                            LocalLyricsGlassBackdrop provides (if (lyricsGlassV2) playerBgBackdrop else null),
+                                            LocalLyricsGlassBackdrop provides
+                                                (
+                                                    if (lyricsGlassV2) {
+                                                        if (bubbleStyleActive && bubbleFullArtwork) fullArtBackdrop else playerBgBackdrop
+                                                    } else {
+                                                        null
+                                                    }
+                                                ),
+                                            LocalFullArtworkBackdrop provides
+                                                (if (lyricsGlassV2 && bubbleStyleActive && bubbleFullArtwork) fullArtBackdrop else null),
                                         ) {
                                         PlayerPage(
                                             playerViewModel = viewModel,

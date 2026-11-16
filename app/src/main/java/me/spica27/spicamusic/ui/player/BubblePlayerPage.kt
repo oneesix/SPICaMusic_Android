@@ -21,6 +21,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.requiredSize
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.wrapContentSize
 import androidx.compose.foundation.layout.width
@@ -474,51 +475,74 @@ internal fun BubblePlayerPage(
                         Box(modifier = Modifier.height(8.dp))
                     }
                     Box(modifier = Modifier.size(width = boxW.dp, height = boxH.dp)) {
-                        if (fullOn) {
-                            FullArtworkFill(
-                                artwork = item?.mediaMetadata?.artwork(),
-                                side = boxW.dp,
-                                hazeState = hazeState,
-                            )
-                        }
-                        // The cover is recorded as its own layer, so the buttons on it can refract it.
+                        val fullArtBackdrop = LocalFullArtworkBackdrop.current
+                        // Full artwork: this wrapper is 3 albums tall (copy, album, copy) and is what the glass bars see.
                         Box(
                             modifier =
-                                Modifier
-                                    .fillMaxSize()
-                                    .then(if (fullOn) Modifier.hazeSource(hazeState) else Modifier)
-                                    .clip(RoundedCornerShape(radius.dp))
-                                    .then(if (v2Enabled) Modifier.layerBackdrop(albumBackdrop) else Modifier)
-                                    .albumHighlight(highlightTuning, radius.toInt()),
-                        ) {
-                            AnimatedContent(
-                                targetState = item,
-                                modifier = Modifier.fillMaxSize(),
-                                transitionSpec = {
-                                    materialSharedAxisYIn(true) togetherWith materialSharedAxisYOut(true)
+                                if (fullOn) {
+                                    Modifier
+                                        .requiredSize(width = boxW.dp, height = (boxH * 3).dp)
+                                        .offset(y = (-boxH).dp)
+                                        .then(if (fullArtBackdrop != null) Modifier.layerBackdrop(fullArtBackdrop) else Modifier)
+                                } else {
+                                    Modifier.fillMaxSize()
                                 },
-                                contentKey = { it?.mediaId ?: "-1" },
-                                label = "bubbleCover",
-                            ) { mediaItem ->
-                                AudioCover(
-                                    artwork = mediaItem?.mediaMetadata?.artwork(),
+                        ) {
+                            Box(
+                                modifier =
+                                    if (fullOn) {
+                                        Modifier.offset(y = boxH.dp).size(width = boxW.dp, height = boxH.dp)
+                                    } else {
+                                        Modifier.fillMaxSize()
+                                    },
+                            ) {
+                                if (fullOn) {
+                                    FullArtworkFill(
+                                        artwork = item?.mediaMetadata?.artwork(),
+                                        side = boxW.dp,
+                                        hazeState = hazeState,
+                                    )
+                                }
+                                // The cover is recorded as its own layer, so the buttons on it can refract it.
+                                Box(
                                     modifier =
                                         Modifier
                                             .fillMaxSize()
-                                            .background(MaterialTheme.colorScheme.surfaceContainerHigh)
-                                            .clickHighlight(onClick = onLyricsClick),
-                                )
+                                            .then(if (fullOn) Modifier.hazeSource(hazeState) else Modifier)
+                                            .clip(RoundedCornerShape(radius.dp))
+                                            .then(if (v2Enabled) Modifier.layerBackdrop(albumBackdrop) else Modifier)
+                                            .albumHighlight(highlightTuning, radius.toInt()),
+                                ) {
+                                    AnimatedContent(
+                                        targetState = item,
+                                        modifier = Modifier.fillMaxSize(),
+                                        transitionSpec = {
+                                            materialSharedAxisYIn(true) togetherWith materialSharedAxisYOut(true)
+                                        },
+                                        contentKey = { it?.mediaId ?: "-1" },
+                                        label = "bubbleCover",
+                                    ) { mediaItem ->
+                                        AudioCover(
+                                            artwork = mediaItem?.mediaMetadata?.artwork(),
+                                            modifier =
+                                                Modifier
+                                                    .fillMaxSize()
+                                                    .background(MaterialTheme.colorScheme.surfaceContainerHigh)
+                                                    .clickHighlight(onClick = onLyricsClick),
+                                        )
+                                    }
+                                    artworkVideoUri?.let { videoUri ->
+                                        ArtworkVideoCover(
+                                            uri = videoUri,
+                                            playing = isPlaying,
+                                            modifier = Modifier.fillMaxSize().clickHighlight(onClick = onLyricsClick),
+                                        )
+                                    }
+                                }
+                                if (fullOn) {
+                                    FullArtworkBlur(side = boxW.dp, tuning = tuning, hazeState = hazeState)
+                                }
                             }
-                            artworkVideoUri?.let { videoUri ->
-                                ArtworkVideoCover(
-                                    uri = videoUri,
-                                    playing = isPlaying,
-                                    modifier = Modifier.fillMaxSize().clickHighlight(onClick = onLyricsClick),
-                                )
-                            }
-                        }
-                        if (fullOn) {
-                            FullArtworkBlur(side = boxW.dp, tuning = tuning, hazeState = hazeState)
                         }
                         Row(
                             modifier =

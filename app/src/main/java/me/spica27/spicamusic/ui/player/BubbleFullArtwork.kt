@@ -13,6 +13,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -26,6 +27,7 @@ import androidx.media3.common.MediaItem
 import androidx.media3.common.Player
 import androidx.media3.common.VideoSize
 import androidx.media3.exoplayer.ExoPlayer
+import com.kyant.backdrop.backdrops.LayerBackdrop
 import dev.chrisbanes.haze.ExperimentalHazeApi
 import dev.chrisbanes.haze.HazeInput
 import dev.chrisbanes.haze.HazePerformanceMode
@@ -37,6 +39,12 @@ import dev.chrisbanes.haze.blur.hazeBlur
 import dev.chrisbanes.haze.hazeSource
 import me.spica27.spicamusic.artwork.MusicArtwork
 import me.spica27.spicamusic.ui.widget.AudioCover
+
+/**
+ * Liquid glass V2 only: records the full artwork picture (copies, album and blur layers), so the glass bars
+ * see it instead of the player background, which is not drawn while full artwork is on.
+ */
+internal val LocalFullArtworkBackdrop = staticCompositionLocalOf<LayerBackdrop?> { null }
 
 /**
  * Full artwork mode, part 1 (drawn BEFORE the album): the flipped copies above and below the square album.
