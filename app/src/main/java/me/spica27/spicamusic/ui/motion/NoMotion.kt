@@ -64,7 +64,7 @@ fun AnimatedVisibility(
     label: String = "AnimatedVisibility",
     content: @Composable AnimatedVisibilityScope.() -> Unit,
 ) {
-    me.spica27.spicamusic.ui.motion.AnimatedVisibility(
+    androidx.compose.animation.AnimatedVisibility(
         visible = visible,
         modifier = modifier,
         enter = EnterTransition.None,
@@ -83,7 +83,7 @@ fun AnimatedVisibility(
     label: String = "AnimatedVisibility",
     content: @Composable AnimatedVisibilityScope.() -> Unit,
 ) {
-    me.spica27.spicamusic.ui.motion.AnimatedVisibility(
+    androidx.compose.animation.AnimatedVisibility(
         visibleState = visibleState,
         modifier = modifier,
         enter = EnterTransition.None,
