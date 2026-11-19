@@ -1,18 +1,18 @@
 package me.spica27.spicamusic.ui.home.page
 
 import android.widget.Toast
-import androidx.compose.animation.AnimatedContent
-import androidx.compose.animation.AnimatedVisibility
+import me.spica27.spicamusic.ui.motion.AnimatedContent
+import me.spica27.spicamusic.ui.motion.AnimatedVisibility
 import androidx.compose.animation.SizeTransform
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.FiniteAnimationSpec
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.VisibilityThreshold
-import androidx.compose.animation.core.animateFloat
-import androidx.compose.animation.core.animateFloatAsState
+import me.spica27.spicamusic.ui.motion.animateFloat
+import me.spica27.spicamusic.ui.motion.animateFloatAsState
 import androidx.compose.animation.core.infiniteRepeatable
-import androidx.compose.animation.core.rememberInfiniteTransition
+import me.spica27.spicamusic.ui.motion.rememberInfiniteTransition
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
@@ -96,8 +96,6 @@ import me.spica27.spicamusic.ui.navigation.PlaylistDetailRoute
 import me.spica27.spicamusic.ui.navigation.ScannerRoute
 import me.spica27.spicamusic.ui.player.LocalPlayerViewModel
 import me.spica27.spicamusic.ui.theme.LayoutTokens
-import me.spica27.spicamusic.ui.theme.ListItemFadeInSpec
-import me.spica27.spicamusic.ui.theme.ListItemFadeOutSpec
 import me.spica27.spicamusic.ui.theme.ScaleEnterFrom
 import me.spica27.spicamusic.ui.theme.ScaleExitTo
 import me.spica27.spicamusic.ui.theme.Shapes
@@ -247,12 +245,7 @@ fun LibraryPage(bottomContentPadding: Dp = 0.dp) {
                             Unit
                         }.takeIf { favoriteSongs.isNotEmpty() },
                     modifier =
-                        Modifier
-                            .animateItem(
-                                fadeInSpec = ListItemFadeInSpec,
-                                placementSpec = null,
-                                fadeOutSpec = ListItemFadeOutSpec,
-                            ).padding(horizontal = pageGutter)
+                        Modifier.padding(horizontal = pageGutter)
                             .padding(top = Spacing.ExtraLarge),
                 )
             }
@@ -261,12 +254,7 @@ fun LibraryPage(bottomContentPadding: Dp = 0.dp) {
                 item(key = "favorites_empty", contentType = "empty") {
                     FavoritesEmptyRow(
                         modifier =
-                            Modifier
-                                .animateItem(
-                                    fadeInSpec = ListItemFadeInSpec,
-                                    placementSpec = null,
-                                    fadeOutSpec = ListItemFadeOutSpec,
-                                ).padding(horizontal = pageGutter)
+                            Modifier.padding(horizontal = pageGutter)
                                 .padding(top = Spacing.Medium),
                     )
                 }
@@ -295,12 +283,7 @@ fun LibraryPage(bottomContentPadding: Dp = 0.dp) {
                             )
                         },
                         modifier =
-                            Modifier
-                                .animateItem(
-                                    fadeInSpec = ListItemFadeInSpec,
-                                    placementSpec = null,
-                                    fadeOutSpec = ListItemFadeOutSpec,
-                                ).padding(horizontal = pageGutter)
+                            Modifier.padding(horizontal = pageGutter)
                                 .padding(top = Spacing.Medium),
                     )
                 }
@@ -325,12 +308,7 @@ fun LibraryPage(bottomContentPadding: Dp = 0.dp) {
                     PlaylistsEmptyState(
                         modifier =
                             Modifier
-                                .fillMaxWidth()
-                                .animateItem(
-                                    fadeInSpec = ListItemFadeInSpec,
-                                    placementSpec = null,
-                                    fadeOutSpec = ListItemFadeOutSpec,
-                                ).padding(horizontal = pageGutter),
+                                .fillMaxWidth().padding(horizontal = pageGutter),
                     )
                 }
             } else {
@@ -344,11 +322,7 @@ fun LibraryPage(bottomContentPadding: Dp = 0.dp) {
                     contentType = { _, _ -> "playlist" },
                 ) { index, item ->
                     val rowModifier =
-                        Modifier.animateItem(
-                            fadeInSpec = ListItemFadeInSpec,
-                            placementSpec = PlaylistPlacementSpec,
-                            fadeOutSpec = ListItemFadeOutSpec,
-                        )
+                        Modifier
                     PlaylistRow(
                         item = item,
                         onClick = { backStack.add(PlaylistDetailRoute(item.playlist)) },

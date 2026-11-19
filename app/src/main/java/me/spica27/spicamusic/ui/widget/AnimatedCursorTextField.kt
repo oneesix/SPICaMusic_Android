@@ -1,13 +1,14 @@
 package me.spica27.spicamusic.ui.widget
 
+import me.spica27.spicamusic.ui.motion.animateToNow
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.VectorConverter
-import androidx.compose.animation.core.animateFloat
+import me.spica27.spicamusic.ui.motion.animateFloat
 import androidx.compose.animation.core.infiniteRepeatable
-import androidx.compose.animation.core.rememberInfiniteTransition
+import me.spica27.spicamusic.ui.motion.rememberInfiniteTransition
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.layout.Box
@@ -134,7 +135,7 @@ fun AnimatedCursorTextField(
                 lastCursorMoveAt = now
                 // 高频时用高刚度 spring 快速追赶；单次移动用中等刚度平滑滑动。
                 // spring retarget 会保留当前速度，连续变化时平滑接续、不从零重启。
-                animatedTopLeft.animateTo(
+                animatedTopLeft.animateToNow(
                     targetValue = rect.topLeft,
                     animationSpec =
                         spring(

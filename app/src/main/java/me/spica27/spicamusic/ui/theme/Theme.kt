@@ -60,7 +60,6 @@ fun ProvideAppInteractionIndication(content: @Composable () -> Unit) {
         LocalIndication provides clickHighlightIndication,
         LocalRippleConfiguration provides null,
         // 主题和崩溃页面统一在此配置交互反馈。
-        LocalReducedMotion provides rememberSystemReducedMotion(),
         content = content,
     )
 }

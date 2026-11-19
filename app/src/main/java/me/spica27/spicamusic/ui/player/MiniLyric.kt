@@ -1,6 +1,6 @@
 package me.spica27.spicamusic.ui.player
 
-import androidx.compose.animation.AnimatedContent
+import me.spica27.spicamusic.ui.motion.AnimatedContent
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box

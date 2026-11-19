@@ -27,7 +27,6 @@ import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.skydoves.landscapist.components.rememberImageComponent
-import com.skydoves.landscapist.crossfade.CrossfadePlugin
 import com.skydoves.landscapist.image.LandscapistImage
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.ExecutorCoroutineDispatcher
@@ -162,7 +161,6 @@ fun FluidMusicBackground(
                     imageModel = { coverUri.invoke() },
                     component =
                         rememberImageComponent {
-                            +CrossfadePlugin(duration = 550)
                             +BlurHashTransformationPlugin()
                         },
                 )

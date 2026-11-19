@@ -1,11 +1,12 @@
 package me.spica27.spicamusic.ui.player.pages
 
+import me.spica27.spicamusic.ui.motion.animateToNow
 import android.widget.Toast
 import androidx.activity.compose.BackHandler
-import androidx.compose.animation.AnimatedContent
-import androidx.compose.animation.AnimatedVisibility
+import me.spica27.spicamusic.ui.motion.AnimatedContent
+import me.spica27.spicamusic.ui.motion.AnimatedVisibility
 import androidx.compose.animation.SizeTransform
-import androidx.compose.animation.animateColorAsState
+import me.spica27.spicamusic.ui.motion.animateColorAsState
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.AnimationVector1D
 import androidx.compose.animation.core.FastOutSlowInEasing
@@ -13,11 +14,11 @@ import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.VisibilityThreshold
-import androidx.compose.animation.core.animateFloat
-import androidx.compose.animation.core.animateFloatAsState
+import me.spica27.spicamusic.ui.motion.animateFloat
+import me.spica27.spicamusic.ui.motion.animateFloatAsState
 import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.keyframes
-import androidx.compose.animation.core.rememberInfiniteTransition
+import me.spica27.spicamusic.ui.motion.rememberInfiniteTransition
 import androidx.compose.animation.core.snap
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
@@ -167,8 +168,6 @@ import me.spica27.spicamusic.ui.player.PlayerViewModel
 import me.spica27.spicamusic.ui.player.formatTime
 import me.spica27.spicamusic.ui.theme.EaseOutEmphasized
 import me.spica27.spicamusic.ui.theme.LayoutTokens
-import me.spica27.spicamusic.ui.theme.ListItemFadeInSpec
-import me.spica27.spicamusic.ui.theme.ListItemFadeOutSpec
 import me.spica27.spicamusic.ui.theme.LocalReducedMotion
 import me.spica27.spicamusic.ui.theme.ScaleEnterFrom
 import me.spica27.spicamusic.ui.theme.Shapes
@@ -181,7 +180,6 @@ import me.spica27.spicamusic.ui.widget.combinedClickHighlight
 import me.spica27.spicamusic.ui.widget.materialSharedAxisZ
 import me.spica27.spicamusic.ui.widget.particleDissolve
 import me.spica27.spicamusic.ui.widget.rememberIOSOverScrollEffect
-import me.spica27.spicamusic.utils.Nav3Transitions
 import org.koin.compose.viewmodel.koinViewModel
 import sh.calvin.reorderable.ReorderableItem
 import sh.calvin.reorderable.rememberReorderableLazyListState
@@ -400,14 +398,14 @@ fun CurrPlaylistPage(
             scope.launch {
                 val info = listState.layoutInfo
                 val viewport = info.viewportSize.height - info.beforeContentPadding - info.afterContentPadding
-                listState.animateScrollToItem(QUEUE_HEADER_COUNT + index, -viewport / 3)
+                listState.scrollToItem(QUEUE_HEADER_COUNT + index, -viewport / 3)
             }
         }
     }
 
     val scrollToTop: () -> Unit = {
         scope.launch {
-            listState.animateScrollToItem(0)
+            listState.scrollToItem(0)
         }
     }
 
@@ -527,7 +525,6 @@ fun CurrPlaylistPage(
                         modifier =
                             Modifier
                                 .fillMaxWidth()
-                                .animateItem()
                                 .entrance(order = 1, play = !entrancePlayed),
                     )
                 }
@@ -569,11 +566,7 @@ fun CurrPlaylistPage(
                                 play = !entrancePlayed && entranceSlot in 0 until ENTRANCE_MAX_ROW,
                             ),
                         animateItemModifier =
-                            Modifier.animateItem(
-                                fadeInSpec = ListItemFadeInSpec,
-                                placementSpec = if (reducedMotion) null else ItemPlacementSpringSpec,
-                                fadeOutSpec = ListItemFadeOutSpec,
-                            ),
+                            Modifier,
                     ) { isDragging ->
                         // 不能用 rememberSaveable：撤销后回到列表的行必须是未滑动状态
                         val swipeState =
@@ -1016,7 +1009,7 @@ private fun Density.mastheadCollapse(listState: LazyListState): Float =
 
 /** 一次“扑通-扑通”双搏脉冲（点击切换播放模式时的反馈） */
 private suspend fun heartThump(pulse: Animatable<Float, AnimationVector1D>) {
-    pulse.animateTo(
+    pulse.animateToNow(
         targetValue = 1f,
         animationSpec =
             keyframes {
@@ -1256,7 +1249,7 @@ private fun QueueMasthead(
                 ) {
                     AnimatedContent(
                         targetState = isMultiSelectMode,
-                        transitionSpec = { Nav3Transitions.cube() },
+                        transitionSpec = { me.spica27.spicamusic.ui.motion.NoTransition },
                         label = "queueMultiSelectPill",
                     ) { active ->
                         Row(

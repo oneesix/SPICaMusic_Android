@@ -3,7 +3,7 @@ package me.spica27.spicamusic.ui.player
 import android.net.Uri
 import android.os.Build
 import android.os.SystemClock
-import androidx.compose.animation.AnimatedContent
+import me.spica27.spicamusic.ui.motion.AnimatedContent
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable

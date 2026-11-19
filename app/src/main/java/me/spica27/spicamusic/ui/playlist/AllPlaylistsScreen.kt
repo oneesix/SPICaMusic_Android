@@ -128,7 +128,7 @@ fun AllPlaylistsScreen() {
                     AllPlaylistCard(
                         item = item,
                         onClick = { backStack.add(PlaylistDetailRoute(item.playlist)) },
-                        modifier = Modifier.animateItem(),
+                        modifier = Modifier,
                     )
                 }
             }

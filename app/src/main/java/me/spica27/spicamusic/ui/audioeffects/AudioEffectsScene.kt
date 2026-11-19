@@ -1,6 +1,6 @@
 package me.spica27.spicamusic.ui.audioeffects
 
-import androidx.compose.animation.AnimatedVisibility
+import me.spica27.spicamusic.ui.motion.AnimatedVisibility
 import androidx.compose.animation.expandVertically
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut

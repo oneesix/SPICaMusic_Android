@@ -1,17 +1,17 @@
 package me.spica27.spicamusic.ui.player
 
+import me.spica27.spicamusic.ui.motion.animateToNow
 import android.os.FileUtils
 import android.text.TextUtils
 import androidx.activity.compose.BackHandler
-import androidx.compose.animation.AnimatedContent
-import androidx.compose.animation.AnimatedVisibility
+import me.spica27.spicamusic.ui.motion.AnimatedContent
+import me.spica27.spicamusic.ui.motion.AnimatedVisibility
 import androidx.compose.animation.ContentTransform
-import androidx.compose.animation.animateContentSize
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.AnimationVector1D
 import androidx.compose.animation.core.EaseOutCubic
 import androidx.compose.animation.core.Spring
-import androidx.compose.animation.core.animateFloatAsState
+import me.spica27.spicamusic.ui.motion.animateFloatAsState
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
@@ -156,7 +156,6 @@ import me.spica27.spicamusic.ui.widget.holographicCoverTilt
 import me.spica27.spicamusic.ui.widget.materialSharedAxisYIn
 import me.spica27.spicamusic.ui.widget.materialSharedAxisYOut
 import me.spica27.spicamusic.ui.widget.rememberIOSOverScrollEffect
-import me.spica27.spicamusic.utils.Nav3Transitions
 import me.spica27.spicamusic.utils.rememberDominantColorFromUri
 import org.koin.compose.koinInject
 import org.koin.compose.viewmodel.koinViewModel
@@ -449,14 +448,14 @@ fun ExpandedPlayerScreen(
                 withFrameNanos { }
                 withFrameNanos { }
             }
-            surfaceProgress.animateTo(target, tween(durationMillis = SURFACE_SLIDE_DURATION_MILLIS, easing = EaseOutCubic))
+            surfaceProgress.animateToNow(target, tween(durationMillis = SURFACE_SLIDE_DURATION_MILLIS, easing = EaseOutCubic))
         }
     }
     // A finished swipe: change the surface, or slide back if it stays the same (cancelled swipe).
     val settleSurface: (PlayerSurface) -> Unit = { target ->
         if (playerSurface == target) {
             coroutineScope.launch {
-                surfaceProgress.animateTo(
+                surfaceProgress.animateToNow(
                     if (target == PlayerSurface.Lyrics) 1f else 0f,
                     tween(durationMillis = SURFACE_SLIDE_DURATION_MILLIS, easing = EaseOutCubic),
                 )
@@ -471,10 +470,7 @@ fun ExpandedPlayerScreen(
             playerSurface == PlayerSurface.Lyrics -> playerSurface = PlayerSurface.Player
             pagerState.currentPage != DEFAULT_PAGE -> {
                 coroutineScope.launch {
-                    pagerState.animateScrollToPage(
-                        DEFAULT_PAGE,
-                        animationSpec = tween(durationMillis = 300, easing = EaseOutCubic),
-                    )
+                    pagerState.scrollToPage(DEFAULT_PAGE)
                 }
             }
             else -> {
@@ -489,10 +485,7 @@ fun ExpandedPlayerScreen(
         snapshotFlow { pagerState.isScrollInProgress }
             .collect { scrolling ->
                 if (!scrolling && abs(pagerState.currentPageOffsetFraction) > 0.01f) {
-                    pagerState.animateScrollToPage(
-                        pagerState.currentPage,
-                        animationSpec = tween(durationMillis = 300, easing = EaseOutCubic),
-                    )
+                    pagerState.scrollToPage(pagerState.currentPage)
                 }
             }
     }
@@ -657,7 +650,7 @@ fun ExpandedPlayerScreen(
                                         modifier = Modifier.weight(1f),
                                         visible = isPlayerPageRevealed,
                                         delayMillis = 225,
-                                        enter = Nav3Transitions.expand().targetContentEnter,
+                                        enter = androidx.compose.animation.EnterTransition.None,
                                         skipFirstEnter = playerPageRevealedOnce,
                                     ) {
                                         CompositionLocalProvider(
@@ -716,14 +709,7 @@ fun ExpandedPlayerScreen(
                                             sleepTimer = sleepTimer,
                                             onPlaylistClick = {
                                                 coroutineScope.launch {
-                                                    pagerState.animateScrollToPage(
-                                                        QUEUE_PAGE,
-                                                        animationSpec =
-                                                            tween(
-                                                                durationMillis = 320,
-                                                                easing = EaseOutEmphasized,
-                                                            ),
-                                                    )
+                                                    pagerState.scrollToPage(QUEUE_PAGE)
                                                 }
                                             },
                                             progressProvider = progressProvider,
@@ -750,19 +736,12 @@ fun ExpandedPlayerScreen(
                                     true,
                                     modifier = Modifier.fillMaxSize(),
                                     delayMillis = 225,
-                                    enter = Nav3Transitions.slideUp().targetContentEnter,
+                                    enter = androidx.compose.animation.EnterTransition.None,
                                 ) {
                                     CurrPlaylistPage(
                                         onNavigateBack = {
                                             coroutineScope.launch {
-                                                pagerState.animateScrollToPage(
-                                                    DEFAULT_PAGE,
-                                                    animationSpec =
-                                                        tween(
-                                                            durationMillis = 300,
-                                                            easing = EaseOutCubic,
-                                                        ),
-                                                )
+                                                pagerState.scrollToPage(DEFAULT_PAGE)
                                             }
                                         },
                                         navigationIcon = Icons.Rounded.KeyboardArrowDown,
@@ -1209,8 +1188,7 @@ private fun PlayerPage(
                 Row(
                     modifier =
                         Modifier
-                            .padding(horizontal = Spacing.Medium, vertical = 5.dp)
-                            .animateContentSize(),
+                            .padding(horizontal = Spacing.Medium, vertical = 5.dp),
                     horizontalArrangement = Arrangement.spacedBy(Spacing.Small),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
@@ -1385,8 +1363,7 @@ private fun SeekBarSection(
         Box(
             modifier =
                 Modifier
-                    .fillMaxWidth()
-                    .animateContentSize(),
+                    .fillMaxWidth(),
             contentAlignment = Alignment.Center,
         ) {
             Row(
@@ -1491,7 +1468,7 @@ private fun SongInfo(
 }
 
 /** 播放按钮动画 */
-private fun controlIconTransform() = Nav3Transitions.rocket()
+private fun controlIconTransform() = me.spica27.spicamusic.ui.motion.NoTransition
 
 /** 主播放控制：上一曲、播放/暂停、下一曲。 */
 @Composable

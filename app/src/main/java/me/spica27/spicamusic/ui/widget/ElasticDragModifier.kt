@@ -1,5 +1,6 @@
 package me.spica27.spicamusic.ui.widget
 
+import me.spica27.spicamusic.ui.motion.animateToNow
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.VectorConverter
 import androidx.compose.animation.core.spring
@@ -210,7 +211,7 @@ private class ElasticDragNode(
         pressJob?.cancel()
         pressJob =
             coroutineScope.launch {
-                pressProgress.animateTo(target, spring(dampingRatio = 0.6f, stiffness = 200f))
+                pressProgress.animateToNow(target, spring(dampingRatio = 0.6f, stiffness = 200f))
             }
     }
 
@@ -222,7 +223,7 @@ private class ElasticDragNode(
         dragJob?.cancel()
         dragJob =
             coroutineScope.launch {
-                dragOffset.animateTo(Offset.Zero, spring(dampingRatio = 0.6f, stiffness = 200f))
+                dragOffset.animateToNow(Offset.Zero, spring(dampingRatio = 0.6f, stiffness = 200f))
             }
     }
 

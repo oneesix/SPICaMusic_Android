@@ -1,14 +1,12 @@
 package me.spica27.spicamusic.ui.albumdetail
 
 import android.widget.Toast
-import androidx.compose.animation.animateColorAsState
+import me.spica27.spicamusic.ui.motion.animateColorAsState
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.RepeatMode
-import androidx.compose.animation.core.Spring
-import androidx.compose.animation.core.VisibilityThreshold
-import androidx.compose.animation.core.animateFloat
+import me.spica27.spicamusic.ui.motion.animateFloat
 import androidx.compose.animation.core.infiniteRepeatable
-import androidx.compose.animation.core.rememberInfiniteTransition
+import me.spica27.spicamusic.ui.motion.rememberInfiniteTransition
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
@@ -79,8 +77,6 @@ import me.spica27.spicamusic.ui.navigation.AlbumMenuRoute
 import me.spica27.spicamusic.ui.navigation.LocalBackStack
 import me.spica27.spicamusic.ui.navigation.SongMenuRoute
 import me.spica27.spicamusic.ui.player.LocalPlayerViewModel
-import me.spica27.spicamusic.ui.theme.ListItemFadeInSpec
-import me.spica27.spicamusic.ui.theme.ListItemFadeOutSpec
 import me.spica27.spicamusic.ui.theme.Shapes
 import me.spica27.spicamusic.ui.theme.Spacing
 import me.spica27.spicamusic.ui.theme.entrance
@@ -299,17 +295,7 @@ fun AlbumDetailScreen(album: Album) {
                     onClick = { viewModel.playSongInList(song) },
                     onMore = { backStack.add(SongMenuRoute(song)) },
                     modifier =
-                        Modifier
-                            .animateItem(
-                                fadeInSpec = ListItemFadeInSpec,
-                                placementSpec =
-                                    spring(
-                                        dampingRatio = Spring.DampingRatioLowBouncy,
-                                        stiffness = Spring.StiffnessMediumLow,
-                                        visibilityThreshold = IntOffset.VisibilityThreshold,
-                                    ),
-                                fadeOutSpec = ListItemFadeOutSpec,
-                            ).entrance(
+                        Modifier.entrance(
                                 order = Math.min(3 + index, 8),
                                 play = listEntrancePlay.value,
                             ).padding(horizontal = Spacing.Large)

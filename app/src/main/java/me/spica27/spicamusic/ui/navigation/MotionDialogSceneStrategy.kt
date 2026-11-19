@@ -1,5 +1,6 @@
 package me.spica27.spicamusic.ui.navigation
 
+import me.spica27.spicamusic.ui.motion.animateToNow
 import android.view.WindowManager
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.spring
@@ -126,12 +127,12 @@ private class MotionDialogScene<T : Any>(
         removeMutex.withLock {
             coroutineScope {
                 launch {
-                    dimProgress.animateTo(
+                    dimProgress.animateToNow(
                         targetValue = 0f,
                         animationSpec = tween(durationMillis = 250, easing = DialogDecelerateEasing),
                     )
                 }
-                contentProgress.animateTo(
+                contentProgress.animateToNow(
                     targetValue = 0f,
                     animationSpec = tween(durationMillis = 260, easing = DialogDecelerateEasing),
                 )
@@ -176,12 +177,12 @@ private fun MotionDialogRouteLayout(
     LaunchedEffect(Unit) {
         coroutineScope {
             launch {
-                dimProgress.animateTo(
+                dimProgress.animateToNow(
                     targetValue = 1f,
                     animationSpec = tween(durationMillis = 300, easing = DialogDecelerateEasing),
                 )
             }
-            contentProgress.animateTo(
+            contentProgress.animateToNow(
                 targetValue = 1f,
                 animationSpec =
                     if (isLargeScreen || anchor != null) {

@@ -1,8 +1,8 @@
 package me.spica27.spicamusic.ui.settings
 
-import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.animateColorAsState
-import androidx.compose.animation.core.animateFloatAsState
+import me.spica27.spicamusic.ui.motion.AnimatedVisibility
+import me.spica27.spicamusic.ui.motion.animateColorAsState
+import me.spica27.spicamusic.ui.motion.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.expandVertically
 import androidx.compose.animation.fadeIn

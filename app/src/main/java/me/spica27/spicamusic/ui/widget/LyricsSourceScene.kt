@@ -1,6 +1,5 @@
 package me.spica27.spicamusic.ui.widget
 
-import androidx.compose.animation.animateContentSize
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
@@ -47,7 +46,6 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.skydoves.landscapist.components.rememberImageComponent
-import com.skydoves.landscapist.crossfade.CrossfadePlugin
 import com.skydoves.landscapist.image.LandscapistImage
 import me.spica27.spicamusic.R
 import me.spica27.spicamusic.common.entity.LyricSource
@@ -132,7 +130,6 @@ private fun LyricsSourceDialogContentInternal(
             modifier =
                 Modifier
                     .fillMaxWidth()
-                    .animateContentSize()
                     .heightIn(min = 320.dp, max = 560.dp),
         ) {
             // 标题栏
@@ -324,7 +321,6 @@ private fun SourceRow(
                 imageModel = { albumArt },
                 component =
                     rememberImageComponent {
-                        +CrossfadePlugin(duration = 550)
                     },
                 modifier =
                     Modifier

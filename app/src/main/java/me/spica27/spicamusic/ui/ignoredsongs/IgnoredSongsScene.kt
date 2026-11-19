@@ -1,18 +1,16 @@
 package me.spica27.spicamusic.ui.ignoredsongs
 
+import me.spica27.spicamusic.ui.motion.animateToNow
 import androidx.activity.compose.BackHandler
-import androidx.compose.animation.AnimatedContent
-import androidx.compose.animation.AnimatedVisibility
+import me.spica27.spicamusic.ui.motion.AnimatedContent
+import me.spica27.spicamusic.ui.motion.AnimatedVisibility
 import androidx.compose.animation.SizeTransform
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.RepeatMode
-import androidx.compose.animation.core.Spring
-import androidx.compose.animation.core.VisibilityThreshold
-import androidx.compose.animation.core.animateFloat
+import me.spica27.spicamusic.ui.motion.animateFloat
 import androidx.compose.animation.core.infiniteRepeatable
-import androidx.compose.animation.core.rememberInfiniteTransition
-import androidx.compose.animation.core.spring
+import me.spica27.spicamusic.ui.motion.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -94,8 +92,6 @@ import me.spica27.spicamusic.common.entity.Song
 import me.spica27.spicamusic.ui.navigation.LocalBackStack
 import me.spica27.spicamusic.ui.theme.EaseOutStrong
 import me.spica27.spicamusic.ui.theme.LayoutTokens
-import me.spica27.spicamusic.ui.theme.ListItemFadeInSpec
-import me.spica27.spicamusic.ui.theme.ListItemFadeOutSpec
 import me.spica27.spicamusic.ui.theme.ScaleDismissTo
 import me.spica27.spicamusic.ui.theme.Shapes
 import me.spica27.spicamusic.ui.theme.Spacing
@@ -253,7 +249,6 @@ private fun IgnoredSongsScreenContent() {
                         modifier =
                             Modifier
                                 .fillMaxWidth()
-                                .animateItem()
                                 .entrance(
                                     order = ENTRANCE_ORDER_ROW_BASE,
                                     play = !entrancePlayed,
@@ -285,17 +280,7 @@ private fun IgnoredSongsScreenContent() {
                         },
                         onRestore = { viewModel.unignoreSong(song) },
                         modifier =
-                            Modifier
-                                .animateItem(
-                                    fadeInSpec = ListItemFadeInSpec,
-                                    placementSpec =
-                                        spring(
-                                            dampingRatio = Spring.DampingRatioLowBouncy,
-                                            stiffness = Spring.StiffnessMediumLow,
-                                            visibilityThreshold = IntOffset.VisibilityThreshold,
-                                        ),
-                                    fadeOutSpec = ListItemFadeOutSpec,
-                                ).entrance(
+                            Modifier.entrance(
                                     order = index + ENTRANCE_ORDER_ROW_BASE,
                                     play = !entrancePlayed && index < ENTRANCE_MAX_ROW,
                                 ),
@@ -659,14 +644,14 @@ private fun IgnoredSongRow(
                     // 缩放动画仅作视觉反馈；避免行在动画期间被回收导致 scope 取消、动作丢失。
                     onRestore()
                     scope.launch {
-                        restoreScale.animateTo(
+                        restoreScale.animateToNow(
                             targetValue = 1.28f,
                             animationSpec = tween(durationMillis = 120, easing = FastOutSlowInEasing),
                         )
                         launch {
-                            restoreAlpha.animateTo(0f, tween(durationMillis = 160, easing = EaseOutStrong))
+                            restoreAlpha.animateToNow(0f, tween(durationMillis = 160, easing = EaseOutStrong))
                         }
-                        restoreScale.animateTo(
+                        restoreScale.animateToNow(
                             targetValue = ScaleDismissTo,
                             animationSpec = tween(durationMillis = 160, easing = EaseOutStrong),
                         )

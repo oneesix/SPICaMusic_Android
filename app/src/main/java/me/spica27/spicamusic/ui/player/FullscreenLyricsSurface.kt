@@ -1,7 +1,7 @@
 package me.spica27.spicamusic.ui.player
 
-import androidx.compose.animation.AnimatedContent
-import androidx.compose.animation.AnimatedVisibility
+import me.spica27.spicamusic.ui.motion.AnimatedContent
+import me.spica27.spicamusic.ui.motion.AnimatedVisibility
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween

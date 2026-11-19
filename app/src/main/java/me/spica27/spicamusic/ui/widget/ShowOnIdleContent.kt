@@ -1,9 +1,10 @@
 package me.spica27.spicamusic.ui.widget
 
+import me.spica27.spicamusic.ui.motion.animateToNow
 import android.os.Handler
 import android.os.Looper
 import android.os.MessageQueue
-import androidx.compose.animation.AnimatedVisibility
+import me.spica27.spicamusic.ui.motion.AnimatedVisibility
 import androidx.compose.animation.AnimatedVisibilityScope
 import androidx.compose.animation.EnterTransition
 import androidx.compose.animation.ExitTransition
@@ -108,7 +109,7 @@ fun AnimateOnEnter(
             if (delayMillis > 0) {
                 kotlinx.coroutines.delay(delayMillis.toLong())
             }
-            animatable.animateTo(targetValue, animationSpec)
+            animatable.animateToNow(targetValue, animationSpec)
         }
     }
 

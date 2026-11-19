@@ -1,6 +1,6 @@
 package me.spica27.spicamusic.ui.scan
 
-import androidx.compose.animation.animateColorAsState
+import me.spica27.spicamusic.ui.motion.animateColorAsState
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box

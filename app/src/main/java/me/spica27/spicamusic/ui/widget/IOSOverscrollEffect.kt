@@ -1,5 +1,7 @@
 package me.spica27.spicamusic.ui.widget
 
+import me.spica27.spicamusic.ui.motion.animateDecayNow
+import me.spica27.spicamusic.ui.motion.animateToNow
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.CubicBezierEasing
 import androidx.compose.animation.core.Spring
@@ -127,14 +129,14 @@ class IOSOverscrollEffect(
                 )
 
             if (predictedEndValue.sign == previousSign) {
-                overscrollAmountAnimatable.animateTo(
+                overscrollAmountAnimatable.animateToNow(
                     targetValue = 0f,
                     initialVelocity = relevantVelocity,
                     animationSpec = animationSpec,
                 )
             } else {
                 try {
-                    overscrollAmountAnimatable.animateDecay(
+                    overscrollAmountAnimatable.animateDecayNow(
                         initialVelocity = relevantVelocity,
                         animationSpec = exponentialDecay(),
                     ) {
@@ -145,7 +147,7 @@ class IOSOverscrollEffect(
                         }
                     }
                 } catch (_: Exception) {
-                    overscrollAmountAnimatable.animateTo(0f, animationSpec = animationSpec)
+                    overscrollAmountAnimatable.animateToNow(0f, animationSpec = animationSpec)
                 }
             }
             return
@@ -155,7 +157,7 @@ class IOSOverscrollEffect(
         val available = velocity - consumed
         val availableRelevant = getRelevantVelocity(available)
 
-        overscrollAmountAnimatable.animateTo(
+        overscrollAmountAnimatable.animateToNow(
             targetValue = 0f,
             initialVelocity = availableRelevant,
             animationSpec = animationSpec,

@@ -32,7 +32,6 @@ import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.platform.LocalDensity
 import androidx.core.graphics.ColorUtils
 import com.skydoves.landscapist.components.rememberImageComponent
-import com.skydoves.landscapist.crossfade.CrossfadePlugin
 import com.skydoves.landscapist.image.LandscapistImage
 import me.spica27.spicamusic.utils.blurhash.BlurHashTransformationPlugin
 import kotlin.math.pow
@@ -214,7 +213,6 @@ fun BlurPlusBackground(
                 imageModel = { coverUri },
                 component =
                     rememberImageComponent {
-                        +CrossfadePlugin(duration = 550)
                     },
             )
         } else {
@@ -223,7 +221,6 @@ fun BlurPlusBackground(
                 imageModel = { coverUri },
                 component =
                     rememberImageComponent {
-                        +CrossfadePlugin(duration = 550)
                         +BlurHashTransformationPlugin()
                     },
             )

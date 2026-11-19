@@ -1,14 +1,14 @@
 package me.spica27.spicamusic.ui.widget
 
-import androidx.compose.animation.AnimatedContent
+import me.spica27.spicamusic.ui.motion.AnimatedContent
 import androidx.compose.animation.SizeTransform
 import androidx.compose.animation.core.CubicBezierEasing
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.StartOffset
-import androidx.compose.animation.core.animateFloat
+import me.spica27.spicamusic.ui.motion.animateFloat
 import androidx.compose.animation.core.infiniteRepeatable
-import androidx.compose.animation.core.rememberInfiniteTransition
+import me.spica27.spicamusic.ui.motion.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut

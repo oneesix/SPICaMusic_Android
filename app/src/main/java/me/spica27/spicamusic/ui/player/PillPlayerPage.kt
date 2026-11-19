@@ -1,8 +1,8 @@
 package me.spica27.spicamusic.ui.player
 
-import androidx.compose.animation.AnimatedContent
+import me.spica27.spicamusic.ui.motion.AnimatedContent
 import androidx.compose.animation.core.Spring
-import androidx.compose.animation.core.animateFloatAsState
+import me.spica27.spicamusic.ui.motion.animateFloatAsState
 import androidx.compose.animation.core.spring
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -73,7 +73,6 @@ import me.spica27.spicamusic.ui.widget.audio_seekbar.pillRingSeek
 import me.spica27.spicamusic.ui.widget.clickHighlight
 import me.spica27.spicamusic.ui.widget.materialSharedAxisYIn
 import me.spica27.spicamusic.ui.widget.materialSharedAxisYOut
-import me.spica27.spicamusic.utils.Nav3Transitions
 import androidx.compose.animation.togetherWith
 import kotlin.math.max
 import kotlin.math.min
@@ -327,7 +326,7 @@ internal fun PillPlayerPage(
                 ) {
                     AnimatedContent(
                         targetState = isPlaying,
-                        transitionSpec = { Nav3Transitions.rocket() },
+                        transitionSpec = { me.spica27.spicamusic.ui.motion.NoTransition },
                         label = "pillPlayPause",
                     ) { playing ->
                         Icon(
@@ -384,7 +383,7 @@ internal fun PillPlayerPage(
                 PillCircleButton(onClick = onPlayModeClick) {
                     AnimatedContent(
                         targetState = playMode,
-                        transitionSpec = { Nav3Transitions.rocket() },
+                        transitionSpec = { me.spica27.spicamusic.ui.motion.NoTransition },
                         label = "pillPlayMode",
                     ) { mode ->
                         Icon(
