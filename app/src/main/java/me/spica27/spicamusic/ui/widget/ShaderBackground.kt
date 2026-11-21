@@ -7,9 +7,9 @@ import android.os.SystemClock
 import androidx.annotation.RequiresApi
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.RepeatMode
-import me.spica27.spicamusic.ui.motion.animateFloat
+import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.infiniteRepeatable
-import me.spica27.spicamusic.ui.motion.rememberInfiniteTransition
+import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.layout.Box
 import androidx.compose.material3.MaterialTheme
@@ -27,6 +27,122 @@ import java.nio.ByteBuffer
 import java.nio.ByteOrder
 import java.nio.FloatBuffer
 import kotlin.math.sqrt
+
+/**
+ * 隧道效果着色器背景
+ * 基于 tunnel.frag 实现的动态背景效果
+ *
+ * @param modifier 修饰符
+ * @param coverColor 封面主色，用于色彩调整
+ * @param fftDrawData FFT 频谱数据
+ * @param speed 动画速度
+ * @param blend 纹理混合比例
+ */
+@RequiresApi(Build.VERSION_CODES.TIRAMISU)
+@Composable
+fun TunnelShaderBackground(
+    modifier: Modifier = Modifier,
+    coverColor: Color = Color(0xFF2196F3),
+    fftDrawData: FloatArray = FloatArray(0),
+    speed: Float = 1.0f,
+    blend: Float = 0.5f,
+) {
+    // 简化的隧道着色器（移除纹理依赖）
+    @Language("AGSL")
+    val shaderSource =
+        """
+        uniform float u_time;
+        uniform float u_speed;
+        uniform vec2 u_resolution;
+        uniform vec4 u_center_color;
+        uniform float u_center_radius;
+        uniform float u_music_level;
+        
+        const float kPi = 3.1415927;
+        
+        vec3 hsv2rgb(vec3 c) {
+            vec4 K = vec4(1.0, 2.0 / 3.0, 1.0 / 3.0, 3.0);
+            vec3 p = abs(fract(c.xxx + K.xyz) * 6.0 - K.www);
+            return c.z * mix(K.xxx, clamp(p - K.xxx, 0.0, 1.0), c.y);
+        }
+        
+        vec4 main(vec2 fragCoord) {
+            vec2 p = (2.0 * fragCoord.xy - u_resolution.xy) / u_resolution.y;
+            float a = atan(p.y, p.x);
+            
+            vec2 p2 = p * p, p4 = p2 * p2, p8 = p4 * p4;
+            float r = pow(p8.x + p8.y, 1.0 / 8.0);
+            
+            float distortion = 0.3 / r + 0.2 * u_time * u_speed * (1.0 + u_music_level * 0.5);
+            // 归一化角度到 0-1 范围，消除断层
+            float angle = (a / (2.0 * kPi)) + 0.5;
+            
+            // 生成渐变色隧道效果，使用 fract 确保色相值在 0-1 范围循环
+            float hue1 = fract(distortion * 0.3 + angle * 0.5);
+            float hue2 = fract(distortion * 0.3 + angle * 0.5 + 0.1);
+            vec3 col1 = hsv2rgb(vec3(hue1, 0.7, 0.8));
+            vec3 col2 = hsv2rgb(vec3(hue2, 0.6, 0.9));
+            vec3 col = mix(col1, col2, sin(distortion * 3.0) * 0.5 + 0.5);
+            
+            // 应用封面色调
+            col = mix(col, u_center_color.rgb, 0.3);
+            
+            // 中心淡出效果
+            float fadeAmount = 1.0 - smoothstep(0.0, u_center_radius, r);
+            col = mix(col, u_center_color.rgb, fadeAmount);
+            
+            return vec4(col, 1.0);
+        }
+        """.trimIndent()
+
+    val infiniteTransition = rememberInfiniteTransition(label = "tunnel_time")
+    val time by infiniteTransition.animateFloat(
+        initialValue = 0f,
+        targetValue = 100f,
+        animationSpec =
+            infiniteRepeatable(
+                animation = tween(100000, easing = LinearEasing),
+                repeatMode = RepeatMode.Restart,
+            ),
+        label = "time",
+    )
+
+    // 计算音频驱动参数
+    val musicLevel =
+        remember(fftDrawData) {
+            if (fftDrawData.isEmpty()) {
+                0f
+            } else {
+                fftDrawData.average().toFloat().coerceIn(0f, 1f)
+            }
+        }
+
+    val shader = remember { RuntimeShader(shaderSource) }
+    val shaderBrush = remember(shader) { ShaderBrush(shader) }
+
+    Box(
+        modifier =
+            modifier.drawWithCache {
+                shader.setFloatUniform("u_time", time)
+                shader.setFloatUniform("u_speed", speed)
+                shader.setFloatUniform("u_resolution", size.width, size.height)
+                // 设置颜色为 vec4 (RGBA)
+                shader.setFloatUniform(
+                    "u_center_color",
+                    coverColor.red,
+                    coverColor.green,
+                    coverColor.blue,
+                    coverColor.alpha,
+                )
+                shader.setFloatUniform("u_center_radius", 0.3f + musicLevel * 0.2f)
+                shader.setFloatUniform("u_music_level", musicLevel)
+
+                onDrawBehind {
+                    drawRect(shaderBrush)
+                }
+            },
+    )
+}
 
 /**
  * 效果着色器背景

@@ -1,13 +1,13 @@
 package me.spica27.spicamusic.ui.home.page
 
 import android.widget.Toast
-import me.spica27.spicamusic.ui.motion.AnimatedContent
-import me.spica27.spicamusic.ui.motion.AnimatedVisibility
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.SizeTransform
 import androidx.compose.animation.core.FiniteAnimationSpec
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.VisibilityThreshold
-import me.spica27.spicamusic.ui.motion.animateFloatAsState
+import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
@@ -92,6 +92,8 @@ import me.spica27.spicamusic.ui.navigation.SearchRoute
 import me.spica27.spicamusic.ui.navigation.SettingsRoute
 import me.spica27.spicamusic.ui.player.LocalPlayerViewModel
 import me.spica27.spicamusic.ui.theme.LayoutTokens
+import me.spica27.spicamusic.ui.theme.ListItemFadeInSpec
+import me.spica27.spicamusic.ui.theme.ListItemFadeOutSpec
 import me.spica27.spicamusic.ui.theme.ScaleEnterFrom
 import me.spica27.spicamusic.ui.theme.ScaleExitTo
 import me.spica27.spicamusic.ui.theme.Shapes
@@ -206,7 +208,12 @@ fun FinderPage(bottomContentPadding: Dp = 0.dp) {
                     ScanGuideCard(
                         onClick = { backStack.add(ScannerRoute) },
                         modifier =
-                            Modifier.entrance(order = 2, play = playEntrance),
+                            Modifier
+                                .animateItem(
+                                    fadeInSpec = ListItemFadeInSpec,
+                                    placementSpec = null,
+                                    fadeOutSpec = ListItemFadeOutSpec,
+                                ).entrance(order = 2, play = playEntrance),
                     )
                 }
             }
@@ -218,7 +225,12 @@ fun FinderPage(bottomContentPadding: Dp = 0.dp) {
                         title = stringResource(R.string.finder_no_frequent_title),
                         subtitle = stringResource(R.string.finder_no_frequent_subtitle),
                         modifier =
-                            Modifier.entrance(order = 3, play = playEntrance),
+                            Modifier
+                                .animateItem(
+                                    fadeInSpec = ListItemFadeInSpec,
+                                    placementSpec = null,
+                                    fadeOutSpec = ListItemFadeOutSpec,
+                                ).entrance(order = 3, play = playEntrance),
                     )
                 }
             } else {
@@ -246,7 +258,12 @@ fun FinderPage(bottomContentPadding: Dp = 0.dp) {
                             )
                         },
                         modifier =
-                            Modifier.entrance(order = 3, play = playEntrance),
+                            Modifier
+                                .animateItem(
+                                    fadeInSpec = ListItemFadeInSpec,
+                                    placementSpec = null,
+                                    fadeOutSpec = ListItemFadeOutSpec,
+                                ).entrance(order = 3, play = playEntrance),
                     )
                 }
             }
@@ -256,7 +273,12 @@ fun FinderPage(bottomContentPadding: Dp = 0.dp) {
                     WeeklyStatsStrip(
                         stats = weeklyStats ?: return@item,
                         modifier =
-                            Modifier.entrance(order = 4, play = playEntrance),
+                            Modifier
+                                .animateItem(
+                                    fadeInSpec = ListItemFadeInSpec,
+                                    placementSpec = null,
+                                    fadeOutSpec = ListItemFadeOutSpec,
+                                ).entrance(order = 4, play = playEntrance),
                     )
                 }
             }
@@ -269,7 +291,12 @@ fun FinderPage(bottomContentPadding: Dp = 0.dp) {
                     fontWeight = FontWeight.SemiBold,
                     color = MaterialTheme.colorScheme.onSurface,
                     modifier =
-                        Modifier.padding(horizontal = LayoutTokens.MusicHeaderHorizontalPadding)
+                        Modifier
+                            .animateItem(
+                                fadeInSpec = ListItemFadeInSpec,
+                                placementSpec = ItemPlacementSpec,
+                                fadeOutSpec = ListItemFadeOutSpec,
+                            ).padding(horizontal = LayoutTokens.MusicHeaderHorizontalPadding)
                             .padding(top = Spacing.ExtraLarge),
                 )
             }
@@ -282,7 +309,11 @@ fun FinderPage(bottomContentPadding: Dp = 0.dp) {
                     badgeColor = MaterialTheme.colorScheme.primary,
                     onClick = { homeViewModel.navigateToPage(HomePage.Library) },
                     modifier =
-                        Modifier,
+                        Modifier.animateItem(
+                            fadeInSpec = ListItemFadeInSpec,
+                            placementSpec = ItemPlacementSpec,
+                            fadeOutSpec = ListItemFadeOutSpec,
+                        ),
                 )
             }
 
@@ -294,7 +325,11 @@ fun FinderPage(bottomContentPadding: Dp = 0.dp) {
                     badgeColor = MaterialTheme.colorScheme.tertiary,
                     onClick = { homeViewModel.navigateToPage(HomePage.Music) },
                     modifier =
-                        Modifier,
+                        Modifier.animateItem(
+                            fadeInSpec = ListItemFadeInSpec,
+                            placementSpec = ItemPlacementSpec,
+                            fadeOutSpec = ListItemFadeOutSpec,
+                        ),
                 )
             }
 
@@ -306,7 +341,11 @@ fun FinderPage(bottomContentPadding: Dp = 0.dp) {
                     badgeColor = MaterialTheme.colorScheme.secondary,
                     onClick = { backStack.add(SettingsRoute) },
                     modifier =
-                        Modifier,
+                        Modifier.animateItem(
+                            fadeInSpec = ListItemFadeInSpec,
+                            placementSpec = ItemPlacementSpec,
+                            fadeOutSpec = ListItemFadeOutSpec,
+                        ),
                 )
             }
         }

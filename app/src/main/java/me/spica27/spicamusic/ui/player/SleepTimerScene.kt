@@ -2,19 +2,18 @@
 
 package me.spica27.spicamusic.ui.player
 
-import me.spica27.spicamusic.ui.motion.animateToNow
-import me.spica27.spicamusic.ui.motion.AnimatedContent
-import me.spica27.spicamusic.ui.motion.AnimatedVisibility
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.SizeTransform
-import me.spica27.spicamusic.ui.motion.animateColorAsState
+import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.Spring
-import me.spica27.spicamusic.ui.motion.animateFloat
-import me.spica27.spicamusic.ui.motion.animateFloatAsState
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.infiniteRepeatable
-import me.spica27.spicamusic.ui.motion.rememberInfiniteTransition
+import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.expandHorizontally
@@ -723,11 +722,11 @@ private fun rememberRingSweep(target: Float): State<Float> {
             reducedMotion -> sweep.snapTo(target)
             // 只有还没显影过的那一次走 ease-out，其余都是跟走
             sweep.value == 0f && target > 0f ->
-                sweep.animateToNow(target, tween(RING_REVEAL_MILLIS, easing = EaseOutEmphasized))
+                sweep.animateTo(target, tween(RING_REVEAL_MILLIS, easing = EaseOutEmphasized))
 
             // 换档或切模式，跳变用临界阻尼弹簧收住，有落点感又不会冲过目标值
             delta > RING_JUMP_THRESHOLD ->
-                sweep.animateToNow(
+                sweep.animateTo(
                     target,
                     spring(
                         dampingRatio = Spring.DampingRatioNoBouncy,
@@ -735,7 +734,7 @@ private fun rememberRingSweep(target: Float): State<Float> {
                     ),
                 )
 
-            else -> sweep.animateToNow(target, tween(RING_TICK_MILLIS, easing = LinearEasing))
+            else -> sweep.animateTo(target, tween(RING_TICK_MILLIS, easing = LinearEasing))
         }
     }
     return sweep.asState()

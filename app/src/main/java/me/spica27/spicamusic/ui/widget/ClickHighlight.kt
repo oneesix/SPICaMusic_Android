@@ -1,6 +1,5 @@
 package me.spica27.spicamusic.ui.widget
 
-import me.spica27.spicamusic.ui.motion.animateToNow
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.tween
@@ -240,7 +239,7 @@ private class ClickHighlightNode(
                 rippleActive = true
                 progress.snapTo(0f)
                 invalidateDraw()
-                progress.animateToNow(
+                progress.animateTo(
                     targetValue = 0.5f,
                     animationSpec = tween(durationMillis = 250, easing = LinearEasing),
                 ) {
@@ -254,7 +253,7 @@ private class ClickHighlightNode(
         animationJob =
             coroutineScope.launch {
                 val duration = ((1f - progress.value) * 500).roundToInt().coerceAtLeast(1)
-                progress.animateToNow(
+                progress.animateTo(
                     targetValue = 1f,
                     animationSpec = tween(durationMillis = duration, easing = LinearEasing),
                 ) {

@@ -1,14 +1,14 @@
 package me.spica27.spicamusic.ui.search
 
-import me.spica27.spicamusic.ui.motion.AnimatedContent
+import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.core.EaseOutCubic
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.VisibilityThreshold
-import me.spica27.spicamusic.ui.motion.animateFloat
+import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.infiniteRepeatable
-import me.spica27.spicamusic.ui.motion.rememberInfiniteTransition
+import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
@@ -85,6 +85,8 @@ import me.spica27.spicamusic.ui.navigation.LocalBackStack
 import me.spica27.spicamusic.ui.navigation.SongMenuRoute
 import me.spica27.spicamusic.ui.player.LocalPlayerViewModel
 import me.spica27.spicamusic.ui.theme.LayoutTokens
+import me.spica27.spicamusic.ui.theme.ListItemFadeInSpec
+import me.spica27.spicamusic.ui.theme.ListItemFadeOutSpec
 import me.spica27.spicamusic.ui.theme.Shapes
 import me.spica27.spicamusic.ui.theme.Spacing
 import me.spica27.spicamusic.ui.theme.entrance
@@ -448,7 +450,7 @@ private fun SearchResultList(
                 is SearchListItem.Header ->
                     SearchGroupHeader(
                         title = item.title,
-                        modifier = Modifier,
+                        modifier = Modifier.animateItem(),
                     )
 
                 is SearchListItem.SongItem ->
@@ -459,10 +461,14 @@ private fun SearchResultList(
                         onPlay = { onPlay(item.song) },
                         onMore = { onMore(item.song) },
                         modifier =
-                            Modifier,
+                            Modifier.animateItem(
+                                fadeInSpec = ListItemFadeInSpec,
+                                placementSpec = ItemPlacementSpringSpec,
+                                fadeOutSpec = ListItemFadeOutSpec,
+                            ),
                     )
 
-                null -> SearchPlaceholderRow(modifier = Modifier)
+                null -> SearchPlaceholderRow(modifier = Modifier.animateItem())
             }
         }
         if (searchResult.loadState.append is LoadState.Loading) {

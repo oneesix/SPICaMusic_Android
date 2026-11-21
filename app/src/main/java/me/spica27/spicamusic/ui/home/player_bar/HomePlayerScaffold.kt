@@ -1,7 +1,7 @@
 package me.spica27.spicamusic.ui.home.player_bar
 
 import androidx.activity.compose.BackHandler
-import me.spica27.spicamusic.ui.motion.AnimatedVisibility
+import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.snap
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.expandVertically

@@ -1,6 +1,6 @@
 package me.spica27.spicamusic.ui.home.player_bar
 
-import me.spica27.spicamusic.ui.motion.animateFloatAsState
+import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.snap
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween

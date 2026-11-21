@@ -2,19 +2,19 @@ package me.spica27.spicamusic.ui.playlistdetail
 
 import android.annotation.SuppressLint
 import androidx.activity.compose.BackHandler
-import me.spica27.spicamusic.ui.motion.AnimatedContent
-import me.spica27.spicamusic.ui.motion.AnimatedVisibility
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.EaseOutCubic
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.MutableTransitionState
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.VisibilityThreshold
-import me.spica27.spicamusic.ui.motion.animateDpAsState
-import me.spica27.spicamusic.ui.motion.animateFloat
-import me.spica27.spicamusic.ui.motion.animateFloatAsState
+import androidx.compose.animation.core.animateDpAsState
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.infiniteRepeatable
-import me.spica27.spicamusic.ui.motion.rememberInfiniteTransition
+import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.expandHorizontally
@@ -146,6 +146,8 @@ import me.spica27.spicamusic.ui.navigation.TextInputDialogRoute
 import me.spica27.spicamusic.ui.player.LocalPlayerViewModel
 import me.spica27.spicamusic.ui.theme.ENTRANCE_STAGGER_MILLIS
 import me.spica27.spicamusic.ui.theme.LayoutTokens
+import me.spica27.spicamusic.ui.theme.ListItemFadeInSpec
+import me.spica27.spicamusic.ui.theme.ListItemFadeOutSpec
 import me.spica27.spicamusic.ui.theme.Shapes
 import me.spica27.spicamusic.ui.theme.Spacing
 import me.spica27.spicamusic.ui.theme.entrance
@@ -445,7 +447,7 @@ fun PlaylistDetailScreen(playlist: Playlist) {
                 ) { index ->
                     val song = browseSongs[index]
                     if (song == null) {
-                        SongSkeletonRow(modifier = Modifier)
+                        SongSkeletonRow(modifier = Modifier.animateItem())
                     } else {
                         PlaylistSongRow(
                             song = song,
@@ -471,7 +473,12 @@ fun PlaylistDetailScreen(playlist: Playlist) {
                             },
                             onMore = { backStack.add(SongMenuRoute(song)) },
                             modifier =
-                                Modifier.entrance(
+                                Modifier
+                                    .animateItem(
+                                        fadeInSpec = ListItemFadeInSpec,
+                                        placementSpec = ItemPlacementSpringSpec,
+                                        fadeOutSpec = ListItemFadeOutSpec,
+                                    ).entrance(
                                         order = min(4 + index, 8),
                                         play = listEntrancePlay,
                                     ),
@@ -1559,6 +1566,7 @@ private fun SearchResultList(
                 SongSkeletonRow(
                     modifier =
                         Modifier
+                            .animateItem()
                             .entrance(order = min(index, 8), play = entrancePlay.value),
                 )
             } else {
@@ -1570,6 +1578,7 @@ private fun SearchResultList(
                     onMore = { onMore(song) },
                     modifier =
                         Modifier
+                            .animateItem()
                             .entrance(order = min(index, 8), play = entrancePlay.value),
                 )
             }
@@ -1953,7 +1962,7 @@ private fun SongPickerDialogContent(
                     val song = pickerSongs[index] ?: return@items
                     val isSelected = selectedIds.contains(song.mediaStoreId)
                     PickerSongRow(
-                        modifier = Modifier,
+                        modifier = Modifier.animateItem(),
                         song = song,
                         isSelected = isSelected,
                         onToggle = {

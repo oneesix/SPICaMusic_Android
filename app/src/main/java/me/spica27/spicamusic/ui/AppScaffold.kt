@@ -51,6 +51,7 @@ import me.spica27.spicamusic.ui.player.LocalPlayerViewModel
 import me.spica27.spicamusic.ui.player.PlayerViewModel
 import me.spica27.spicamusic.ui.theme.SPICaMusicTheme
 import me.spica27.spicamusic.ui.widget.rememberAppFontFamily
+import me.spica27.spicamusic.utils.Nav3Transitions
 import org.koin.compose.koinInject
 import org.koin.compose.viewmodel.koinActivityViewModel
 import org.koin.compose.viewmodel.koinViewModel
@@ -157,10 +158,10 @@ fun AppScaffold() {
                     sceneStrategies = sceneStrategies,
                     entryProvider = entryProvider,
                     transitionSpec = {
-                        me.spica27.spicamusic.ui.motion.NoTransition
+                        Nav3Transitions.iosStyle()
                     },
                     popTransitionSpec = {
-                        me.spica27.spicamusic.ui.motion.NoTransition
+                        Nav3Transitions.iosStylePop()
                     },
                     sharedTransitionScope = this,
                 )

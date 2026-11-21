@@ -1,10 +1,9 @@
 package me.spica27.spicamusic.ui.playlist
 
-import me.spica27.spicamusic.ui.motion.animateToNow
-import me.spica27.spicamusic.ui.motion.AnimatedContent
-import me.spica27.spicamusic.ui.motion.AnimatedVisibility
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.ContentTransform
-import me.spica27.spicamusic.ui.motion.animateColorAsState
+import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.keyframes
@@ -140,7 +139,7 @@ fun PlaylistCreatorScreen() {
 
     LaunchedEffect(shakeTrigger) {
         if (shakeTrigger == 0) return@LaunchedEffect
-        shakeOffset.animateToNow(
+        shakeOffset.animateTo(
             targetValue = 0f,
             animationSpec =
                 keyframes {

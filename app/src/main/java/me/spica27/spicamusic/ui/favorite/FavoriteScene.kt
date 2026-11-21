@@ -1,10 +1,9 @@
 package me.spica27.spicamusic.ui.favorite
 
-import me.spica27.spicamusic.ui.motion.animateToNow
 import android.widget.Toast
 import androidx.activity.compose.BackHandler
-import me.spica27.spicamusic.ui.motion.AnimatedContent
-import me.spica27.spicamusic.ui.motion.AnimatedVisibility
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.SizeTransform
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.AnimationVector1D
@@ -12,11 +11,11 @@ import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.VisibilityThreshold
-import me.spica27.spicamusic.ui.motion.animateFloat
-import me.spica27.spicamusic.ui.motion.animateFloatAsState
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.keyframes
-import me.spica27.spicamusic.ui.motion.rememberInfiniteTransition
+import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
@@ -113,6 +112,8 @@ import me.spica27.spicamusic.ui.navigation.SongMenuRoute
 import me.spica27.spicamusic.ui.navigation.TextInputDialogRoute
 import me.spica27.spicamusic.ui.theme.EaseOutStrong
 import me.spica27.spicamusic.ui.theme.LayoutTokens
+import me.spica27.spicamusic.ui.theme.ListItemFadeInSpec
+import me.spica27.spicamusic.ui.theme.ListItemFadeOutSpec
 import me.spica27.spicamusic.ui.theme.ScaleDismissTo
 import me.spica27.spicamusic.ui.theme.ScaleEnterFrom
 import me.spica27.spicamusic.ui.theme.ScaleExitTo
@@ -305,6 +306,7 @@ private fun FavoriteScreenContent() {
                         modifier =
                             Modifier
                                 .fillMaxWidth()
+                                .animateItem()
                                 .entrance(
                                     order = ENTRANCE_ORDER_ROW_BASE,
                                     play = !entrancePlayed,
@@ -338,7 +340,12 @@ private fun FavoriteScreenContent() {
                             },
                             onRemoveFavorite = { viewModel.toggleFavorite(song) },
                             modifier =
-                                Modifier.entrance(
+                                Modifier
+                                    .animateItem(
+                                        fadeInSpec = ListItemFadeInSpec,
+                                        placementSpec = ItemPlacementSpringSpec,
+                                        fadeOutSpec = ListItemFadeOutSpec,
+                                    ).entrance(
                                         order = index + ENTRANCE_ORDER_ROW_BASE,
                                         play = !entrancePlayed && index < ENTRANCE_MAX_ROW,
                                     ),
@@ -419,7 +426,7 @@ private fun Density.mastheadCollapse(listState: LazyListState): Float =
 
 /** 一次“扑通-扑通”双搏脉冲（点击播放时的心跳签名） */
 private suspend fun heartThump(pulse: Animatable<Float, AnimationVector1D>) {
-    pulse.animateToNow(
+    pulse.animateTo(
         targetValue = 1f,
         animationSpec =
             keyframes {
@@ -905,14 +912,14 @@ private fun FavoriteSongRow(
                         onClick = {
                             if (heartScale.isRunning) return@IconButton
                             scope.launch {
-                                heartScale.animateToNow(
+                                heartScale.animateTo(
                                     targetValue = 1.28f,
                                     animationSpec = tween(durationMillis = 120, easing = FastOutSlowInEasing),
                                 )
                                 launch {
-                                    heartAlpha.animateToNow(0f, tween(durationMillis = 160, easing = EaseOutStrong))
+                                    heartAlpha.animateTo(0f, tween(durationMillis = 160, easing = EaseOutStrong))
                                 }
-                                heartScale.animateToNow(
+                                heartScale.animateTo(
                                     targetValue = ScaleDismissTo,
                                     animationSpec = tween(durationMillis = 160, easing = EaseOutStrong),
                                 )

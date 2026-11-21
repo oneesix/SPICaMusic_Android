@@ -1,12 +1,12 @@
 package me.spica27.spicamusic.ui.basic_widget
 
-import me.spica27.spicamusic.ui.motion.AnimatedVisibility
-import me.spica27.spicamusic.ui.motion.animateColorAsState
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.Spring
-import me.spica27.spicamusic.ui.motion.animateFloat
+import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.infiniteRepeatable
-import me.spica27.spicamusic.ui.motion.rememberInfiniteTransition
+import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.snap
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween

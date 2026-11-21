@@ -1,20 +1,21 @@
 package me.spica27.spicamusic.ui.artistdetail
 
-import me.spica27.spicamusic.ui.motion.AnimatedContent
-import me.spica27.spicamusic.ui.motion.animateColorAsState
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.VisibilityThreshold
-import me.spica27.spicamusic.ui.motion.animateFloat
+import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.infiniteRepeatable
-import me.spica27.spicamusic.ui.motion.rememberInfiniteTransition
+import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.Orientation
+import androidx.compose.foundation.gestures.animateScrollBy
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.gestures.scrollBy
@@ -105,6 +106,8 @@ import me.spica27.spicamusic.ui.navigation.LocalBackStack
 import me.spica27.spicamusic.ui.navigation.SongMenuRoute
 import me.spica27.spicamusic.ui.player.LocalPlayerViewModel
 import me.spica27.spicamusic.ui.theme.EaseOutEmphasized
+import me.spica27.spicamusic.ui.theme.ListItemFadeInSpec
+import me.spica27.spicamusic.ui.theme.ListItemFadeOutSpec
 import me.spica27.spicamusic.ui.theme.LocalReducedMotion
 import me.spica27.spicamusic.ui.theme.Shapes
 import me.spica27.spicamusic.ui.theme.Spacing
@@ -306,7 +309,7 @@ fun ArtistDetailScreen(artist: Artist) {
                         if (reducedMotion) {
                             listState.scrollBy(delta)
                         } else {
-                            listState.scrollBy(delta)
+                            listState.animateScrollBy(delta, SettleSpec)
                         }
                     }
             }
@@ -495,7 +498,12 @@ fun ArtistDetailScreen(artist: Artist) {
                     onClick = { viewModel.playSongInList(song, songs) },
                     onMore = { backStack.add(SongMenuRoute(song)) },
                     modifier =
-                        Modifier.entrance(
+                        Modifier
+                            .animateItem(
+                                fadeInSpec = ListItemFadeInSpec,
+                                placementSpec = ItemPlacementSpringSpec,
+                                fadeOutSpec = ListItemFadeOutSpec,
+                            ).entrance(
                                 order = min(5 + index, 9),
                                 play = listEntrancePlay,
                             ),
@@ -527,7 +535,11 @@ fun ArtistDetailScreen(artist: Artist) {
                         onClick = { viewModel.playSongInList(song, sectionSongs) },
                         onMore = { backStack.add(SongMenuRoute(song)) },
                         modifier =
-                            Modifier,
+                            Modifier.animateItem(
+                                fadeInSpec = ListItemFadeInSpec,
+                                placementSpec = ItemPlacementSpringSpec,
+                                fadeOutSpec = ListItemFadeOutSpec,
+                            ),
                     )
                 }
             }
@@ -996,7 +1008,7 @@ private fun ArtistSongRow(
                 modifier = Modifier.fillMaxSize(),
             )
             // 外层是 RowScope，显式限定以调用无作用域版本
-            me.spica27.spicamusic.ui.motion.AnimatedVisibility(
+            androidx.compose.animation.AnimatedVisibility(
                 visible = isCurrent,
                 enter = fadeIn(tween(durationMillis = 220, easing = EaseOutEmphasized)),
                 exit = fadeOut(tween(durationMillis = 160, easing = EaseOutEmphasized)),

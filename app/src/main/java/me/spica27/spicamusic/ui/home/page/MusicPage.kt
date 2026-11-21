@@ -3,19 +3,20 @@
 package me.spica27.spicamusic.ui.home.page
 
 import androidx.annotation.StringRes
-import me.spica27.spicamusic.ui.motion.AnimatedContent
-import me.spica27.spicamusic.ui.motion.AnimatedVisibility
-import me.spica27.spicamusic.ui.motion.animateColorAsState
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.SizeTransform
+import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.LinearOutSlowInEasing
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.VisibilityThreshold
-import me.spica27.spicamusic.ui.motion.animateFloat
-import me.spica27.spicamusic.ui.motion.animateFloatAsState
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.infiniteRepeatable
-import me.spica27.spicamusic.ui.motion.rememberInfiniteTransition
+import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.snap
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
@@ -23,6 +24,8 @@ import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.scaleIn
 import androidx.compose.animation.scaleOut
+import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.slideOutVertically
 import androidx.compose.animation.togetherWith
 import dev.chrisbanes.haze.hazeSource
 import dev.chrisbanes.haze.blur.hazeBlur
@@ -540,7 +543,12 @@ fun MusicPage(bottomContentPadding: Dp = 0.dp) {
                                         Unit
                                     }.takeIf { allSongs.isEmpty() },
                                 modifier =
-                                    Modifier.entrance(
+                                    Modifier
+                                        .animateItem(
+                                            fadeInSpec = itemFadeInSpec,
+                                            placementSpec = null,
+                                            fadeOutSpec = ItemFadeOutSpec,
+                                        ).entrance(
                                             order = itemEntranceOrderBase,
                                             play = playItemEntrance,
                                             replayKey = itemEntranceReplayKey,
@@ -566,7 +574,12 @@ fun MusicPage(bottomContentPadding: Dp = 0.dp) {
                                 },
                                 onLongClick = { backStack.add(SongMenuRoute(song)) },
                                 modifier =
-                                    Modifier.entrance(
+                                    Modifier
+                                        .animateItem(
+                                            fadeInSpec = itemFadeInSpec,
+                                            placementSpec = itemPlacementSpec,
+                                            fadeOutSpec = ItemFadeOutSpec,
+                                        ).entrance(
                                             order = minOf(index, ENTRANCE_MAX_ORDER - ENTRANCE_ORDER_ITEM_BASE) + itemEntranceOrderBase,
                                             play = playItemEntrance,
                                             replayKey = itemEntranceReplayKey,
@@ -590,7 +603,12 @@ fun MusicPage(bottomContentPadding: Dp = 0.dp) {
                                     ),
                                 subtitle = stringResource(R.string.music_empty_albums_subtitle),
                                 modifier =
-                                    Modifier.entrance(
+                                    Modifier
+                                        .animateItem(
+                                            fadeInSpec = itemFadeInSpec,
+                                            placementSpec = null,
+                                            fadeOutSpec = ItemFadeOutSpec,
+                                        ).entrance(
                                             order = itemEntranceOrderBase,
                                             play = playItemEntrance,
                                             replayKey = itemEntranceReplayKey,
@@ -611,7 +629,12 @@ fun MusicPage(bottomContentPadding: Dp = 0.dp) {
                                 tuning = albumStyleTuning,
                                 onClick = { backStack.add(AlbumDetailRoute(album)) },
                                 modifier =
-                                    Modifier.entrance(
+                                    Modifier
+                                        .animateItem(
+                                            fadeInSpec = itemFadeInSpec,
+                                            placementSpec = itemPlacementSpec,
+                                            fadeOutSpec = ItemFadeOutSpec,
+                                        ).entrance(
                                             order = minOf(row, ENTRANCE_MAX_ORDER - ENTRANCE_ORDER_ITEM_BASE) + itemEntranceOrderBase,
                                             play = playItemEntrance,
                                             replayKey = itemEntranceReplayKey,
@@ -635,7 +658,12 @@ fun MusicPage(bottomContentPadding: Dp = 0.dp) {
                                     ),
                                 subtitle = stringResource(R.string.music_empty_artists_subtitle),
                                 modifier =
-                                    Modifier.entrance(
+                                    Modifier
+                                        .animateItem(
+                                            fadeInSpec = itemFadeInSpec,
+                                            placementSpec = null,
+                                            fadeOutSpec = ItemFadeOutSpec,
+                                        ).entrance(
                                             order = itemEntranceOrderBase,
                                             play = playItemEntrance,
                                             replayKey = itemEntranceReplayKey,
@@ -653,7 +681,12 @@ fun MusicPage(bottomContentPadding: Dp = 0.dp) {
                                 artist = artist,
                                 onClick = { backStack.add(ArtistDetailRoute(artist)) },
                                 modifier =
-                                    Modifier.entrance(
+                                    Modifier
+                                        .animateItem(
+                                            fadeInSpec = itemFadeInSpec,
+                                            placementSpec = itemPlacementSpec,
+                                            fadeOutSpec = ItemFadeOutSpec,
+                                        ).entrance(
                                             order = minOf(index, ENTRANCE_MAX_ORDER - ENTRANCE_ORDER_ITEM_BASE) + itemEntranceOrderBase,
                                             play = playItemEntrance,
                                             replayKey = itemEntranceReplayKey,

@@ -1,0 +1,243 @@
+diff --git a/app/src/main/java/me/spica27/spicamusic/ui/player/ExpandedPlayerScreen.kt b/app/src/main/java/me/spica27/spicamusic/ui/player/ExpandedPlayerScreen.kt
+index f014452..3be11d7 100644
+--- a/app/src/main/java/me/spica27/spicamusic/ui/player/ExpandedPlayerScreen.kt
++++ b/app/src/main/java/me/spica27/spicamusic/ui/player/ExpandedPlayerScreen.kt
+@@ -138,6 +138,7 @@ import me.spica27.spicamusic.ui.widget.DynamicPlayerColorScope
+ import me.spica27.spicamusic.ui.widget.FluidMusicBackground
+ import me.spica27.spicamusic.ui.widget.rememberDynamicPlayerColors
+ import org.koin.compose.viewmodel.koinActivityViewModel
++import me.spica27.spicamusic.ui.widget.LocalVerseArtistColor
+ import me.spica27.spicamusic.ui.widget.SmoothBackground
+ import me.spica27.spicamusic.ui.widget.VerseFlowBackground
+ import me.spica27.spicamusic.ui.widget.VerseFlowThemeScope
+@@ -492,7 +493,7 @@ fun ExpandedPlayerScreen(
+     val useAlbumTheme = isVerseFlow || (isSmooth && smoothSettings.colorUi)
+     val verseTheme =
+         rememberVerseTheme(
+-            coverUri = if (useAlbumTheme) currentMediaItem?.mediaMetadata?.artworkUri else null,
++            coverUri = if (isVerseFlow || isSmooth) currentMediaItem?.mediaMetadata?.artworkUri else null,
+             mode = if (isSmooth) smoothSettings.themeMode else verseMode,
+             saturationPercent = if (isSmooth) smoothSettings.saturationPercent else verseSaturation,
+             vibrancyPercent = verseVibrancy,
+@@ -506,6 +507,7 @@ fun ExpandedPlayerScreen(
+             verseTheme.copy(
+                 fg = androidx.compose.ui.graphics.lerp(neutral, verseTheme.fg, tint),
+                 fg2 = androidx.compose.ui.graphics.lerp(neutral.copy(alpha = verseTheme.fg2.alpha), verseTheme.fg2, tint),
++                accent2 = verseTheme.accent2?.let { androidx.compose.ui.graphics.lerp(neutral, it, tint) },
+             )
+         } else {
+             verseTheme
+@@ -525,7 +527,12 @@ fun ExpandedPlayerScreen(
+         )
+     val lyricsScrimColor = MaterialTheme.colorScheme.scrim.copy(alpha = 0.14f)
+ 
+-    PlayerThemeScope(isVerseFlow = useAlbumTheme, theme = playerTheme, dynamicColors = dynamicColors) {
++    PlayerThemeScope(
++        isVerseFlow = useAlbumTheme,
++        theme = playerTheme,
++        artistColor = if (isSmooth) playerTheme.accent2 else null,
++        dynamicColors = dynamicColors,
++    ) {
+         Box(
+             modifier =
+                 modifier
+@@ -557,7 +564,7 @@ fun ExpandedPlayerScreen(
+                     // 仅在页面可见且应用在前台时启用动态背景。
+                     if (isSmooth) {
+                         SmoothBackground(
+-                            coverUri = currentMediaItem?.mediaMetadata?.artworkUri,
++                            theme = verseTheme,
+                             settings = smoothSettings,
+                             enabled = animationsEnabled && isAppInForeground,
+                             modifier =
+@@ -835,12 +842,13 @@ fun ExpandedPlayerScreen(
+ private fun PlayerThemeScope(
+     isVerseFlow: Boolean,
+     theme: me.spica27.spicamusic.ui.widget.VerseTheme,
++    artistColor: Color? = null,
+     dynamicColors: me.spica27.spicamusic.ui.widget.DynamicPlayerColors? = null,
+     content: @Composable () -> Unit,
+ ) {
+     DynamicPlayerColorScope(colors = dynamicColors) {
+         if (isVerseFlow) {
+-            VerseFlowThemeScope(theme = theme, content = content)
++            VerseFlowThemeScope(theme = theme, artistColor = artistColor, content = content)
+         } else {
+             content()
+         }
+@@ -1427,7 +1435,7 @@ private fun SongInfo(
+                             onClick = { onArtistClick?.invoke(artist) },
+                         ),
+                 style = MaterialTheme.typography.bodyMedium,
+-                color = MaterialTheme.colorScheme.onSurfaceVariant,
++                color = LocalVerseArtistColor.current ?: MaterialTheme.colorScheme.onSurfaceVariant,
+                 maxLines = 1,
+                 textAlign = TextAlign.Center,
+             )
+diff --git a/app/src/main/java/me/spica27/spicamusic/ui/widget/SmoothBackground.kt b/app/src/main/java/me/spica27/spicamusic/ui/widget/SmoothBackground.kt
+index 7e492a4..32551a1 100644
+--- a/app/src/main/java/me/spica27/spicamusic/ui/widget/SmoothBackground.kt
++++ b/app/src/main/java/me/spica27/spicamusic/ui/widget/SmoothBackground.kt
+@@ -1,7 +1,6 @@
+ package me.spica27.spicamusic.ui.widget
+ 
+ import android.graphics.RuntimeShader
+-import android.net.Uri
+ import android.os.Build
+ import androidx.annotation.RequiresApi
+ import androidx.compose.foundation.background
+@@ -22,6 +21,7 @@ import androidx.compose.ui.graphics.Color
+ import androidx.compose.ui.graphics.CompositingStrategy
+ import androidx.compose.ui.graphics.ShaderBrush
+ import androidx.compose.ui.graphics.TransformOrigin
++import androidx.compose.ui.graphics.lerp
+ import androidx.compose.ui.layout.layout
+ import androidx.compose.ui.platform.LocalContext
+ import androidx.compose.ui.unit.Constraints
+@@ -99,35 +99,20 @@ private fun rgbToLab(r255: Float, g255: Float, b255: Float): FloatArray {
+     return floatArrayOf(116f * f(y) - 16f, 500f * (f(x) - f(y)), 200f * (f(y) - f(z)))
+ }
+ 
+-private val DefaultSmoothColors =
+-    listOf(
+-        intArrayOf(125, 20, 8),
+-        intArrayOf(143, 26, 9),
+-        intArrayOf(255, 170, 60),
+-        intArrayOf(74, 11, 4),
+-    )
+-
+-private fun buildSmoothPalette(
+-    palette: VersePalette?,
+-    saturation: Float,
+-): SmoothPalette {
+-    val source = palette?.clusters?.take(6)?.map { it.rgb } ?: DefaultSmoothColors
+-    val colors = if (source.size >= 4) source else List(4) { source[it % source.size] }
++/** Gradient points from the Verse engine theme: top, middle, bottom, glow and a glow/middle mix. */
++private fun buildSmoothPalette(theme: VerseTheme): SmoothPalette {
++    fun opaque(c: Color) = c.copy(alpha = 1f)
++    val glow = lerp(opaque(theme.c1), opaque(theme.c4), theme.c4.alpha.coerceIn(0f, 1f))
++    val mid = lerp(opaque(theme.c2), glow, 0.5f)
++    val colors = listOf(opaque(theme.c1), opaque(theme.c2), opaque(theme.c3), glow, mid)
+     val lab = FloatArray(SLOTS * 3)
+-    val rgb = ArrayList<Color>()
+     colors.forEachIndexed { i, c ->
+-        // saturation: push the colour away from (or towards) its own grey
+-        val gray = 0.299f * c[0] + 0.587f * c[1] + 0.114f * c[2]
+-        val r = (gray + (c[0] - gray) * saturation).coerceIn(0f, 255f)
+-        val g = (gray + (c[1] - gray) * saturation).coerceIn(0f, 255f)
+-        val b = (gray + (c[2] - gray) * saturation).coerceIn(0f, 255f)
+-        val l = rgbToLab(r, g, b)
++        val l = rgbToLab(c.red * 255f, c.green * 255f, c.blue * 255f)
+         lab[i * 3] = l[0]
+         lab[i * 3 + 1] = l[1]
+         lab[i * 3 + 2] = l[2]
+-        rgb.add(Color(r.roundToInt(), g.roundToInt(), b.roundToInt()))
+     }
+-    return SmoothPalette(lab, colors.size.coerceAtMost(SLOTS), rgb)
++    return SmoothPalette(lab, colors.size, colors)
+ }
+ 
+ private fun snapColors(
+@@ -230,18 +215,12 @@ private const val SMOOTH_SHADER =
+  */
+ @Composable
+ fun SmoothBackground(
+-    coverUri: Uri?,
++    theme: VerseTheme,
+     settings: SmoothSettings,
+     enabled: Boolean,
+     modifier: Modifier = Modifier,
+ ) {
+-    val context = LocalContext.current
+-    var versePalette by remember(coverUri) { mutableStateOf<VersePalette?>(null) }
+-    LaunchedEffect(coverUri) { versePalette = extractVersePalette(context, coverUri) }
+-    val palette =
+-        remember(versePalette, settings.saturationPercent) {
+-            buildSmoothPalette(versePalette, settings.saturationPercent / 100f)
+-        }
++    val palette = remember(theme) { buildSmoothPalette(theme) }
+     val dim = settings.dimPercent.coerceIn(0, 70) / 100f
+ 
+     Box(modifier = modifier) {
+diff --git a/app/src/main/java/me/spica27/spicamusic/ui/widget/VerseFlowTheme.kt b/app/src/main/java/me/spica27/spicamusic/ui/widget/VerseFlowTheme.kt
+index d6c43a0..c88b0d1 100644
+--- a/app/src/main/java/me/spica27/spicamusic/ui/widget/VerseFlowTheme.kt
++++ b/app/src/main/java/me/spica27/spicamusic/ui/widget/VerseFlowTheme.kt
+@@ -17,6 +17,8 @@ import androidx.compose.material3.MaterialTheme
+ import androidx.compose.runtime.Composable
+ import androidx.compose.runtime.State
+ import androidx.compose.runtime.LaunchedEffect
++import androidx.compose.runtime.CompositionLocalProvider
++import androidx.compose.runtime.compositionLocalOf
+ import androidx.compose.runtime.getValue
+ import androidx.compose.runtime.mutableStateOf
+ import androidx.compose.runtime.remember
+@@ -77,6 +79,8 @@ data class VerseTheme(
+     val fg: Color,
+     val fg2: Color,
+     val light: Boolean,
++    /** Second accent (another hue than [fg]) – Smooth uses it for the artist name. null = none. */
++    val accent2: Color? = null,
+ ) {
+     companion object {
+         /** HTML DEFAULT_THEME (used when a song has no cover). */
+@@ -344,13 +348,12 @@ fun buildVerseTheme(
+         c.rgb = hsl2rgb(ch, cs2, ll)
+         c.ok = contrast(lum(c.rgb), bgL) >= 4.5f
+     }
++    val okCands = cands.filter { it.ok }.sortedByDescending { it.base }
+     val accRgb =
+-        cands
+-            .filter { it.ok }
+-            .sortedByDescending { it.base }
+-            .firstOrNull()
+-            ?.rgb
++        okCands.firstOrNull()?.rgb
+             ?: if (light) intArrayOf(20, 20, 20) else intArrayOf(245, 245, 245)
++    val accent2Rgb =
++        okCands.firstOrNull()?.let { first -> okCands.firstOrNull { hdiff(it.h, first.h) > 35f } }?.rgb
+ 
+     val second = cl.firstOrNull { it !== base && hdiff(it.h, h) > 35f && it.s > .3f && it.w > .03f }
+     val top = hsl2rgb(h, s, clampF(l + (if (light) .03f else .05f), 0f, .92f))
+@@ -379,6 +382,7 @@ fun buildVerseTheme(
+         fg = toColor(accRgb),
+         fg2 = toColor(accRgb, .78f),
+         light = light,
++        accent2 = accent2Rgb?.let { toColor(it) },
+     )
+ }
+ 
+@@ -463,6 +467,7 @@ fun rememberVerseTheme(
+ @Composable
+ fun VerseFlowThemeScope(
+     theme: VerseTheme,
++    artistColor: Color? = null,
+     content: @Composable () -> Unit,
+ ) {
+     val base = MaterialTheme.colorScheme
+@@ -498,14 +503,19 @@ fun VerseFlowThemeScope(
+                 inverseOnSurface = theme.c1,
+             )
+         }
+-    MaterialTheme(
+-        colorScheme = scheme,
+-        typography = MaterialTheme.typography,
+-        shapes = MaterialTheme.shapes,
+-        content = content,
+-    )
++    CompositionLocalProvider(LocalVerseArtistColor provides artistColor) {
++        MaterialTheme(
++            colorScheme = scheme,
++            typography = MaterialTheme.typography,
++            shapes = MaterialTheme.shapes,
++            content = content,
++        )
++    }
+ }
+ 
++/** Artist-name colour override (Smooth background only). null = the normal secondary text colour. */
++val LocalVerseArtistColor = compositionLocalOf<Color?> { null }
++
+ // ---------------------------------------------------------------------------------------------
+ // Background: `.bg` gradient (+ the `.mesh` drifting blobs in lyrics view)
+ // ---------------------------------------------------------------------------------------------

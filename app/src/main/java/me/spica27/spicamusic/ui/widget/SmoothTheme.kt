@@ -1,7 +1,7 @@
 package me.spica27.spicamusic.ui.widget
 
 import android.net.Uri
-import me.spica27.spicamusic.ui.motion.animateColorAsState
+import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.LocalIndication
 import androidx.compose.foundation.layout.Box
