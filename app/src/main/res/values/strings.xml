@@ -1389,4 +1389,7 @@
   <string name="automix_fail_invalid_zip">This is not a valid AutoMix result (automix.json not found).</string>
   <string name="automix_fail_generic">Something went wrong: %1$s</string>
   <string name="automix_import_menu_subtitle">Open the result zip from Colab</string>
+  <string name="automix_settings_title">AutoMix</string>
+  <string name="automix_play_title">Play AutoMix transitions</string>
+  <string name="automix_play_summary">Use imported transitions between songs. Songs without one play normally.</string>
 </resources>

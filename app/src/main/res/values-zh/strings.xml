@@ -1389,4 +1389,7 @@
   <string name="automix_fail_invalid_zip">这不是有效的 AutoMix 结果（找不到 automix.json）。</string>
   <string name="automix_fail_generic">出错了：%1$s</string>
   <string name="automix_import_menu_subtitle">选择 Colab 生成的结果压缩包</string>
+  <string name="automix_settings_title">AutoMix</string>
+  <string name="automix_play_title">播放 AutoMix 过渡</string>
+  <string name="automix_play_summary">在歌曲之间使用已导入的过渡。没有过渡的歌曲正常播放。</string>
 </resources>

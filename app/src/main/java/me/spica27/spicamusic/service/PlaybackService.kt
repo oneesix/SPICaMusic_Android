@@ -25,6 +25,8 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.guava.future
+import kotlinx.coroutines.launch
+import me.spica27.spicamusic.automix.AutoMixStore
 import me.spica27.spicamusic.dsp.InteractiveAudioTrackBufferSizeProvider
 import me.spica27.spicamusic.player.api.IMusicPlayer
 import me.spica27.spicamusic.player.impl.utils.MediaLibrary
@@ -42,6 +44,7 @@ class PlaybackService : MediaLibraryService() {
 
     private var mediaSession: MediaLibrarySession? = null
     private lateinit var exoPlayer: ExoPlayer
+    private var autoMixController: AutoMixTransitionController? = null
     private lateinit var notificationProvider: SpicaNotificationProvider
 
     // 服务级别的协程作用域
@@ -102,6 +105,11 @@ class PlaybackService : MediaLibraryService() {
                     true,
                 ).setUsePlatformDiagnostics(false)
                 .build()
+
+        // AutoMix: plays imported transition clips between songs (off unless the user turns it on).
+        AutoMixStore.init(this)
+        serviceScope.launch { AutoMixStore.refresh(applicationContext) }
+        autoMixController = AutoMixTransitionController(applicationContext, exoPlayer).also { it.attach() }
 
         mediaSession =
             MediaLibrarySession
@@ -198,6 +206,8 @@ class PlaybackService : MediaLibraryService() {
     override fun onDestroy() {
         serviceScope.cancel()
         notificationProvider.cancel()
+        autoMixController?.release()
+        autoMixController = null
         exoPlayer.release()
         mediaSession?.run {
             release()

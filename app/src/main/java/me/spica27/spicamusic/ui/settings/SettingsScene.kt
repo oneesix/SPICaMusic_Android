@@ -54,6 +54,7 @@ import androidx.compose.material.icons.filled.LocationCity
 import androidx.compose.material.icons.filled.MusicOff
 import androidx.compose.material.icons.filled.PowerSettingsNew
 import androidx.compose.material.icons.filled.Tune
+import androidx.compose.material.icons.filled.SwapHoriz
 import androidx.compose.material.icons.filled.ViewAgenda
 import androidx.compose.material.icons.filled.Visibility
 import androidx.compose.material.icons.filled.Waves
@@ -81,6 +82,7 @@ import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.graphics.TransformOrigin
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -89,6 +91,7 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.google.common.collect.ImmutableList
 import me.spica27.spicamusic.R
+import me.spica27.spicamusic.automix.AutoMixStore
 import me.spica27.spicamusic.common.entity.BottomBarLayout
 import me.spica27.spicamusic.common.entity.DynamicCoverType
 import me.spica27.spicamusic.common.entity.DynamicSpectrumBackground
@@ -480,6 +483,28 @@ fun SettingsScreen() {
                         icon = Icons.Default.Visibility,
                         checked = keepScreenOn,
                         onCheckedChange = viewModel::setKeepScreenOn,
+                    )
+                }
+            }
+
+            item(key = "settings_automix") {
+                val context = LocalContext.current
+                remember(context) { AutoMixStore.init(context) }
+                val automixOn by AutoMixStore.enabled.collectAsStateWithLifecycle()
+                SettingsSectionCard(
+                    title = stringResource(R.string.automix_settings_title),
+                    subtitle = null,
+                    modifier =
+                        Modifier
+                            .padding(horizontal = LayoutTokens.MusicHeaderHorizontalPadding)
+                            .entrance(order = 4, play = !entrancePlayed),
+                ) {
+                    SwitchRow(
+                        title = stringResource(R.string.automix_play_title),
+                        summary = stringResource(R.string.automix_play_summary),
+                        icon = Icons.Default.SwapHoriz,
+                        checked = automixOn,
+                        onCheckedChange = { AutoMixStore.setEnabled(context, it) },
                     )
                 }
             }

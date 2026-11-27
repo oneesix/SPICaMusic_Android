@@ -359,6 +359,7 @@ object AutoMixTransfer {
                         lines += AutoMixImportLine(true, label)
                     }
                     saveIndex(root, index)
+                    AutoMixStore.refresh(app)
                     _state.value =
                         AutoMixTransferState.ImportDone(
                             importedCount = imported,
