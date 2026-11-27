@@ -1388,4 +1388,5 @@
   <string name="automix_fail_empty">This playlist has no songs.</string>
   <string name="automix_fail_invalid_zip">This is not a valid AutoMix result (automix.json not found).</string>
   <string name="automix_fail_generic">Something went wrong: %1$s</string>
+  <string name="automix_import_menu_subtitle">Open the result zip from Colab</string>
 </resources>

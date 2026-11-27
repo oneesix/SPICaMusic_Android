@@ -49,6 +49,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowForward
 import androidx.compose.material.icons.automirrored.rounded.KeyboardArrowRight
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.FileDownload
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Scanner
 import androidx.compose.material.icons.rounded.MusicNote
@@ -71,6 +72,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.TransformOrigin
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -85,10 +87,13 @@ import kotlinx.coroutines.delay
 import me.spica27.spicamusic.App
 import me.spica27.spicamusic.R
 import me.spica27.spicamusic.artwork.artwork
+import me.spica27.spicamusic.automix.AutoMixTransfer
+import me.spica27.spicamusic.automix.rememberAutoMixImportPicker
 import me.spica27.spicamusic.common.entity.Song
 import me.spica27.spicamusic.ui.home.HomeViewModel
 import me.spica27.spicamusic.ui.library.LibraryPageViewModel
 import me.spica27.spicamusic.ui.model.PlaylistWithCover
+import me.spica27.spicamusic.ui.navigation.AutoMixTransferRoute
 import me.spica27.spicamusic.ui.navigation.FavoriteRoute
 import me.spica27.spicamusic.ui.navigation.LocalBackStack
 import me.spica27.spicamusic.ui.navigation.PlaylistCreatorRoute
@@ -139,6 +144,14 @@ private val PlaylistPlacementSpec: FiniteAnimationSpec<IntOffset> =
 @Composable
 fun LibraryPage(bottomContentPadding: Dp = 0.dp) {
     val backStack = LocalBackStack.current
+    val context = LocalContext.current
+    val pickAutoMixImport =
+        rememberAutoMixImportPicker { uri ->
+            if (uri != null) {
+                AutoMixTransfer.startImport(context, uri)
+                backStack.add(AutoMixTransferRoute)
+            }
+        }
     val viewModel: LibraryPageViewModel = koinActivityViewModel()
     val homeViewModel: HomeViewModel = koinActivityViewModel()
     val playerViewModel = LocalPlayerViewModel.current
@@ -231,6 +244,26 @@ fun LibraryPage(bottomContentPadding: Dp = 0.dp) {
                         container = MaterialTheme.colorScheme.secondaryContainer,
                         contentColor = MaterialTheme.colorScheme.onSecondaryContainer,
                         onClick = { backStack.add(ScannerRoute) },
+                        modifier = Modifier.weight(1f),
+                    )
+                }
+            }
+
+            item(key = "automix_import", contentType = "actions") {
+                Row(
+                    modifier =
+                        Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = pageGutter)
+                            .padding(top = Spacing.Medium)
+                            .entrance(order = 1, play = playEntrance),
+                ) {
+                    LibraryCommandPill(
+                        text = stringResource(R.string.automix_import_button),
+                        icon = Icons.Default.FileDownload,
+                        container = MaterialTheme.colorScheme.secondaryContainer,
+                        contentColor = MaterialTheme.colorScheme.onSecondaryContainer,
+                        onClick = pickAutoMixImport,
                         modifier = Modifier.weight(1f),
                     )
                 }

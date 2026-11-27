@@ -1388,4 +1388,5 @@
   <string name="automix_fail_empty">此歌单没有歌曲。</string>
   <string name="automix_fail_invalid_zip">这不是有效的 AutoMix 结果（找不到 automix.json）。</string>
   <string name="automix_fail_generic">出错了：%1$s</string>
+  <string name="automix_import_menu_subtitle">选择 Colab 生成的结果压缩包</string>
 </resources>

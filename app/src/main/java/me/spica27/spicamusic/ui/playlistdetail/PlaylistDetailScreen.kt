@@ -65,6 +65,7 @@ import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.DragIndicator
 import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material.icons.filled.FileDownload
 import androidx.compose.material.icons.filled.FileUpload
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.MusicNote
@@ -139,6 +140,7 @@ import me.spica27.spicamusic.ui.component.DialogContainer
 import me.spica27.spicamusic.ui.component.DialogMenuItem
 import me.spica27.spicamusic.ui.component.PopupMenuContainer
 import me.spica27.spicamusic.automix.AutoMixTransfer
+import me.spica27.spicamusic.automix.rememberAutoMixImportPicker
 import me.spica27.spicamusic.ui.navigation.AutoMixTransferRoute
 import me.spica27.spicamusic.ui.navigation.ConfirmationDialogRoute
 import me.spica27.spicamusic.ui.navigation.LocalBackStack
@@ -1007,6 +1009,22 @@ fun PlaylistOptionsDialogContent(
                     showDivider = true,
                 )
             }
+            // The picker is launched while this menu stays open, so the result still has a receiver.
+            val pickAutoMixImport =
+                rememberAutoMixImportPicker { uri ->
+                    backStack.removeLastOrNull()
+                    if (uri != null) {
+                        AutoMixTransfer.startImport(context, uri)
+                        backStack.add(AutoMixTransferRoute)
+                    }
+                }
+            DialogMenuItem(
+                title = stringResource(R.string.automix_import_button),
+                subtitle = stringResource(R.string.automix_import_menu_subtitle),
+                icon = Icons.Default.FileDownload,
+                onClick = pickAutoMixImport,
+                showDivider = true,
+            )
             val renameTitle = stringResource(R.string.rename_playlist_dialog_title)
             val playlistNameLabel = stringResource(R.string.playlist_name_label)
             val confirmLabel = stringResource(R.string.confirm)
