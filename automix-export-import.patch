@@ -1,0 +1,916 @@
+diff --git a/app/src/main/java/me/spica27/spicamusic/automix/AutoMixTransfer.kt b/app/src/main/java/me/spica27/spicamusic/automix/AutoMixTransfer.kt
+new file mode 100644
+index 0000000..f2632da
+--- /dev/null
++++ b/app/src/main/java/me/spica27/spicamusic/automix/AutoMixTransfer.kt
+@@ -0,0 +1,427 @@
++package me.spica27.spicamusic.automix
++
++import android.content.ContentUris
++import android.content.ContentValues
++import android.content.Context
++import android.net.Uri
++import android.provider.MediaStore
++import kotlinx.coroutines.CancellationException
++import kotlinx.coroutines.CoroutineScope
++import kotlinx.coroutines.Dispatchers
++import kotlinx.coroutines.Job
++import kotlinx.coroutines.SupervisorJob
++import kotlinx.coroutines.ensureActive
++import kotlinx.coroutines.flow.MutableStateFlow
++import kotlinx.coroutines.flow.StateFlow
++import kotlinx.coroutines.flow.asStateFlow
++import kotlinx.coroutines.launch
++import me.spica27.spicamusic.common.entity.Song
++import me.spica27.spicamusic.feature.library.domain.PlaylistUseCases
++import me.spica27.spicamusic.feature.library.domain.SongUseCases
++import org.json.JSONArray
++import org.json.JSONObject
++import org.koin.core.context.GlobalContext
++import timber.log.Timber
++import java.io.File
++import java.io.InputStream
++import java.security.DigestInputStream
++import java.security.MessageDigest
++import java.util.Locale
++import java.util.zip.Deflater
++import java.util.zip.ZipEntry
++import java.util.zip.ZipInputStream
++import java.util.zip.ZipOutputStream
++import kotlin.math.abs
++
++/** Why an import line was skipped. The dialog turns this into a localized message. */
++enum class AutoMixSkipReason { SongNotFound, ClipMissing }
++
++/** Why a whole export/import failed. */
++enum class AutoMixFailReason { EmptyPlaylist, InvalidZip, Generic }
++
++data class AutoMixImportLine(
++    val ok: Boolean,
++    val title: String,
++    val reason: AutoMixSkipReason? = null,
++)
++
++sealed interface AutoMixTransferState {
++    data object Idle : AutoMixTransferState
++
++    data class Exporting(
++        val done: Int,
++        val total: Int,
++        val title: String,
++    ) : AutoMixTransferState
++
++    data class ExportDone(
++        val fileName: String,
++        val uri: Uri,
++    ) : AutoMixTransferState
++
++    data object Importing : AutoMixTransferState
++
++    data class ImportDone(
++        val importedCount: Int,
++        val skippedCount: Int,
++        val lines: List<AutoMixImportLine>,
++    ) : AutoMixTransferState
++
++    data class Failed(
++        val reason: AutoMixFailReason,
++        val detail: String = "",
++    ) : AutoMixTransferState
++}
++
++/**
++ * Export a playlist as a zip for the AutoMix Colab notebook, and import the result zip.
++ *
++ * Export zip  (Download/AutoMix/<name>.automix-in.zip):
++ *   001_<title>.<ext> ... + playlist.json (written last)
++ * Import zip  (<name>.automix-out.zip):
++ *   automix.json + the transition clips it lists.
++ *
++ * Imported clips live in app-private storage: filesDir/.automix/ (with .nomedia),
++ * not in the cache directory. This patch only stores them; playback is unchanged.
++ */
++object AutoMixTransfer {
++    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
++    private val _state = MutableStateFlow<AutoMixTransferState>(AutoMixTransferState.Idle)
++    val state: StateFlow<AutoMixTransferState> = _state.asStateFlow()
++    private var job: Job? = null
++
++    private val audioExtensions = setOf("m4a", "mp3", "aac", "flac", "wav", "ogg", "opus")
++
++    private fun isBusy(): Boolean {
++        val s = _state.value
++        return s is AutoMixTransferState.Exporting || s is AutoMixTransferState.Importing
++    }
++
++    /** Clear a finished result so the next run starts clean. Does nothing while busy. */
++    fun reset() {
++        if (!isBusy()) _state.value = AutoMixTransferState.Idle
++    }
++
++    /** Cancel the running export/import. */
++    fun cancel() {
++        job?.cancel()
++        _state.value = AutoMixTransferState.Idle
++    }
++
++    // ───────────────────────────── Export ─────────────────────────────
++
++    fun startExport(
++        context: Context,
++        playlistId: Long,
++        playlistName: String,
++    ) {
++        if (isBusy()) return
++        val app = context.applicationContext
++        _state.value = AutoMixTransferState.Exporting(0, 0, playlistName)
++        job =
++            scope.launch {
++                var pending: Uri? = null
++                var finished = false
++                try {
++                    val songs =
++                        GlobalContext
++                            .get()
++                            .get<PlaylistUseCases>()
++                            .getSongsByPlaylistIdList(playlistId)
++                    if (songs.isEmpty()) {
++                        _state.value = AutoMixTransferState.Failed(AutoMixFailReason.EmptyPlaylist)
++                        return@launch
++                    }
++
++                    val resolver = app.contentResolver
++                    val zipName = "${safeName(playlistName, 40)}.automix-in.zip"
++                    val values =
++                        ContentValues().apply {
++                            put(MediaStore.Downloads.DISPLAY_NAME, zipName)
++                            put(MediaStore.Downloads.MIME_TYPE, "application/zip")
++                            put(MediaStore.Downloads.RELATIVE_PATH, "Download/AutoMix")
++                            put(MediaStore.Downloads.IS_PENDING, 1)
++                        }
++                    val uri =
++                        resolver.insert(MediaStore.Downloads.EXTERNAL_CONTENT_URI, values)
++                            ?: error("Could not create the zip in Downloads")
++                    pending = uri
++
++                    val tracks = JSONArray()
++                    val output = resolver.openOutputStream(uri) ?: error("Could not open the zip for writing")
++                    ZipOutputStream(output.buffered()).use { zip ->
++                        // Songs are already compressed, so skip compression (faster, same size).
++                        zip.setLevel(Deflater.NO_COMPRESSION)
++                        songs.forEachIndexed { index, song ->
++                            ensureActive()
++                            _state.value = AutoMixTransferState.Exporting(index, songs.size, song.displayName)
++                            val input = openSong(app, song)
++                            if (input == null) {
++                                Timber.w("AutoMix export: cannot read %s, skipped", song.displayName)
++                                return@forEachIndexed
++                            }
++                            val ext = extensionOf(song)
++                            val base = stripExtension(song.displayName, ext)
++                            val entryName =
++                                String.format(Locale.ROOT, "%03d_%s.%s", index + 1, safeName(base, 60), ext)
++                            val digest = MessageDigest.getInstance("SHA-256")
++                            zip.putNextEntry(ZipEntry(entryName))
++                            DigestInputStream(input, digest).use { it.copyTo(zip, 64 * 1024) }
++                            zip.closeEntry()
++                            tracks.put(
++                                JSONObject()
++                                    .put("position", index + 1)
++                                    .put("file", entryName)
++                                    .put("songId", song.songId ?: -1L)
++                                    .put("mediaStoreId", song.mediaStoreId)
++                                    .put("title", song.displayName)
++                                    .put("artist", song.artist)
++                                    .put("durationMs", song.duration)
++                                    .put("size", song.size)
++                                    .put("sha256", digest.digest().joinToString("") { "%02x".format(it) }),
++                            )
++                        }
++                        val manifest =
++                            JSONObject()
++                                .put("format", "automix-in")
++                                .put("version", 1)
++                                .put("playlist", JSONObject().put("name", playlistName))
++                                .put("created", System.currentTimeMillis())
++                                .put("tracks", tracks)
++                        zip.putNextEntry(ZipEntry("playlist.json"))
++                        zip.write(manifest.toString(2).toByteArray(Charsets.UTF_8))
++                        zip.closeEntry()
++                    }
++
++                    resolver.update(
++                        uri,
++                        ContentValues().apply { put(MediaStore.Downloads.IS_PENDING, 0) },
++                        null,
++                        null,
++                    )
++                    finished = true
++                    _state.value = AutoMixTransferState.ExportDone(zipName, uri)
++                } catch (e: CancellationException) {
++                    throw e
++                } catch (e: Exception) {
++                    Timber.e(e, "AutoMix export failed")
++                    _state.value = AutoMixTransferState.Failed(AutoMixFailReason.Generic, e.message.orEmpty())
++                } finally {
++                    if (!finished) {
++                        pending?.let { runCatching { app.contentResolver.delete(it, null, null) } }
++                    }
++                }
++            }
++    }
++
++    private fun openSong(
++        context: Context,
++        song: Song,
++    ): InputStream? {
++        val uri = ContentUris.withAppendedId(MediaStore.Audio.Media.EXTERNAL_CONTENT_URI, song.mediaStoreId)
++        runCatching { context.contentResolver.openInputStream(uri) }.getOrNull()?.let { return it }
++        val file = File(song.path)
++        return if (file.exists()) file.inputStream() else null
++    }
++
++    private fun extensionOf(song: Song): String {
++        val fromPath = song.path.substringAfterLast('.', "").lowercase(Locale.ROOT)
++        if (fromPath.length in 1..5 && fromPath.all { it.isLetterOrDigit() }) return fromPath
++        return when {
++            song.mimeType.contains("mpeg") -> "mp3"
++            song.mimeType.contains("flac") -> "flac"
++            song.mimeType.contains("mp4") || song.mimeType.contains("aac") -> "m4a"
++            song.mimeType.contains("ogg") -> "ogg"
++            song.mimeType.contains("wav") -> "wav"
++            else -> "audio"
++        }
++    }
++
++    private fun stripExtension(
++        name: String,
++        ext: String,
++    ): String = if (name.endsWith(".$ext", ignoreCase = true)) name.dropLast(ext.length + 1) else name
++
++    /** Letters and digits of any language are kept; everything else becomes "_". */
++    private fun safeName(
++        text: String,
++        maxLength: Int,
++    ): String {
++        val cleaned =
++            text
++                .replace(Regex("[^\\p{L}\\p{N}]+"), "_")
++                .trim('_')
++                .take(maxLength)
++                .trim('_')
++        return cleaned.ifEmpty { "track" }
++    }
++
++    // ───────────────────────────── Import ─────────────────────────────
++
++    fun startImport(
++        context: Context,
++        zipUri: Uri,
++    ) {
++        if (isBusy()) return
++        val app = context.applicationContext
++        _state.value = AutoMixTransferState.Importing
++        job =
++            scope.launch {
++                val root = automixRoot(app)
++                val staging = File(root, "staging").apply { deleteRecursively() }
++                staging.mkdirs()
++                try {
++                    var manifestText: String? = null
++                    val extracted = mutableMapOf<String, File>()
++                    val stream = app.contentResolver.openInputStream(zipUri) ?: error("Could not open the file")
++                    ZipInputStream(stream.buffered()).use { zin ->
++                        var entry = zin.nextEntry
++                        while (entry != null) {
++                            ensureActive()
++                            if (!entry.isDirectory) {
++                                // Keep only the last path segment so an entry can never escape the folder.
++                                val name = File(entry.name).name
++                                if (name.equals("automix.json", ignoreCase = true)) {
++                                    manifestText = zin.readBytes().toString(Charsets.UTF_8)
++                                } else if (name.substringAfterLast('.', "").lowercase(Locale.ROOT) in audioExtensions) {
++                                    val target = File(staging, name)
++                                    target.outputStream().use { zin.copyTo(it) }
++                                    extracted[name] = target
++                                }
++                            }
++                            zin.closeEntry()
++                            entry = zin.nextEntry
++                        }
++                    }
++
++                    val text = manifestText
++                    if (text == null) {
++                        _state.value = AutoMixTransferState.Failed(AutoMixFailReason.InvalidZip)
++                        return@launch
++                    }
++                    val manifest = JSONObject(text)
++                    if (manifest.optString("format") != "automix-out") {
++                        _state.value = AutoMixTransferState.Failed(AutoMixFailReason.InvalidZip)
++                        return@launch
++                    }
++                    val playlistName = manifest.optJSONObject("playlist")?.optString("name").orEmpty()
++                    val transitions = manifest.optJSONArray("transitions") ?: JSONArray()
++
++                    val library = GlobalContext.get().get<SongUseCases>().getAllSongs()
++                    val clipsDir = File(root, "clips").apply { mkdirs() }
++                    val index = loadIndex(root)
++                    val lines = mutableListOf<AutoMixImportLine>()
++                    var imported = 0
++
++                    for (i in 0 until transitions.length()) {
++                        ensureActive()
++                        val t = transitions.optJSONObject(i) ?: continue
++                        val fromRef = t.optJSONObject("from") ?: JSONObject()
++                        val toRef = t.optJSONObject("to") ?: JSONObject()
++                        val label = "${fromRef.optString("title")} → ${toRef.optString("title")}"
++                        val from = findSong(library, fromRef)
++                        val to = findSong(library, toRef)
++                        val clipName = File(t.optString("clip")).name
++                        val clipFile = extracted[clipName]
++                        val fromId = from?.songId
++                        val toId = to?.songId
++                        if (fromId == null || toId == null) {
++                            lines += AutoMixImportLine(false, label, AutoMixSkipReason.SongNotFound)
++                            continue
++                        }
++                        if (clipFile == null) {
++                            lines += AutoMixImportLine(false, label, AutoMixSkipReason.ClipMissing)
++                            continue
++                        }
++                        val ext = clipName.substringAfterLast('.', "m4a")
++                        val finalName = "${fromId}_$toId.$ext"
++                        clipFile.copyTo(File(clipsDir, finalName), overwrite = true)
++                        // One transition per song pair: replace any older entry.
++                        for (k in index.length() - 1 downTo 0) {
++                            val old = index.getJSONObject(k)
++                            if (old.optLong("fromSongId") == fromId && old.optLong("toSongId") == toId) {
++                                val oldClip = old.optString("clip")
++                                if (oldClip != finalName) File(clipsDir, oldClip).delete()
++                                index.remove(k)
++                            }
++                        }
++                        index.put(
++                            JSONObject()
++                                .put("fromSongId", fromId)
++                                .put("toSongId", toId)
++                                .put("clip", finalName)
++                                .put("cueOutMs", t.optLong("cueOutMs", -1L))
++                                .put("resumeToMs", t.optLong("resumeToMs", -1L))
++                                .put("playlist", playlistName)
++                                .put("importedAt", System.currentTimeMillis()),
++                        )
++                        imported++
++                        lines += AutoMixImportLine(true, label)
++                    }
++                    saveIndex(root, index)
++                    _state.value =
++                        AutoMixTransferState.ImportDone(
++                            importedCount = imported,
++                            skippedCount = lines.size - imported,
++                            lines = lines,
++                        )
++                } catch (e: CancellationException) {
++                    throw e
++                } catch (e: Exception) {
++                    Timber.e(e, "AutoMix import failed")
++                    _state.value = AutoMixTransferState.Failed(AutoMixFailReason.Generic, e.message.orEmpty())
++                } finally {
++                    staging.deleteRecursively()
++                }
++            }
++    }
++
++    /**
++     * Match a manifest song to the library: the stored song id (only if the title also matches,
++     * in case the library was rebuilt), then title + artist + duration (within 2 s).
++     * The manifest also carries a SHA-256 for a later, stricter check.
++     */
++    private fun findSong(
++        library: List<Song>,
++        ref: JSONObject,
++    ): Song? {
++        val id = ref.optLong("songId", -1L)
++        val title = ref.optString("title")
++        val artist = ref.optString("artist")
++        val duration = ref.optLong("durationMs", -1L)
++        if (title.isEmpty()) return null
++        fun sameTitle(s: Song) = s.displayName.equals(title, ignoreCase = true)
++        if (id >= 0) {
++            library.firstOrNull { it.songId == id && sameTitle(it) }?.let { return it }
++        }
++        return library.firstOrNull {
++            sameTitle(it) &&
++                it.artist.equals(artist, ignoreCase = true) &&
++                (duration < 0 || abs(it.duration - duration) <= 2000)
++        }
++    }
++
++    /** Hidden, app-private folder (filesDir, not cacheDir) with a .nomedia marker. */
++    private fun automixRoot(context: Context): File {
++        val root = File(context.filesDir, ".automix").apply { mkdirs() }
++        val marker = File(root, ".nomedia")
++        if (!marker.exists()) runCatching { marker.createNewFile() }
++        return root
++    }
++
++    private fun loadIndex(root: File): JSONArray {
++        val file = File(root, "index.json")
++        if (!file.exists()) return JSONArray()
++        return runCatching { JSONObject(file.readText()).getJSONArray("transitions") }.getOrDefault(JSONArray())
++    }
++
++    private fun saveIndex(
++        root: File,
++        transitions: JSONArray,
++    ) {
++        val json = JSONObject().put("version", 1).put("transitions", transitions)
++        val tmp = File(root, "index.json.tmp")
++        tmp.writeText(json.toString(2))
++        tmp.renameTo(File(root, "index.json"))
++    }
++}
+diff --git a/app/src/main/java/me/spica27/spicamusic/ui/dialog/AutoMixTransferDialog.kt b/app/src/main/java/me/spica27/spicamusic/ui/dialog/AutoMixTransferDialog.kt
+new file mode 100644
+index 0000000..eaff67f
+--- /dev/null
++++ b/app/src/main/java/me/spica27/spicamusic/ui/dialog/AutoMixTransferDialog.kt
+@@ -0,0 +1,203 @@
++package me.spica27.spicamusic.ui.dialog
++
++import android.content.Intent
++import androidx.compose.foundation.layout.Arrangement
++import androidx.compose.foundation.layout.Column
++import androidx.compose.foundation.layout.Row
++import androidx.compose.foundation.layout.fillMaxWidth
++import androidx.compose.foundation.layout.heightIn
++import androidx.compose.foundation.layout.padding
++import androidx.compose.foundation.rememberScrollState
++import androidx.compose.foundation.verticalScroll
++import androidx.compose.material3.LinearProgressIndicator
++import androidx.compose.material3.MaterialTheme
++import androidx.compose.material3.Text
++import androidx.compose.material3.TextButton
++import androidx.compose.runtime.Composable
++import androidx.compose.runtime.getValue
++import androidx.compose.ui.Modifier
++import androidx.compose.ui.platform.LocalContext
++import androidx.compose.ui.res.stringResource
++import androidx.compose.ui.text.font.FontWeight
++import androidx.compose.ui.unit.dp
++import androidx.lifecycle.compose.collectAsStateWithLifecycle
++import me.spica27.spicamusic.R
++import me.spica27.spicamusic.automix.AutoMixFailReason
++import me.spica27.spicamusic.automix.AutoMixSkipReason
++import me.spica27.spicamusic.automix.AutoMixTransfer
++import me.spica27.spicamusic.automix.AutoMixTransferState
++import me.spica27.spicamusic.ui.component.DialogContainer
++import me.spica27.spicamusic.ui.navigation.LocalBackStack
++import me.spica27.spicamusic.ui.theme.Spacing
++
++/** Progress / result dialog shared by "Export for AutoMix" and "Import AutoMix". */
++@Composable
++fun AutoMixTransferDialogContent() {
++    val backStack = LocalBackStack.current
++    val context = LocalContext.current
++    val state by AutoMixTransfer.state.collectAsStateWithLifecycle()
++
++    val close: () -> Unit = {
++        AutoMixTransfer.reset()
++        backStack.removeLastOrNull()
++    }
++    val cancel: () -> Unit = {
++        AutoMixTransfer.cancel()
++        backStack.removeLastOrNull()
++    }
++
++    DialogContainer {
++        Column(
++            modifier = Modifier.padding(Spacing.ExtraLarge),
++            verticalArrangement = Arrangement.spacedBy(Spacing.Large),
++        ) {
++            when (val s = state) {
++                is AutoMixTransferState.Idle -> {
++                    // Nothing running (for example just cancelled): offer a way out.
++                    ButtonRow { TextButton(onClick = close) { Text(stringResource(R.string.automix_done)) } }
++                }
++
++                is AutoMixTransferState.Exporting -> {
++                    DialogTitle(stringResource(R.string.automix_exporting_title))
++                    if (s.total > 0) {
++                        LinearProgressIndicator(
++                            progress = { s.done.toFloat() / s.total },
++                            modifier = Modifier.fillMaxWidth(),
++                        )
++                        Text(
++                            text =
++                                stringResource(
++                                    R.string.automix_exporting_progress,
++                                    minOf(s.done + 1, s.total),
++                                    s.total,
++                                ),
++                            style = MaterialTheme.typography.bodyLarge,
++                            color = MaterialTheme.colorScheme.onSurfaceVariant,
++                        )
++                    } else {
++                        LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
++                        Text(
++                            text = stringResource(R.string.automix_preparing),
++                            style = MaterialTheme.typography.bodyLarge,
++                            color = MaterialTheme.colorScheme.onSurfaceVariant,
++                        )
++                    }
++                    ButtonRow { TextButton(onClick = cancel) { Text(stringResource(R.string.cancel)) } }
++                }
++
++                is AutoMixTransferState.ExportDone -> {
++                    DialogTitle(stringResource(R.string.automix_export_done_title))
++                    Text(
++                        text = stringResource(R.string.automix_export_done_location, s.fileName),
++                        style = MaterialTheme.typography.bodyLarge,
++                        color = MaterialTheme.colorScheme.onSurfaceVariant,
++                    )
++                    ButtonRow {
++                        TextButton(
++                            onClick = {
++                                val send =
++                                    Intent(Intent.ACTION_SEND).apply {
++                                        type = "application/zip"
++                                        putExtra(Intent.EXTRA_STREAM, s.uri)
++                                        addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
++                                    }
++                                context.startActivity(
++                                    Intent
++                                        .createChooser(send, null)
++                                        .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
++                                )
++                            },
++                        ) { Text(stringResource(R.string.automix_share)) }
++                        TextButton(onClick = close) { Text(stringResource(R.string.automix_done)) }
++                    }
++                }
++
++                is AutoMixTransferState.Importing -> {
++                    DialogTitle(stringResource(R.string.automix_importing_title))
++                    LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
++                    Text(
++                        text = stringResource(R.string.automix_importing_progress),
++                        style = MaterialTheme.typography.bodyLarge,
++                        color = MaterialTheme.colorScheme.onSurfaceVariant,
++                    )
++                    ButtonRow { TextButton(onClick = cancel) { Text(stringResource(R.string.cancel)) } }
++                }
++
++                is AutoMixTransferState.ImportDone -> {
++                    DialogTitle(stringResource(R.string.automix_importing_title))
++                    Text(
++                        text = stringResource(R.string.automix_import_summary, s.importedCount, s.skippedCount),
++                        style = MaterialTheme.typography.bodyLarge,
++                        color = MaterialTheme.colorScheme.onSurface,
++                    )
++                    Column(
++                        modifier = Modifier.heightIn(max = 240.dp).verticalScroll(rememberScrollState()),
++                        verticalArrangement = Arrangement.spacedBy(Spacing.Small),
++                    ) {
++                        s.lines.forEach { line ->
++                            val reason =
++                                when (line.reason) {
++                                    AutoMixSkipReason.SongNotFound -> stringResource(R.string.automix_reason_song_not_found)
++                                    AutoMixSkipReason.ClipMissing -> stringResource(R.string.automix_reason_clip_missing)
++                                    null -> null
++                                }
++                            Text(
++                                text =
++                                    (if (line.ok) "✓ " else "✕ ") + line.title +
++                                        (if (reason != null) " — $reason" else ""),
++                                style = MaterialTheme.typography.bodyMedium,
++                                color =
++                                    if (line.ok) {
++                                        MaterialTheme.colorScheme.primary
++                                    } else {
++                                        MaterialTheme.colorScheme.error
++                                    },
++                            )
++                        }
++                    }
++                    Text(
++                        text = stringResource(R.string.automix_import_storage_note),
++                        style = MaterialTheme.typography.bodySmall,
++                        color = MaterialTheme.colorScheme.onSurfaceVariant,
++                    )
++                    ButtonRow { TextButton(onClick = close) { Text(stringResource(R.string.automix_done)) } }
++                }
++
++                is AutoMixTransferState.Failed -> {
++                    DialogTitle(stringResource(R.string.automix_failed_title))
++                    Text(
++                        text =
++                            when (s.reason) {
++                                AutoMixFailReason.EmptyPlaylist -> stringResource(R.string.automix_fail_empty)
++                                AutoMixFailReason.InvalidZip -> stringResource(R.string.automix_fail_invalid_zip)
++                                AutoMixFailReason.Generic -> stringResource(R.string.automix_fail_generic, s.detail)
++                            },
++                        style = MaterialTheme.typography.bodyLarge,
++                        color = MaterialTheme.colorScheme.onSurfaceVariant,
++                    )
++                    ButtonRow { TextButton(onClick = close) { Text(stringResource(R.string.automix_done)) } }
++                }
++            }
++        }
++    }
++}
++
++@Composable
++private fun DialogTitle(text: String) {
++    Text(
++        text = text,
++        style = MaterialTheme.typography.headlineSmall,
++        fontWeight = FontWeight.SemiBold,
++        color = MaterialTheme.colorScheme.onSurface,
++    )
++}
++
++@Composable
++private fun ButtonRow(content: @Composable () -> Unit) {
++    Row(
++        modifier = Modifier.fillMaxWidth(),
++        horizontalArrangement = Arrangement.End,
++    ) {
++        content()
++    }
++}
+diff --git a/app/src/main/java/me/spica27/spicamusic/ui/navigation/AppEntryProvider.kt b/app/src/main/java/me/spica27/spicamusic/ui/navigation/AppEntryProvider.kt
+index 14ccd7b..7980e06 100644
+--- a/app/src/main/java/me/spica27/spicamusic/ui/navigation/AppEntryProvider.kt
++++ b/app/src/main/java/me/spica27/spicamusic/ui/navigation/AppEntryProvider.kt
+@@ -14,6 +14,7 @@ import me.spica27.spicamusic.ui.albumdetail.AlbumMenuDialogContent
+ import me.spica27.spicamusic.ui.artistdetail.ArtistDetailScreen
+ import me.spica27.spicamusic.ui.audioeffects.AudioEffectsScreen
+ import me.spica27.spicamusic.ui.dialog.ArtistPickerDialogContent
++import me.spica27.spicamusic.ui.dialog.AutoMixTransferDialogContent
+ import me.spica27.spicamusic.ui.dialog.ConfirmationDialogContent
+ import me.spica27.spicamusic.ui.dialog.CreatePlaylistForSongDialogContent
+ import me.spica27.spicamusic.ui.dialog.PlaylistPickerDialogContent
+@@ -83,6 +84,7 @@ fun appEntryProvider(): (Route) -> NavEntry<Route> =
+                 is SleepTimerRoute -> NavEntry(key, metadata = dialogMetadata) { SleepTimerDialogContent() }
+                 is ScanFoldersRoute -> NavEntry(key, metadata = dialogMetadata) { ScanFoldersDialogContent() }
+                 is ScanRulesRoute -> NavEntry(key, metadata = dialogMetadata) { ScanRulesDialogContent() }
++                is AutoMixTransferRoute -> NavEntry(key, metadata = dialogMetadata) { AutoMixTransferDialogContent() }
+                 is LyricsSourceRoute -> NavEntry(key, metadata = dialogMetadata) { LyricsSourceDialogContent() }
+                 is SongMenuRoute -> NavEntry(key, metadata = dialogMetadata) { SongMenuDialogContent(song = key.song) }
+                 is SongInfoRoute -> NavEntry(key, metadata = dialogMetadata) { SongInfoDialogContent(song = key.song) }
+diff --git a/app/src/main/java/me/spica27/spicamusic/ui/navigation/Routes.kt b/app/src/main/java/me/spica27/spicamusic/ui/navigation/Routes.kt
+index 295e5e9..7d85aff 100644
+--- a/app/src/main/java/me/spica27/spicamusic/ui/navigation/Routes.kt
++++ b/app/src/main/java/me/spica27/spicamusic/ui/navigation/Routes.kt
+@@ -98,6 +98,9 @@ data object CurrentListRoute : DialogRoute
+ 
+ data object SleepTimerRoute : DialogRoute
+ 
++/** Progress / result dialog for AutoMix export and import. */
++data object AutoMixTransferRoute : DialogRoute
++
+ data object ScanFoldersRoute : DialogRoute
+ 
+ data object ScanRulesRoute : DialogRoute
+diff --git a/app/src/main/java/me/spica27/spicamusic/ui/playlist/AllPlaylistsScreen.kt b/app/src/main/java/me/spica27/spicamusic/ui/playlist/AllPlaylistsScreen.kt
+index f865e46..1746b0d 100644
+--- a/app/src/main/java/me/spica27/spicamusic/ui/playlist/AllPlaylistsScreen.kt
++++ b/app/src/main/java/me/spica27/spicamusic/ui/playlist/AllPlaylistsScreen.kt
+@@ -1,6 +1,8 @@
+ package me.spica27.spicamusic.ui.playlist
+ 
+ import androidx.activity.compose.BackHandler
++import androidx.activity.compose.rememberLauncherForActivityResult
++import androidx.activity.result.contract.ActivityResultContracts
+ import androidx.compose.foundation.background
+ import androidx.compose.foundation.clickable
+ import androidx.compose.foundation.gestures.Orientation
+@@ -8,10 +10,13 @@ import androidx.compose.foundation.layout.Arrangement
+ import androidx.compose.foundation.layout.Box
+ import androidx.compose.foundation.layout.Column
+ import androidx.compose.foundation.layout.PaddingValues
++import androidx.compose.foundation.layout.Spacer
+ import androidx.compose.foundation.layout.aspectRatio
+ import androidx.compose.foundation.layout.fillMaxSize
+ import androidx.compose.foundation.layout.fillMaxWidth
+ import androidx.compose.foundation.layout.padding
++import androidx.compose.foundation.layout.size
++import androidx.compose.foundation.layout.width
+ import androidx.compose.foundation.lazy.grid.GridCells
+ import androidx.compose.foundation.lazy.grid.GridItemSpan
+ import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
+@@ -19,25 +24,30 @@ import androidx.compose.foundation.lazy.grid.items
+ import androidx.compose.material.icons.Icons
+ import androidx.compose.material.icons.automirrored.filled.ArrowBack
+ import androidx.compose.material.icons.filled.Add
++import androidx.compose.material.icons.filled.FileDownload
+ import androidx.compose.material3.ExperimentalMaterial3Api
+ import androidx.compose.material3.Icon
+ import androidx.compose.material3.IconButton
+ import androidx.compose.material3.MaterialTheme
+ import androidx.compose.material3.Scaffold
+ import androidx.compose.material3.Text
++import androidx.compose.material3.TextButton
+ import androidx.compose.material3.TopAppBar
+ import androidx.compose.runtime.Composable
+ import androidx.compose.runtime.getValue
+ import androidx.compose.ui.Alignment
+ import androidx.compose.ui.Modifier
+ import androidx.compose.ui.draw.clip
++import androidx.compose.ui.platform.LocalContext
+ import androidx.compose.ui.res.stringResource
+ import androidx.compose.ui.text.font.FontWeight
+ import androidx.compose.ui.text.style.TextOverflow
+ import androidx.compose.ui.unit.dp
+ import androidx.lifecycle.compose.collectAsStateWithLifecycle
+ import me.spica27.spicamusic.R
++import me.spica27.spicamusic.automix.AutoMixTransfer
+ import me.spica27.spicamusic.ui.model.PlaylistWithCover
++import me.spica27.spicamusic.ui.navigation.AutoMixTransferRoute
+ import me.spica27.spicamusic.ui.navigation.LocalBackStack
+ import me.spica27.spicamusic.ui.navigation.PlaylistCreatorRoute
+ import me.spica27.spicamusic.ui.navigation.PlaylistDetailRoute
+@@ -55,6 +65,14 @@ fun AllPlaylistsScreen() {
+     val viewModel: PlaylistViewModel = koinActivityViewModel()
+     val playlists by viewModel.playlists.collectAsStateWithLifecycle()
+     val playlistsWithCover by viewModel.playlistsWithCover.collectAsStateWithLifecycle()
++    val context = LocalContext.current
++    val importLauncher =
++        rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
++            if (uri != null) {
++                AutoMixTransfer.startImport(context, uri)
++                backStack.add(AutoMixTransferRoute)
++            }
++        }
+ 
+     BackHandler { backStack.removeLastOrNull() }
+ 
+@@ -71,6 +89,21 @@ fun AllPlaylistsScreen() {
+                 },
+                 title = { Text(stringResource(R.string.my_playlists)) },
+                 actions = {
++                    TextButton(
++                        onClick = {
++                            importLauncher.launch(
++                                arrayOf("application/zip", "application/x-zip-compressed", "application/octet-stream"),
++                            )
++                        },
++                    ) {
++                        Icon(
++                            imageVector = Icons.Default.FileDownload,
++                            contentDescription = null,
++                            modifier = Modifier.size(18.dp),
++                        )
++                        Spacer(modifier = Modifier.width(6.dp))
++                        Text(stringResource(R.string.automix_import_button))
++                    }
+                     IconButton(onClick = { backStack.add(PlaylistCreatorRoute) }) {
+                         Icon(
+                             imageVector = Icons.Default.Add,
+diff --git a/app/src/main/java/me/spica27/spicamusic/ui/playlistdetail/PlaylistDetailScreen.kt b/app/src/main/java/me/spica27/spicamusic/ui/playlistdetail/PlaylistDetailScreen.kt
+index d347056..a119b47 100644
+--- a/app/src/main/java/me/spica27/spicamusic/ui/playlistdetail/PlaylistDetailScreen.kt
++++ b/app/src/main/java/me/spica27/spicamusic/ui/playlistdetail/PlaylistDetailScreen.kt
+@@ -65,6 +65,7 @@ import androidx.compose.material.icons.filled.Close
+ import androidx.compose.material.icons.filled.Delete
+ import androidx.compose.material.icons.filled.DragIndicator
+ import androidx.compose.material.icons.filled.Edit
++import androidx.compose.material.icons.filled.FileUpload
+ import androidx.compose.material.icons.filled.MoreVert
+ import androidx.compose.material.icons.filled.MusicNote
+ import androidx.compose.material.icons.filled.PlayArrow
+@@ -112,6 +113,7 @@ import androidx.compose.ui.layout.positionInWindow
+ import androidx.compose.ui.platform.LocalFocusManager
+ import androidx.compose.ui.platform.LocalHapticFeedback
+ import androidx.compose.ui.platform.LocalSoftwareKeyboardController
++import androidx.compose.ui.platform.LocalContext
+ import androidx.compose.ui.res.stringResource
+ import androidx.compose.ui.text.font.FontWeight
+ import androidx.compose.ui.text.input.ImeAction
+@@ -136,6 +138,8 @@ import me.spica27.spicamusic.common.entity.Song
+ import me.spica27.spicamusic.ui.component.DialogContainer
+ import me.spica27.spicamusic.ui.component.DialogMenuItem
+ import me.spica27.spicamusic.ui.component.PopupMenuContainer
++import me.spica27.spicamusic.automix.AutoMixTransfer
++import me.spica27.spicamusic.ui.navigation.AutoMixTransferRoute
+ import me.spica27.spicamusic.ui.navigation.ConfirmationDialogRoute
+ import me.spica27.spicamusic.ui.navigation.LocalBackStack
+ import me.spica27.spicamusic.ui.navigation.PlaylistOptionsRoute
+@@ -944,6 +948,7 @@ fun PlaylistOptionsDialogContent(
+     onDelete: (onSuccess: () -> Unit) -> Unit,
+ ) {
+     val backStack = LocalBackStack.current
++    val context = LocalContext.current
+     val cancelLabel = stringResource(R.string.cancel)
+ 
+     fun closeThen(action: () -> Unit) {
+@@ -988,6 +993,20 @@ fun PlaylistOptionsDialogContent(
+                     showDivider = true,
+                 )
+             }
++            if (!isPlaylistEmpty) {
++                DialogMenuItem(
++                    title = stringResource(R.string.automix_export_menu),
++                    subtitle = stringResource(R.string.automix_export_menu_subtitle),
++                    icon = Icons.Default.FileUpload,
++                    onClick = {
++                        closeThen {
++                            AutoMixTransfer.startExport(context, playlistId, playlistName)
++                            backStack.add(AutoMixTransferRoute)
++                        }
++                    },
++                    showDivider = true,
++                )
++            }
+             val renameTitle = stringResource(R.string.rename_playlist_dialog_title)
+             val playlistNameLabel = stringResource(R.string.playlist_name_label)
+             val confirmLabel = stringResource(R.string.confirm)
+diff --git a/app/src/main/res/values-zh-rTW/strings.xml b/app/src/main/res/values-zh-rTW/strings.xml
+index cbdcf13..c80b4e6 100644
+--- a/app/src/main/res/values-zh-rTW/strings.xml
++++ b/app/src/main/res/values-zh-rTW/strings.xml
+@@ -1367,4 +1367,24 @@
+   <string name="bp_fill_blur_quality">填充模糊品質</string>
+   <string name="bp_fill_reach_top">填充模糊頂部延伸</string>
+   <string name="bp_fill_reach_bottom">填充模糊底部延伸</string>
++  <string name="automix_export_menu">匯出為 AutoMix</string>
++  <string name="automix_export_menu_subtitle">產生可上傳到 Colab 的壓縮檔</string>
++  <string name="automix_import_button">匯入 AutoMix</string>
++  <string name="automix_exporting_title">正在匯出 AutoMix</string>
++  <string name="automix_exporting_progress">正在加入 %1$d / %2$d</string>
++  <string name="automix_preparing">準備中…</string>
++  <string name="automix_export_done_title">已儲存</string>
++  <string name="automix_export_done_location">%1$s\n資料夾：Downloads/AutoMix</string>
++  <string name="automix_share">分享</string>
++  <string name="automix_done">完成</string>
++  <string name="automix_importing_title">匯入 AutoMix</string>
++  <string name="automix_importing_progress">正在讀取並比對歌曲…</string>
++  <string name="automix_import_summary">已匯入 %1$d 個過渡，略過 %2$d 個</string>
++  <string name="automix_import_storage_note">已儲存在應用程式儲存空間，其他應用程式看不到。</string>
++  <string name="automix_reason_song_not_found">曲庫中沒有這首歌</string>
++  <string name="automix_reason_clip_missing">壓縮檔中缺少片段</string>
++  <string name="automix_failed_title">AutoMix 失敗</string>
++  <string name="automix_fail_empty">此歌單沒有歌曲。</string>
++  <string name="automix_fail_invalid_zip">這不是有效的 AutoMix 結果（找不到 automix.json）。</string>
++  <string name="automix_fail_generic">發生錯誤：%1$s</string>
+ </resources>
+diff --git a/app/src/main/res/values-zh/strings.xml b/app/src/main/res/values-zh/strings.xml
+index fe857bb..3dca4e6 100644
+--- a/app/src/main/res/values-zh/strings.xml
++++ b/app/src/main/res/values-zh/strings.xml
+@@ -1368,4 +1368,24 @@
+   <string name="bp_fill_blur_quality">填充模糊质量</string>
+   <string name="bp_fill_reach_top">填充模糊顶部延伸</string>
+   <string name="bp_fill_reach_bottom">填充模糊底部延伸</string>
++  <string name="automix_export_menu">导出为 AutoMix</string>
++  <string name="automix_export_menu_subtitle">生成可上传到 Colab 的压缩包</string>
++  <string name="automix_import_button">导入 AutoMix</string>
++  <string name="automix_exporting_title">正在导出 AutoMix</string>
++  <string name="automix_exporting_progress">正在添加 %1$d / %2$d</string>
++  <string name="automix_preparing">准备中…</string>
++  <string name="automix_export_done_title">已保存</string>
++  <string name="automix_export_done_location">%1$s\n文件夹：Downloads/AutoMix</string>
++  <string name="automix_share">分享</string>
++  <string name="automix_done">完成</string>
++  <string name="automix_importing_title">导入 AutoMix</string>
++  <string name="automix_importing_progress">正在读取并匹配歌曲…</string>
++  <string name="automix_import_summary">已导入 %1$d 个过渡，跳过 %2$d 个</string>
++  <string name="automix_import_storage_note">已保存在应用存储中，其他应用不可见。</string>
++  <string name="automix_reason_song_not_found">曲库中没有这首歌</string>
++  <string name="automix_reason_clip_missing">压缩包中缺少片段</string>
++  <string name="automix_failed_title">AutoMix 失败</string>
++  <string name="automix_fail_empty">此歌单没有歌曲。</string>
++  <string name="automix_fail_invalid_zip">这不是有效的 AutoMix 结果（找不到 automix.json）。</string>
++  <string name="automix_fail_generic">出错了：%1$s</string>
+ </resources>
+diff --git a/app/src/main/res/values/strings.xml b/app/src/main/res/values/strings.xml
+index 6223ae7..6c3d074 100644
+--- a/app/src/main/res/values/strings.xml
++++ b/app/src/main/res/values/strings.xml
+@@ -1368,4 +1368,24 @@
+   <string name="bp_fill_blur_quality">Fill blur quality</string>
+   <string name="bp_fill_reach_top">Fill blur reach (top)</string>
+   <string name="bp_fill_reach_bottom">Fill blur reach (bottom)</string>
++  <string name="automix_export_menu">Export for AutoMix</string>
++  <string name="automix_export_menu_subtitle">Make a zip to upload to Colab</string>
++  <string name="automix_import_button">Import AutoMix</string>
++  <string name="automix_exporting_title">Exporting for AutoMix</string>
++  <string name="automix_exporting_progress">Adding %1$d of %2$d</string>
++  <string name="automix_preparing">Preparing…</string>
++  <string name="automix_export_done_title">Saved</string>
++  <string name="automix_export_done_location">%1$s\nFolder: Downloads/AutoMix</string>
++  <string name="automix_share">Share</string>
++  <string name="automix_done">Done</string>
++  <string name="automix_importing_title">Import AutoMix</string>
++  <string name="automix_importing_progress">Reading and matching songs…</string>
++  <string name="automix_import_summary">%1$d transitions imported, %2$d skipped</string>
++  <string name="automix_import_storage_note">Saved in app storage, hidden from other apps.</string>
++  <string name="automix_reason_song_not_found">song not in your library</string>
++  <string name="automix_reason_clip_missing">clip missing in the zip</string>
++  <string name="automix_failed_title">AutoMix failed</string>
++  <string name="automix_fail_empty">This playlist has no songs.</string>
++  <string name="automix_fail_invalid_zip">This is not a valid AutoMix result (automix.json not found).</string>
++  <string name="automix_fail_generic">Something went wrong: %1$s</string>
+ </resources>
