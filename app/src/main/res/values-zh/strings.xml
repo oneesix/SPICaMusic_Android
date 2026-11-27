@@ -1368,4 +1368,24 @@
   <string name="bp_fill_blur_quality">填充模糊质量</string>
   <string name="bp_fill_reach_top">填充模糊顶部延伸</string>
   <string name="bp_fill_reach_bottom">填充模糊底部延伸</string>
+  <string name="automix_export_menu">导出为 AutoMix</string>
+  <string name="automix_export_menu_subtitle">生成可上传到 Colab 的压缩包</string>
+  <string name="automix_import_button">导入 AutoMix</string>
+  <string name="automix_exporting_title">正在导出 AutoMix</string>
+  <string name="automix_exporting_progress">正在添加 %1$d / %2$d</string>
+  <string name="automix_preparing">准备中…</string>
+  <string name="automix_export_done_title">已保存</string>
+  <string name="automix_export_done_location">%1$s\n文件夹：Downloads/AutoMix</string>
+  <string name="automix_share">分享</string>
+  <string name="automix_done">完成</string>
+  <string name="automix_importing_title">导入 AutoMix</string>
+  <string name="automix_importing_progress">正在读取并匹配歌曲…</string>
+  <string name="automix_import_summary">已导入 %1$d 个过渡，跳过 %2$d 个</string>
+  <string name="automix_import_storage_note">已保存在应用存储中，其他应用不可见。</string>
+  <string name="automix_reason_song_not_found">曲库中没有这首歌</string>
+  <string name="automix_reason_clip_missing">压缩包中缺少片段</string>
+  <string name="automix_failed_title">AutoMix 失败</string>
+  <string name="automix_fail_empty">此歌单没有歌曲。</string>
+  <string name="automix_fail_invalid_zip">这不是有效的 AutoMix 结果（找不到 automix.json）。</string>
+  <string name="automix_fail_generic">出错了：%1$s</string>
 </resources>

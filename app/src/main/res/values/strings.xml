@@ -1368,4 +1368,24 @@
   <string name="bp_fill_blur_quality">Fill blur quality</string>
   <string name="bp_fill_reach_top">Fill blur reach (top)</string>
   <string name="bp_fill_reach_bottom">Fill blur reach (bottom)</string>
+  <string name="automix_export_menu">Export for AutoMix</string>
+  <string name="automix_export_menu_subtitle">Make a zip to upload to Colab</string>
+  <string name="automix_import_button">Import AutoMix</string>
+  <string name="automix_exporting_title">Exporting for AutoMix</string>
+  <string name="automix_exporting_progress">Adding %1$d of %2$d</string>
+  <string name="automix_preparing">Preparing…</string>
+  <string name="automix_export_done_title">Saved</string>
+  <string name="automix_export_done_location">%1$s\nFolder: Downloads/AutoMix</string>
+  <string name="automix_share">Share</string>
+  <string name="automix_done">Done</string>
+  <string name="automix_importing_title">Import AutoMix</string>
+  <string name="automix_importing_progress">Reading and matching songs…</string>
+  <string name="automix_import_summary">%1$d transitions imported, %2$d skipped</string>
+  <string name="automix_import_storage_note">Saved in app storage, hidden from other apps.</string>
+  <string name="automix_reason_song_not_found">song not in your library</string>
+  <string name="automix_reason_clip_missing">clip missing in the zip</string>
+  <string name="automix_failed_title">AutoMix failed</string>
+  <string name="automix_fail_empty">This playlist has no songs.</string>
+  <string name="automix_fail_invalid_zip">This is not a valid AutoMix result (automix.json not found).</string>
+  <string name="automix_fail_generic">Something went wrong: %1$s</string>
 </resources>

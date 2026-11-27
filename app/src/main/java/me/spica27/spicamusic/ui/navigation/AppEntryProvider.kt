@@ -14,6 +14,7 @@ import me.spica27.spicamusic.ui.albumdetail.AlbumMenuDialogContent
 import me.spica27.spicamusic.ui.artistdetail.ArtistDetailScreen
 import me.spica27.spicamusic.ui.audioeffects.AudioEffectsScreen
 import me.spica27.spicamusic.ui.dialog.ArtistPickerDialogContent
+import me.spica27.spicamusic.ui.dialog.AutoMixTransferDialogContent
 import me.spica27.spicamusic.ui.dialog.ConfirmationDialogContent
 import me.spica27.spicamusic.ui.dialog.CreatePlaylistForSongDialogContent
 import me.spica27.spicamusic.ui.dialog.PlaylistPickerDialogContent
@@ -83,6 +84,7 @@ fun appEntryProvider(): (Route) -> NavEntry<Route> =
                 is SleepTimerRoute -> NavEntry(key, metadata = dialogMetadata) { SleepTimerDialogContent() }
                 is ScanFoldersRoute -> NavEntry(key, metadata = dialogMetadata) { ScanFoldersDialogContent() }
                 is ScanRulesRoute -> NavEntry(key, metadata = dialogMetadata) { ScanRulesDialogContent() }
+                is AutoMixTransferRoute -> NavEntry(key, metadata = dialogMetadata) { AutoMixTransferDialogContent() }
                 is LyricsSourceRoute -> NavEntry(key, metadata = dialogMetadata) { LyricsSourceDialogContent() }
                 is SongMenuRoute -> NavEntry(key, metadata = dialogMetadata) { SongMenuDialogContent(song = key.song) }
                 is SongInfoRoute -> NavEntry(key, metadata = dialogMetadata) { SongInfoDialogContent(song = key.song) }

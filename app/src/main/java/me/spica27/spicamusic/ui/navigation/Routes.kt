@@ -98,6 +98,9 @@ data object CurrentListRoute : DialogRoute
 
 data object SleepTimerRoute : DialogRoute
 
+/** Progress / result dialog for AutoMix export and import. */
+data object AutoMixTransferRoute : DialogRoute
+
 data object ScanFoldersRoute : DialogRoute
 
 data object ScanRulesRoute : DialogRoute

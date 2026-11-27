@@ -65,6 +65,7 @@ import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.DragIndicator
 import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material.icons.filled.FileUpload
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.MusicNote
 import androidx.compose.material.icons.filled.PlayArrow
@@ -112,6 +113,7 @@ import androidx.compose.ui.layout.positionInWindow
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
@@ -136,6 +138,8 @@ import me.spica27.spicamusic.common.entity.Song
 import me.spica27.spicamusic.ui.component.DialogContainer
 import me.spica27.spicamusic.ui.component.DialogMenuItem
 import me.spica27.spicamusic.ui.component.PopupMenuContainer
+import me.spica27.spicamusic.automix.AutoMixTransfer
+import me.spica27.spicamusic.ui.navigation.AutoMixTransferRoute
 import me.spica27.spicamusic.ui.navigation.ConfirmationDialogRoute
 import me.spica27.spicamusic.ui.navigation.LocalBackStack
 import me.spica27.spicamusic.ui.navigation.PlaylistOptionsRoute
@@ -944,6 +948,7 @@ fun PlaylistOptionsDialogContent(
     onDelete: (onSuccess: () -> Unit) -> Unit,
 ) {
     val backStack = LocalBackStack.current
+    val context = LocalContext.current
     val cancelLabel = stringResource(R.string.cancel)
 
     fun closeThen(action: () -> Unit) {
@@ -985,6 +990,20 @@ fun PlaylistOptionsDialogContent(
                     title = stringResource(R.string.multi_select),
                     icon = Icons.Default.CheckBoxOutlineBlank,
                     onClick = { closeThen(onToggleMultiSelectMode) },
+                    showDivider = true,
+                )
+            }
+            if (!isPlaylistEmpty) {
+                DialogMenuItem(
+                    title = stringResource(R.string.automix_export_menu),
+                    subtitle = stringResource(R.string.automix_export_menu_subtitle),
+                    icon = Icons.Default.FileUpload,
+                    onClick = {
+                        closeThen {
+                            AutoMixTransfer.startExport(context, playlistId, playlistName)
+                            backStack.add(AutoMixTransferRoute)
+                        }
+                    },
                     showDivider = true,
                 )
             }
