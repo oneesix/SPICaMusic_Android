@@ -45,6 +45,7 @@ class PlaybackService : MediaLibraryService() {
     private var mediaSession: MediaLibrarySession? = null
     private lateinit var exoPlayer: ExoPlayer
     private var autoMixController: AutoMixTransitionController? = null
+    private var stemMixManager: StemMixManager? = null
     private lateinit var notificationProvider: SpicaNotificationProvider
 
     // 服务级别的协程作用域
@@ -110,6 +111,8 @@ class PlaybackService : MediaLibraryService() {
         AutoMixStore.init(this)
         serviceScope.launch { AutoMixStore.refresh(applicationContext) }
         autoMixController = AutoMixTransitionController(applicationContext, exoPlayer).also { it.attach() }
+        // AutoMix from stems: renders the transition to the next song from Music/mixing (when both songs have stems).
+        stemMixManager = StemMixManager(applicationContext, exoPlayer).also { it.attach() }
 
         mediaSession =
             MediaLibrarySession
@@ -206,6 +209,8 @@ class PlaybackService : MediaLibraryService() {
     override fun onDestroy() {
         serviceScope.cancel()
         notificationProvider.cancel()
+        stemMixManager?.release()
+        stemMixManager = null
         autoMixController?.release()
         autoMixController = null
         exoPlayer.release()

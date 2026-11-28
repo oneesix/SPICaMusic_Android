@@ -39,6 +39,34 @@ object AutoMixStore {
     private val _transitions = MutableStateFlow<Map<Pair<String, String>, AutoMixTransition>>(emptyMap())
     val transitions: StateFlow<Map<Pair<String, String>, AutoMixTransition>> = _transitions.asStateFlow()
 
+    // Imported clips (from the zip) and clips the phone rendered from stems. An imported clip wins.
+    private var imported: Map<Pair<String, String>, AutoMixTransition> = emptyMap()
+    private val rendered = HashMap<Pair<String, String>, AutoMixTransition>()
+
+    private fun publish() {
+        _transitions.value = synchronized(rendered) { HashMap(rendered) + imported }
+    }
+
+    /** true when a clip for this pair came from an imported zip. */
+    fun hasImported(
+        fromMediaId: String,
+        toMediaId: String,
+    ): Boolean = imported.containsKey(fromMediaId to toMediaId)
+
+    /** Add or replace a clip that was rendered on the phone. */
+    fun putRendered(transition: AutoMixTransition) {
+        synchronized(rendered) { rendered[transition.fromMediaId to transition.toMediaId] = transition }
+        publish()
+    }
+
+    fun removeRendered(
+        fromMediaId: String,
+        toMediaId: String,
+    ) {
+        val removed = synchronized(rendered) { rendered.remove(fromMediaId to toMediaId) }
+        if (removed != null) publish()
+    }
+
     @Volatile
     private var prefsLoaded = false
 
@@ -77,7 +105,8 @@ object AutoMixStore {
                 val root = File(context.applicationContext.filesDir, ".automix")
                 val indexFile = File(root, "index.json")
                 if (!indexFile.exists()) {
-                    _transitions.value = emptyMap()
+                    imported = emptyMap()
+                    publish()
                     return@withContext
                 }
                 val array = JSONObject(indexFile.readText()).getJSONArray("transitions")
@@ -99,7 +128,8 @@ object AutoMixStore {
                     val duration = clipDurationMs(clip) ?: continue
                     result[from to to] = AutoMixTransition(from, to, clip.absolutePath, start, resume, duration)
                 }
-                _transitions.value = result
+                imported = result
+                publish()
             } catch (e: Exception) {
                 Timber.e(e, "AutoMix: could not load transitions")
             }
