@@ -1,0 +1,652 @@
+diff --git a/app/src/main/AndroidManifest.xml b/app/src/main/AndroidManifest.xml
+index 3bf17a9..cf6d8c2 100644
+--- a/app/src/main/AndroidManifest.xml
++++ b/app/src/main/AndroidManifest.xml
+@@ -10,6 +10,10 @@
+     <uses-permission
+         android:name="android.permission.READ_EXTERNAL_STORAGE"
+         android:maxSdkVersion="32" />
++    <!-- AutoMix reads the stems from Music/mixing (artist/album/song folders) -->
++    <uses-permission
++        android:name="android.permission.MANAGE_EXTERNAL_STORAGE"
++        tools:ignore="ScopedStorage" />
+     <uses-permission android:name="android.permission.VIBRATE" />
+     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+     <uses-permission android:name="android.permission.WAKE_LOCK" />
+diff --git a/app/src/main/java/me/spica27/spicamusic/automix/AutoMixSettings.kt b/app/src/main/java/me/spica27/spicamusic/automix/AutoMixSettings.kt
+new file mode 100644
+index 0000000..6077206
+--- /dev/null
++++ b/app/src/main/java/me/spica27/spicamusic/automix/AutoMixSettings.kt
+@@ -0,0 +1,103 @@
++package me.spica27.spicamusic.automix
++
++import android.content.Context
++import kotlinx.coroutines.flow.MutableStateFlow
++import kotlinx.coroutines.flow.StateFlow
++import kotlinx.coroutines.flow.asStateFlow
++
++/** How the mix points are chosen. */
++enum class AutoMixMode(
++    val key: String,
++) {
++    /** The best cues, picked by the engine rules. */
++    Auto("auto"),
++
++    /** The user chooses the part of each song where the app looks for a cue. */
++    Manual("manual"),
++    ;
++
++    companion object {
++        fun fromKey(key: String?): AutoMixMode = entries.firstOrNull { it.key == key } ?: Auto
++    }
++}
++
++/** The values of the "AutoMix settings" sheet. */
++data class AutoMixSettingsState(
++    val mode: AutoMixMode = AutoMixMode.Auto,
++    /** Manual mode: song A looks for its mix point in the last N percent of the song. */
++    val outgoingRangePercent: Int = 10,
++    /** Manual mode: song B looks for its mix point in the first N percent of the song. */
++    val incomingRangePercent: Int = 10,
++    /** How many beats the blend lasts. */
++    val blendBeats: Int = 32,
++    /** Use TTML lyrics for the vocal handover when a song has them. */
++    val useTtmlVocalTiming: Boolean = true,
++)
++
++/**
++ * Saved AutoMix settings. They live in the same preferences file as the on/off switch
++ * ([AutoMixStore]), under their own keys, so nothing that is saved already changes.
++ */
++object AutoMixSettings {
++    private const val PREFS = "automix_prefs"
++    private const val KEY_MODE = "mix_mode"
++    private const val KEY_RANGE_OUT = "mix_range_out_percent"
++    private const val KEY_RANGE_IN = "mix_range_in_percent"
++    private const val KEY_BEATS = "mix_blend_beats"
++    private const val KEY_TTML = "mix_use_ttml"
++
++    val BLEND_BEATS_OPTIONS = listOf(8, 16, 32, 64)
++    val RANGE_PERCENT_RANGE = 5..50
++
++    private val _state = MutableStateFlow(AutoMixSettingsState())
++    val state: StateFlow<AutoMixSettingsState> = _state.asStateFlow()
++
++    @Volatile
++    private var loaded = false
++
++    /** Read the saved values once. Safe to call many times. */
++    fun init(context: Context) {
++        if (loaded) return
++        synchronized(this) {
++            if (loaded) return
++            val prefs = context.applicationContext.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
++            val defaults = AutoMixSettingsState()
++            _state.value =
++                sanitize(
++                    AutoMixSettingsState(
++                        mode = AutoMixMode.fromKey(prefs.getString(KEY_MODE, null)),
++                        outgoingRangePercent = prefs.getInt(KEY_RANGE_OUT, defaults.outgoingRangePercent),
++                        incomingRangePercent = prefs.getInt(KEY_RANGE_IN, defaults.incomingRangePercent),
++                        blendBeats = prefs.getInt(KEY_BEATS, defaults.blendBeats),
++                        useTtmlVocalTiming = prefs.getBoolean(KEY_TTML, defaults.useTtmlVocalTiming),
++                    ),
++                )
++            loaded = true
++        }
++    }
++
++    fun update(
++        context: Context,
++        transform: (AutoMixSettingsState) -> AutoMixSettingsState,
++    ) {
++        init(context)
++        val next = sanitize(transform(_state.value))
++        _state.value = next
++        context.applicationContext
++            .getSharedPreferences(PREFS, Context.MODE_PRIVATE)
++            .edit()
++            .putString(KEY_MODE, next.mode.key)
++            .putInt(KEY_RANGE_OUT, next.outgoingRangePercent)
++            .putInt(KEY_RANGE_IN, next.incomingRangePercent)
++            .putInt(KEY_BEATS, next.blendBeats)
++            .putBoolean(KEY_TTML, next.useTtmlVocalTiming)
++            .apply()
++    }
++
++    private fun sanitize(value: AutoMixSettingsState): AutoMixSettingsState =
++        value.copy(
++            outgoingRangePercent = value.outgoingRangePercent.coerceIn(RANGE_PERCENT_RANGE),
++            incomingRangePercent = value.incomingRangePercent.coerceIn(RANGE_PERCENT_RANGE),
++            blendBeats = if (value.blendBeats in BLEND_BEATS_OPTIONS) value.blendBeats else 32,
++        )
++}
+diff --git a/app/src/main/java/me/spica27/spicamusic/automix/MixingLibrary.kt b/app/src/main/java/me/spica27/spicamusic/automix/MixingLibrary.kt
+new file mode 100644
+index 0000000..8e0c88a
+--- /dev/null
++++ b/app/src/main/java/me/spica27/spicamusic/automix/MixingLibrary.kt
+@@ -0,0 +1,132 @@
++package me.spica27.spicamusic.automix
++
++import android.content.Context
++import android.content.Intent
++import android.net.Uri
++import android.os.Build
++import android.os.Environment
++import android.provider.Settings
++import kotlinx.coroutines.Dispatchers
++import kotlinx.coroutines.flow.MutableStateFlow
++import kotlinx.coroutines.flow.StateFlow
++import kotlinx.coroutines.flow.asStateFlow
++import kotlinx.coroutines.withContext
++import org.json.JSONObject
++import timber.log.Timber
++import java.io.File
++
++/** One song that has mixing data (a folder with song.json and the four stems). */
++data class MixingSong(
++    /** The song folder: Music/mixing/artist/album/song. */
++    val folder: File,
++    /** "artist/album/song", used as the key in lists. */
++    val relativePath: String,
++    val title: String,
++    val artist: String,
++    val album: String,
++    val songId: Long,
++    val mediaStoreId: Long,
++    val durationMs: Long,
++    val sha256: String,
++    /** true when drums, bass, other and vocals all exist next to song.json. */
++    val stemsComplete: Boolean,
++)
++
++/**
++ * The songs that have mixing data in Music/mixing/<artist>/<album>/<song>/ (made by the Colab notebook).
++ * A song counts when its folder holds a valid song.json. The files are read with the
++ * "All files access" permission, so they stay in a normal folder and not in app storage.
++ */
++object MixingLibrary {
++    const val FOLDER_PATH = "Music/mixing"
++    private const val SONG_FILE = "song.json"
++    private val STEM_NAMES = listOf("drums", "bass", "other", "vocals")
++
++    private val _songs = MutableStateFlow<List<MixingSong>>(emptyList())
++    val songs: StateFlow<List<MixingSong>> = _songs.asStateFlow()
++
++    private val _scanned = MutableStateFlow(false)
++
++    /** true after the first scan finished (so the screen can tell "not scanned yet" from "empty"). */
++    val scanned: StateFlow<Boolean> = _scanned.asStateFlow()
++
++    fun rootDir(): File = File(Environment.getExternalStorageDirectory(), FOLDER_PATH)
++
++    /** "All files access" exists from Android 11. */
++    fun isSupported(): Boolean = Build.VERSION.SDK_INT >= Build.VERSION_CODES.R
++
++    fun hasAllFilesAccess(): Boolean =
++        Build.VERSION.SDK_INT >= Build.VERSION_CODES.R && Environment.isExternalStorageManager()
++
++    /** Opens the system screen where the user allows "All files access" for this app. */
++    fun accessSettingsIntent(context: Context): Intent =
++        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
++            Intent(
++                Settings.ACTION_MANAGE_APP_ALL_FILES_ACCESS_PERMISSION,
++                Uri.parse("package:${context.packageName}"),
++            )
++        } else {
++            Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.parse("package:${context.packageName}"))
++        }
++
++    /** Scan Music/mixing again. Without the permission the list is empty. */
++    suspend fun refresh() =
++        withContext(Dispatchers.IO) {
++            val found = ArrayList<MixingSong>()
++            try {
++                val root = rootDir()
++                if (hasAllFilesAccess() && root.isDirectory) {
++                    for (artistDir in root.subFolders()) {
++                        for (albumDir in artistDir.subFolders()) {
++                            for (songDir in albumDir.subFolders()) {
++                                readSong(root, songDir)?.let(found::add)
++                            }
++                        }
++                    }
++                }
++            } catch (e: Exception) {
++                Timber.w(e, "Could not scan %s", FOLDER_PATH)
++            }
++            _songs.value = found.sortedBy { it.relativePath.lowercase() }
++            _scanned.value = true
++        }
++
++    private fun File.subFolders(): List<File> =
++        listFiles { f -> f.isDirectory && !f.name.startsWith(".") && !f.name.endsWith(".building") }
++            ?.sortedBy { it.name.lowercase() }
++            ?: emptyList()
++
++    private fun readSong(
++        root: File,
++        songDir: File,
++    ): MixingSong? {
++        val file = File(songDir, SONG_FILE)
++        if (!file.isFile) return null
++        return try {
++            val json = JSONObject(file.readText(Charsets.UTF_8))
++            if (json.optString("format") != "automix-song") return null
++            val stemFiles = json.optJSONObject("stems")?.optJSONObject("files")
++            val complete =
++                stemFiles != null &&
++                    STEM_NAMES.all { name ->
++                        val fileName = stemFiles.optString(name)
++                        fileName.isNotEmpty() && File(songDir, fileName).isFile
++                    }
++            MixingSong(
++                folder = songDir,
++                relativePath = songDir.relativeTo(root).invariantSeparatorsPath,
++                title = json.optString("title"),
++                artist = json.optString("artist"),
++                album = json.optString("album"),
++                songId = json.optLong("songId", -1L),
++                mediaStoreId = json.optLong("mediaStoreId", -1L),
++                durationMs = json.optLong("durationMs", 0L),
++                sha256 = json.optString("sha256"),
++                stemsComplete = complete,
++            )
++        } catch (e: Exception) {
++            Timber.w(e, "Bad song.json in %s", songDir.path)
++            null
++        }
++    }
++}
+diff --git a/app/src/main/java/me/spica27/spicamusic/ui/player/FullscreenLyricsSurface.kt b/app/src/main/java/me/spica27/spicamusic/ui/player/FullscreenLyricsSurface.kt
+index 93bf26d..aae00de 100644
+--- a/app/src/main/java/me/spica27/spicamusic/ui/player/FullscreenLyricsSurface.kt
++++ b/app/src/main/java/me/spica27/spicamusic/ui/player/FullscreenLyricsSurface.kt
+@@ -81,6 +81,7 @@ import me.spica27.spicamusic.ui.navigation.LyricsSourceRoute
+ import me.spica27.spicamusic.ui.theme.Shapes
+ import me.spica27.spicamusic.ui.theme.Spacing
+ import me.spica27.spicamusic.ui.widget.AudioCover
++import me.spica27.spicamusic.ui.widget.AutoMixSettingsSheet
+ import me.spica27.spicamusic.ui.widget.LyricsCircleButton
+ import me.spica27.spicamusic.ui.widget.LyricsSettingsSheet
+ import me.spica27.spicamusic.ui.widget.LyricsToolbarMenuContent
+@@ -273,6 +274,7 @@ private fun FullscreenLyricsHeader(
+     val backStack = LocalBackStack.current
+     var menuExpanded by remember { mutableStateOf(false) }
+     var showLyricsSettings by remember { mutableStateOf(false) }
++    var showAutoMixSettings by remember { mutableStateOf(false) }
+ 
+     // Enhance header off = the original header (default sizes, no line, no blur).
+     val enhanced = styleSettings.enhanceHeader
+@@ -503,6 +505,10 @@ private fun FullscreenLyricsHeader(
+                     viewModel.openPanel()
+                     backStack.add(LyricsSourceRoute)
+                 },
++                onOpenAutoMixSettings = {
++                    menuExpanded = false
++                    showAutoMixSettings = true
++                },
+             )
+         }
+     }
+@@ -514,6 +520,10 @@ private fun FullscreenLyricsHeader(
+             onDismiss = { showLyricsSettings = false },
+         )
+     }
++
++    if (showAutoMixSettings) {
++        AutoMixSettingsSheet(onDismiss = { showAutoMixSettings = false })
++    }
+ }
+ 
+ /** The player's glow-particle seek bar, sized for the header. */
+diff --git a/app/src/main/java/me/spica27/spicamusic/ui/widget/AutoMixSettingsSheet.kt b/app/src/main/java/me/spica27/spicamusic/ui/widget/AutoMixSettingsSheet.kt
+new file mode 100644
+index 0000000..ca512ef
+--- /dev/null
++++ b/app/src/main/java/me/spica27/spicamusic/ui/widget/AutoMixSettingsSheet.kt
+@@ -0,0 +1,179 @@
++package me.spica27.spicamusic.ui.widget
++
++import androidx.activity.compose.rememberLauncherForActivityResult
++import androidx.activity.result.contract.ActivityResultContracts
++import androidx.compose.foundation.layout.Arrangement
++import androidx.compose.foundation.layout.Column
++import androidx.compose.foundation.layout.Row
++import androidx.compose.foundation.layout.fillMaxWidth
++import androidx.compose.foundation.layout.navigationBarsPadding
++import androidx.compose.foundation.layout.padding
++import androidx.compose.foundation.rememberScrollState
++import androidx.compose.foundation.verticalScroll
++import androidx.compose.material3.Button
++import androidx.compose.material3.ExperimentalMaterial3Api
++import androidx.compose.material3.MaterialTheme
++import androidx.compose.material3.ModalBottomSheet
++import androidx.compose.material3.Text
++import androidx.compose.material3.TextButton
++import androidx.compose.material3.rememberModalBottomSheetState
++import androidx.compose.runtime.Composable
++import androidx.compose.runtime.LaunchedEffect
++import androidx.compose.runtime.getValue
++import androidx.compose.runtime.mutableStateOf
++import androidx.compose.runtime.remember
++import androidx.compose.runtime.rememberCoroutineScope
++import androidx.compose.runtime.setValue
++import androidx.compose.ui.Alignment
++import androidx.compose.ui.Modifier
++import androidx.compose.ui.platform.LocalContext
++import androidx.compose.ui.res.stringResource
++import androidx.compose.ui.unit.dp
++import androidx.lifecycle.compose.collectAsStateWithLifecycle
++import kotlinx.coroutines.launch
++import me.spica27.spicamusic.R
++import me.spica27.spicamusic.automix.AutoMixMode
++import me.spica27.spicamusic.automix.AutoMixSettings
++import me.spica27.spicamusic.automix.MixingLibrary
++
++/**
++ * "AutoMix settings" sheet, opened from the three-dots menu of the lyrics window.
++ *
++ * Mode (auto / manual), where to look for the mix points, how many beats the blend lasts,
++ * the vocal timing source, and the state of the Music/mixing folder.
++ */
++@OptIn(ExperimentalMaterial3Api::class)
++@Composable
++fun AutoMixSettingsSheet(onDismiss: () -> Unit) {
++    val context = LocalContext.current
++    val scope = rememberCoroutineScope()
++    remember(context) { AutoMixSettings.init(context) }
++    val settings by AutoMixSettings.state.collectAsStateWithLifecycle()
++    val songs by MixingLibrary.songs.collectAsStateWithLifecycle()
++    val scanned by MixingLibrary.scanned.collectAsStateWithLifecycle()
++    var hasAccess by remember { mutableStateOf(MixingLibrary.hasAllFilesAccess()) }
++
++    LaunchedEffect(Unit) { MixingLibrary.refresh() }
++
++    // Back from the system "All files access" screen: check again and rescan.
++    val accessLauncher =
++        rememberLauncherForActivityResult(ActivityResultContracts.StartActivityForResult()) {
++            hasAccess = MixingLibrary.hasAllFilesAccess()
++            scope.launch { MixingLibrary.refresh() }
++        }
++
++    ModalBottomSheet(
++        onDismissRequest = onDismiss,
++        sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
++    ) {
++        Column(
++            modifier =
++                Modifier
++                    .fillMaxWidth()
++                    .verticalScroll(rememberScrollState())
++                    .padding(horizontal = 24.dp)
++                    .navigationBarsPadding()
++                    .padding(bottom = 24.dp),
++        ) {
++            Text(
++                text = stringResource(R.string.amx_sheet_title),
++                style = MaterialTheme.typography.titleLarge,
++                color = MaterialTheme.colorScheme.onSurface,
++            )
++
++            LyricsSettingsSection(stringResource(R.string.amx_section_mix_points))
++            LyricsSettingsChips(
++                label = stringResource(R.string.amx_mode_label),
++                description = stringResource(R.string.amx_mode_desc),
++                options = AutoMixMode.entries.toList(),
++                selected = settings.mode,
++                optionLabel = {
++                    when (it) {
++                        AutoMixMode.Auto -> stringResource(R.string.amx_mode_auto)
++                        AutoMixMode.Manual -> stringResource(R.string.amx_mode_manual)
++                    }
++                },
++                onSelect = { mode -> AutoMixSettings.update(context) { it.copy(mode = mode) } },
++            )
++            if (settings.mode == AutoMixMode.Manual) {
++                LyricsSettingsSlider(
++                    label = stringResource(R.string.amx_range_out_label),
++                    description = stringResource(R.string.amx_range_out_desc),
++                    value = settings.outgoingRangePercent,
++                    range = AutoMixSettings.RANGE_PERCENT_RANGE,
++                    step = 5,
++                    valueText = { "$it%" },
++                    onValueChange = { v -> AutoMixSettings.update(context) { it.copy(outgoingRangePercent = v) } },
++                )
++                LyricsSettingsSlider(
++                    label = stringResource(R.string.amx_range_in_label),
++                    description = stringResource(R.string.amx_range_in_desc),
++                    value = settings.incomingRangePercent,
++                    range = AutoMixSettings.RANGE_PERCENT_RANGE,
++                    step = 5,
++                    valueText = { "$it%" },
++                    onValueChange = { v -> AutoMixSettings.update(context) { it.copy(incomingRangePercent = v) } },
++                )
++            }
++
++            LyricsSettingsSection(stringResource(R.string.amx_section_blend))
++            LyricsSettingsChips(
++                label = stringResource(R.string.amx_blend_label),
++                description = stringResource(R.string.amx_blend_desc),
++                options = AutoMixSettings.BLEND_BEATS_OPTIONS,
++                selected = settings.blendBeats,
++                optionLabel = { stringResource(R.string.amx_beats_format, it) },
++                onSelect = { beats -> AutoMixSettings.update(context) { it.copy(blendBeats = beats) } },
++            )
++
++            LyricsSettingsSection(stringResource(R.string.amx_section_vocals))
++            LyricsSettingsToggle(
++                label = stringResource(R.string.amx_ttml_label),
++                description = stringResource(R.string.amx_ttml_desc),
++                checked = settings.useTtmlVocalTiming,
++                onCheckedChange = { on -> AutoMixSettings.update(context) { it.copy(useTtmlVocalTiming = on) } },
++            )
++
++            LyricsSettingsSection(stringResource(R.string.amx_section_library))
++            Text(
++                text = stringResource(R.string.amx_library_folder, MixingLibrary.FOLDER_PATH),
++                style = MaterialTheme.typography.bodyMedium,
++                color = MaterialTheme.colorScheme.onSurface,
++            )
++            val ready = songs.count { it.stemsComplete }
++            val status =
++                when {
++                    !MixingLibrary.isSupported() -> stringResource(R.string.amx_library_need_android11)
++                    !hasAccess -> stringResource(R.string.amx_library_need_access)
++                    !scanned -> stringResource(R.string.amx_library_scanning)
++                    songs.isEmpty() -> stringResource(R.string.amx_library_empty)
++                    else -> stringResource(R.string.amx_library_count, songs.size, ready)
++                }
++            Text(
++                text = status,
++                style = MaterialTheme.typography.bodySmall,
++                color = MaterialTheme.colorScheme.onSurfaceVariant,
++                modifier = Modifier.padding(top = 4.dp),
++            )
++            Row(
++                modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
++                horizontalArrangement = Arrangement.spacedBy(8.dp),
++                verticalAlignment = Alignment.CenterVertically,
++            ) {
++                if (MixingLibrary.isSupported() && !hasAccess) {
++                    Button(onClick = { accessLauncher.launch(MixingLibrary.accessSettingsIntent(context)) }) {
++                        Text(stringResource(R.string.amx_library_allow))
++                    }
++                }
++                TextButton(
++                    onClick = {
++                        hasAccess = MixingLibrary.hasAllFilesAccess()
++                        scope.launch { MixingLibrary.refresh() }
++                    },
++                ) {
++                    Text(stringResource(R.string.amx_library_refresh))
++                }
++            }
++        }
++    }
++}
+diff --git a/app/src/main/java/me/spica27/spicamusic/ui/widget/FloatingLyricsToolbar.kt b/app/src/main/java/me/spica27/spicamusic/ui/widget/FloatingLyricsToolbar.kt
+index 928b415..14be192 100644
+--- a/app/src/main/java/me/spica27/spicamusic/ui/widget/FloatingLyricsToolbar.kt
++++ b/app/src/main/java/me/spica27/spicamusic/ui/widget/FloatingLyricsToolbar.kt
+@@ -120,6 +120,7 @@ fun LyricsToolbarMenuContent(
+     onOpenLyricsSettings: () -> Unit,
+     onOpenLyricsSwitcher: () -> Unit,
+     modifier: Modifier = Modifier,
++    onOpenAutoMixSettings: (() -> Unit)? = null,
+ ) {
+     Column(
+         modifier = modifier,
+@@ -139,6 +140,11 @@ fun LyricsToolbarMenuContent(
+ 
+         // 切换歌词来源按钮（常驻：无内嵌/在线时用户仍可进入选择本地文件）
+         SwitchLyricsButton(onClick = onOpenLyricsSwitcher)
++
++        // AutoMix settings (only where the caller provides it: the lyrics window three-dots menu)
++        if (onOpenAutoMixSettings != null) {
++            AutoMixSettingsButton(onClick = onOpenAutoMixSettings)
++        }
+     }
+ }
+ 
+@@ -250,6 +256,33 @@ private fun SwitchLyricsButton(
+     }
+ }
+ 
++/**
++ * AutoMix settings button
++ */
++@Composable
++private fun AutoMixSettingsButton(
++    onClick: () -> Unit,
++    modifier: Modifier = Modifier,
++) {
++    LyricsPill(
++        modifier = modifier,
++        onClick = onClick,
++        shape = Shapes.ExtraLargeCornerBasedShape,
++    ) {
++        Icon(
++            imageVector = Icons.Rounded.Tune,
++            contentDescription = null,
++            tint = MaterialTheme.colorScheme.onSurface,
++            modifier = Modifier.size(18.dp),
++        )
++        Text(
++            text = stringResource(R.string.amx_sheet_title),
++            style = LyricsControlDefaults.pillLabelTextStyle,
++            color = MaterialTheme.colorScheme.onSurface,
++        )
++    }
++}
++
+ /**
+  * 工具栏小按钮
+  */
+diff --git a/app/src/main/res/values-zh-rTW/strings.xml b/app/src/main/res/values-zh-rTW/strings.xml
+index 9cc6e34..df2bfdc 100644
+--- a/app/src/main/res/values-zh-rTW/strings.xml
++++ b/app/src/main/res/values-zh-rTW/strings.xml
+@@ -1391,4 +1391,30 @@
+   <string name="automix_settings_title">AutoMix</string>
+   <string name="automix_play_title">播放 AutoMix 過渡</string>
+   <string name="automix_play_summary">在歌曲之間使用已匯入的過渡。沒有過渡的歌曲正常播放。</string>
++  <string name="amx_sheet_title">AutoMix 設定</string>
++  <string name="amx_section_mix_points">混音點</string>
++  <string name="amx_mode_label">模式</string>
++  <string name="amx_mode_desc">自動使用最佳切入點；手動可選擇應用程式在哪裡尋找。</string>
++  <string name="amx_mode_auto">自動</string>
++  <string name="amx_mode_manual">手動</string>
++  <string name="amx_range_out_label">歌曲 A：在最後一部分尋找</string>
++  <string name="amx_range_out_desc">應用程式在歌曲結尾的這一部分尋找混音點。</string>
++  <string name="amx_range_in_label">歌曲 B：在開頭一部分尋找</string>
++  <string name="amx_range_in_desc">應用程式在歌曲開頭的這一部分尋找混音點。</string>
++  <string name="amx_section_blend">混合長度</string>
++  <string name="amx_blend_label">拍數</string>
++  <string name="amx_blend_desc">混合持續多少拍。拍數越少，混合越短。預設 32。</string>
++  <string name="amx_beats_format">%d 拍</string>
++  <string name="amx_section_vocals">人聲時機</string>
++  <string name="amx_ttml_label">使用 TTML 歌詞時間</string>
++  <string name="amx_ttml_desc">歌曲有 TTML 歌詞時，用它來銜接人聲；否則使用分析得到的人聲片段。</string>
++  <string name="amx_section_library">混音資料庫</string>
++  <string name="amx_library_folder">資料夾：%1$s</string>
++  <string name="amx_library_need_access">應用程式需要「所有檔案存取權限」才能讀取此資料夾。</string>
++  <string name="amx_library_need_android11">讀取此資料夾需要 Android 11 或更新版本。</string>
++  <string name="amx_library_scanning">正在尋找歌曲…</string>
++  <string name="amx_library_empty">此資料夾中還沒有帶混音資料的歌曲。</string>
++  <string name="amx_library_count">%1$d 首歌曲有混音資料，%2$d 首可混音</string>
++  <string name="amx_library_allow">允許存取</string>
++  <string name="amx_library_refresh">重新整理</string>
+ </resources>
+diff --git a/app/src/main/res/values-zh/strings.xml b/app/src/main/res/values-zh/strings.xml
+index fd4b7a1..45f7729 100644
+--- a/app/src/main/res/values-zh/strings.xml
++++ b/app/src/main/res/values-zh/strings.xml
+@@ -1392,4 +1392,30 @@
+   <string name="automix_settings_title">AutoMix</string>
+   <string name="automix_play_title">播放 AutoMix 过渡</string>
+   <string name="automix_play_summary">在歌曲之间使用已导入的过渡。没有过渡的歌曲正常播放。</string>
++  <string name="amx_sheet_title">AutoMix 设置</string>
++  <string name="amx_section_mix_points">混音点</string>
++  <string name="amx_mode_label">模式</string>
++  <string name="amx_mode_desc">自动使用最佳切入点；手动可选择应用在哪里查找。</string>
++  <string name="amx_mode_auto">自动</string>
++  <string name="amx_mode_manual">手动</string>
++  <string name="amx_range_out_label">歌曲 A：在最后一部分查找</string>
++  <string name="amx_range_out_desc">应用在歌曲结尾的这一部分查找混音点。</string>
++  <string name="amx_range_in_label">歌曲 B：在开头一部分查找</string>
++  <string name="amx_range_in_desc">应用在歌曲开头的这一部分查找混音点。</string>
++  <string name="amx_section_blend">混合长度</string>
++  <string name="amx_blend_label">节拍数</string>
++  <string name="amx_blend_desc">混合持续多少拍。拍数越少，混合越短。默认 32。</string>
++  <string name="amx_beats_format">%d 拍</string>
++  <string name="amx_section_vocals">人声时机</string>
++  <string name="amx_ttml_label">使用 TTML 歌词时间</string>
++  <string name="amx_ttml_desc">歌曲有 TTML 歌词时，用它来衔接人声；否则使用分析得到的人声片段。</string>
++  <string name="amx_section_library">混音资料库</string>
++  <string name="amx_library_folder">文件夹：%1$s</string>
++  <string name="amx_library_need_access">应用需要“所有文件访问权限”才能读取此文件夹。</string>
++  <string name="amx_library_need_android11">读取此文件夹需要 Android 11 或更高版本。</string>
++  <string name="amx_library_scanning">正在查找歌曲…</string>
++  <string name="amx_library_empty">此文件夹中还没有带混音数据的歌曲。</string>
++  <string name="amx_library_count">%1$d 首歌曲有混音数据，%2$d 首可混音</string>
++  <string name="amx_library_allow">允许访问</string>
++  <string name="amx_library_refresh">刷新</string>
+ </resources>
+diff --git a/app/src/main/res/values/strings.xml b/app/src/main/res/values/strings.xml
+index 26576e6..56c0cb4 100644
+--- a/app/src/main/res/values/strings.xml
++++ b/app/src/main/res/values/strings.xml
+@@ -1392,4 +1392,30 @@
+   <string name="automix_settings_title">AutoMix</string>
+   <string name="automix_play_title">Play AutoMix transitions</string>
+   <string name="automix_play_summary">Use imported transitions between songs. Songs without one play normally.</string>
++  <string name="amx_sheet_title">AutoMix settings</string>
++  <string name="amx_section_mix_points">Mix points</string>
++  <string name="amx_mode_label">Mode</string>
++  <string name="amx_mode_desc">Auto uses the best cues. Manual lets you choose where the app looks.</string>
++  <string name="amx_mode_auto">Auto</string>
++  <string name="amx_mode_manual">Manual</string>
++  <string name="amx_range_out_label">Song A: look in the last part</string>
++  <string name="amx_range_out_desc">The end of the song where the app looks for the mix point.</string>
++  <string name="amx_range_in_label">Song B: look in the first part</string>
++  <string name="amx_range_in_desc">The start of the song where the app looks for the mix point.</string>
++  <string name="amx_section_blend">Blend length</string>
++  <string name="amx_blend_label">Beats</string>
++  <string name="amx_blend_desc">How many beats the blend lasts. Fewer beats make a shorter blend. 32 is the default.</string>
++  <string name="amx_beats_format">%d beats</string>
++  <string name="amx_section_vocals">Vocal timing</string>
++  <string name="amx_ttml_label">Use TTML lyrics timing</string>
++  <string name="amx_ttml_desc">Use the timed lyrics for the vocal handover when a song has them. Otherwise the analysed vocal phrases are used.</string>
++  <string name="amx_section_library">Mixing library</string>
++  <string name="amx_library_folder">Folder: %1$s</string>
++  <string name="amx_library_need_access">The app needs “All files access” to read this folder.</string>
++  <string name="amx_library_need_android11">Reading this folder needs Android 11 or newer.</string>
++  <string name="amx_library_scanning">Looking for songs…</string>
++  <string name="amx_library_empty">No songs with mixing data found in this folder yet.</string>
++  <string name="amx_library_count">%1$d songs with mixing data, %2$d ready to mix</string>
++  <string name="amx_library_allow">Allow access</string>
++  <string name="amx_library_refresh">Refresh</string>
+ </resources>
