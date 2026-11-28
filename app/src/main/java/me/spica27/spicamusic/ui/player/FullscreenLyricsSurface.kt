@@ -81,6 +81,7 @@ import me.spica27.spicamusic.ui.navigation.LyricsSourceRoute
 import me.spica27.spicamusic.ui.theme.Shapes
 import me.spica27.spicamusic.ui.theme.Spacing
 import me.spica27.spicamusic.ui.widget.AudioCover
+import me.spica27.spicamusic.ui.widget.AutoMixSettingsSheet
 import me.spica27.spicamusic.ui.widget.LyricsCircleButton
 import me.spica27.spicamusic.ui.widget.LyricsSettingsSheet
 import me.spica27.spicamusic.ui.widget.LyricsToolbarMenuContent
@@ -273,6 +274,7 @@ private fun FullscreenLyricsHeader(
     val backStack = LocalBackStack.current
     var menuExpanded by remember { mutableStateOf(false) }
     var showLyricsSettings by remember { mutableStateOf(false) }
+    var showAutoMixSettings by remember { mutableStateOf(false) }
 
     // Enhance header off = the original header (default sizes, no line, no blur).
     val enhanced = styleSettings.enhanceHeader
@@ -503,6 +505,10 @@ private fun FullscreenLyricsHeader(
                     viewModel.openPanel()
                     backStack.add(LyricsSourceRoute)
                 },
+                onOpenAutoMixSettings = {
+                    menuExpanded = false
+                    showAutoMixSettings = true
+                },
             )
         }
     }
@@ -513,6 +519,10 @@ private fun FullscreenLyricsHeader(
             onUpdate = styleViewModel::update,
             onDismiss = { showLyricsSettings = false },
         )
+    }
+
+    if (showAutoMixSettings) {
+        AutoMixSettingsSheet(onDismiss = { showAutoMixSettings = false })
     }
 }
 

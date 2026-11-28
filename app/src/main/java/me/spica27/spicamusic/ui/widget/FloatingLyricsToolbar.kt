@@ -120,6 +120,7 @@ fun LyricsToolbarMenuContent(
     onOpenLyricsSettings: () -> Unit,
     onOpenLyricsSwitcher: () -> Unit,
     modifier: Modifier = Modifier,
+    onOpenAutoMixSettings: (() -> Unit)? = null,
 ) {
     Column(
         modifier = modifier,
@@ -139,6 +140,11 @@ fun LyricsToolbarMenuContent(
 
         // 切换歌词来源按钮（常驻：无内嵌/在线时用户仍可进入选择本地文件）
         SwitchLyricsButton(onClick = onOpenLyricsSwitcher)
+
+        // AutoMix settings (only where the caller provides it: the lyrics window three-dots menu)
+        if (onOpenAutoMixSettings != null) {
+            AutoMixSettingsButton(onClick = onOpenAutoMixSettings)
+        }
     }
 }
 
@@ -244,6 +250,33 @@ private fun SwitchLyricsButton(
         )
         Text(
             text = stringResource(R.string.toggle_lyrics),
+            style = LyricsControlDefaults.pillLabelTextStyle,
+            color = MaterialTheme.colorScheme.onSurface,
+        )
+    }
+}
+
+/**
+ * AutoMix settings button
+ */
+@Composable
+private fun AutoMixSettingsButton(
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    LyricsPill(
+        modifier = modifier,
+        onClick = onClick,
+        shape = Shapes.ExtraLargeCornerBasedShape,
+    ) {
+        Icon(
+            imageVector = Icons.Rounded.Tune,
+            contentDescription = null,
+            tint = MaterialTheme.colorScheme.onSurface,
+            modifier = Modifier.size(18.dp),
+        )
+        Text(
+            text = stringResource(R.string.amx_sheet_title),
             style = LyricsControlDefaults.pillLabelTextStyle,
             color = MaterialTheme.colorScheme.onSurface,
         )
