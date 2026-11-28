@@ -1,0 +1,176 @@
+diff --git a/app/src/main/java/me/spica27/spicamusic/automix/AutoMixTransfer.kt b/app/src/main/java/me/spica27/spicamusic/automix/AutoMixTransfer.kt
+index 05f04f5..202bb41 100644
+--- a/app/src/main/java/me/spica27/spicamusic/automix/AutoMixTransfer.kt
++++ b/app/src/main/java/me/spica27/spicamusic/automix/AutoMixTransfer.kt
+@@ -37,7 +37,7 @@ import kotlin.math.abs
+ enum class AutoMixSkipReason { SongNotFound, ClipMissing }
+ 
+ /** Why a whole export/import failed. */
+-enum class AutoMixFailReason { EmptyPlaylist, InvalidZip, Generic }
++enum class AutoMixFailReason { EmptyPlaylist, InvalidZip, Generic, NoStorageAccess }
+ 
+ data class AutoMixImportLine(
+     val ok: Boolean,
+@@ -65,6 +65,8 @@ sealed interface AutoMixTransferState {
+         val importedCount: Int,
+         val skippedCount: Int,
+         val lines: List<AutoMixImportLine>,
++        /** true when the zip was a stems package (copied to Music/mixing), not transition clips. */
++        val stems: Boolean = false,
+     ) : AutoMixTransferState
+ 
+     data class Failed(
+@@ -273,12 +275,23 @@ object AutoMixTransfer {
+                 try {
+                     var manifestText: String? = null
+                     val extracted = mutableMapOf<String, File>()
++                    // A stems package (made by the Colab "stems for the phone" cells) holds a "mixing" folder.
++                    val canWriteMixing = MixingLibrary.hasAllFilesAccess()
++                    var mixingBlocked = false
++                    val mixingSongs = linkedSetOf<String>()
+                     val stream = app.contentResolver.openInputStream(zipUri) ?: error("Could not open the file")
+                     ZipInputStream(stream.buffered()).use { zin ->
+                         var entry = zin.nextEntry
+                         while (entry != null) {
+                             ensureActive()
+-                            if (!entry.isDirectory) {
++                            val mixingPath = if (entry.isDirectory) null else mixingRelativePath(entry.name)
++                            if (mixingPath != null) {
++                                if (!canWriteMixing) {
++                                    mixingBlocked = true
++                                } else if (extractMixingEntry(zin, mixingPath) && mixingPath.endsWith("/song.json")) {
++                                    mixingSongs += mixingPath.removeSuffix("/song.json")
++                                }
++                            } else if (!entry.isDirectory) {
+                                 // Keep only the last path segment so an entry can never escape the folder.
+                                 val name = File(entry.name).name
+                                 if (name.equals("automix.json", ignoreCase = true)) {
+@@ -294,6 +307,22 @@ object AutoMixTransfer {
+                         }
+                     }
+ 
++                    if (mixingBlocked) {
++                        _state.value = AutoMixTransferState.Failed(AutoMixFailReason.NoStorageAccess)
++                        return@launch
++                    }
++                    if (mixingSongs.isNotEmpty()) {
++                        MixingLibrary.refresh()
++                        _state.value =
++                            AutoMixTransferState.ImportDone(
++                                importedCount = mixingSongs.size,
++                                skippedCount = 0,
++                                lines = mixingSongs.map { AutoMixImportLine(true, it.replace("/", " / ")) },
++                                stems = true,
++                            )
++                        return@launch
++                    }
++
+                     val text = manifestText
+                     if (text == null) {
+                         _state.value = AutoMixTransferState.Failed(AutoMixFailReason.InvalidZip)
+@@ -377,6 +406,31 @@ object AutoMixTransfer {
+             }
+     }
+ 
++    /** "Artist/Album/Song/drums.opus" for a zip entry inside a "mixing" folder, otherwise null. */
++    private fun mixingRelativePath(entryName: String): String? {
++        val parts = entryName.replace('\\', '/').split('/').filter { it.isNotEmpty() }
++        val at = parts.indexOfFirst { it.equals("mixing", ignoreCase = true) }
++        if (at < 0 || at == parts.lastIndex) return null
++        val rest = parts.subList(at + 1, parts.size)
++        if (rest.any { it == ".." || it == "." }) return null
++        return rest.joinToString("/")
++    }
++
++    /** Copy one zip entry to Music/mixing/<relative>. Entries that would leave that folder are skipped. */
++    private fun extractMixingEntry(
++        zin: ZipInputStream,
++        relative: String,
++    ): Boolean {
++        val root = MixingLibrary.rootDir()
++        val target = File(root, relative)
++        if (!target.canonicalPath.startsWith(root.canonicalPath + File.separator)) return false
++        target.parentFile?.mkdirs()
++        val part = File(target.parentFile, target.name + ".part")
++        part.outputStream().use { zin.copyTo(it, 64 * 1024) }
++        if (target.exists()) target.delete()
++        return part.renameTo(target)
++    }
++
+     /**
+      * Match a manifest song to the library: the stored song id (only if the title also matches,
+      * in case the library was rebuilt), then title + artist + duration (within 2 s).
+diff --git a/app/src/main/java/me/spica27/spicamusic/ui/dialog/AutoMixTransferDialog.kt b/app/src/main/java/me/spica27/spicamusic/ui/dialog/AutoMixTransferDialog.kt
+index eaff67f..7f8616b 100644
+--- a/app/src/main/java/me/spica27/spicamusic/ui/dialog/AutoMixTransferDialog.kt
++++ b/app/src/main/java/me/spica27/spicamusic/ui/dialog/AutoMixTransferDialog.kt
+@@ -126,7 +126,12 @@ fun AutoMixTransferDialogContent() {
+                 is AutoMixTransferState.ImportDone -> {
+                     DialogTitle(stringResource(R.string.automix_importing_title))
+                     Text(
+-                        text = stringResource(R.string.automix_import_summary, s.importedCount, s.skippedCount),
++                        text =
++                            if (s.stems) {
++                                stringResource(R.string.automix_import_stems_summary, s.importedCount)
++                            } else {
++                                stringResource(R.string.automix_import_summary, s.importedCount, s.skippedCount)
++                            },
+                         style = MaterialTheme.typography.bodyLarge,
+                         color = MaterialTheme.colorScheme.onSurface,
+                     )
+@@ -156,7 +161,10 @@ fun AutoMixTransferDialogContent() {
+                         }
+                     }
+                     Text(
+-                        text = stringResource(R.string.automix_import_storage_note),
++                        text =
++                            stringResource(
++                                if (s.stems) R.string.automix_import_stems_note else R.string.automix_import_storage_note,
++                            ),
+                         style = MaterialTheme.typography.bodySmall,
+                         color = MaterialTheme.colorScheme.onSurfaceVariant,
+                     )
+@@ -171,6 +179,7 @@ fun AutoMixTransferDialogContent() {
+                                 AutoMixFailReason.EmptyPlaylist -> stringResource(R.string.automix_fail_empty)
+                                 AutoMixFailReason.InvalidZip -> stringResource(R.string.automix_fail_invalid_zip)
+                                 AutoMixFailReason.Generic -> stringResource(R.string.automix_fail_generic, s.detail)
++                                AutoMixFailReason.NoStorageAccess -> stringResource(R.string.automix_fail_no_storage_access)
+                             },
+                         style = MaterialTheme.typography.bodyLarge,
+                         color = MaterialTheme.colorScheme.onSurfaceVariant,
+diff --git a/app/src/main/res/values-zh-rTW/strings.xml b/app/src/main/res/values-zh-rTW/strings.xml
+index df2bfdc..1412cb6 100644
+--- a/app/src/main/res/values-zh-rTW/strings.xml
++++ b/app/src/main/res/values-zh-rTW/strings.xml
+@@ -1417,4 +1417,7 @@
+   <string name="amx_library_count">%1$d 首歌曲有混音資料，%2$d 首可混音</string>
+   <string name="amx_library_allow">允許存取</string>
+   <string name="amx_library_refresh">重新整理</string>
++  <string name="automix_import_stems_summary">已匯入 %1$d 首帶混音資料的歌曲</string>
++  <string name="automix_import_stems_note">已儲存到 Music/mixing。</string>
++  <string name="automix_fail_no_storage_access">匯入分軌需要「所有檔案存取權限」。請在歌詞選單中開啟 AutoMix 設定，點選「允許存取」，然後重新匯入。</string>
+ </resources>
+diff --git a/app/src/main/res/values-zh/strings.xml b/app/src/main/res/values-zh/strings.xml
+index 45f7729..b3f167d 100644
+--- a/app/src/main/res/values-zh/strings.xml
++++ b/app/src/main/res/values-zh/strings.xml
+@@ -1418,4 +1418,7 @@
+   <string name="amx_library_count">%1$d 首歌曲有混音数据，%2$d 首可混音</string>
+   <string name="amx_library_allow">允许访问</string>
+   <string name="amx_library_refresh">刷新</string>
++  <string name="automix_import_stems_summary">已导入 %1$d 首带混音数据的歌曲</string>
++  <string name="automix_import_stems_note">已保存到 Music/mixing。</string>
++  <string name="automix_fail_no_storage_access">导入分轨需要“所有文件访问权限”。请在歌词菜单中打开 AutoMix 设置，点按“允许访问”，然后重新导入。</string>
+ </resources>
+diff --git a/app/src/main/res/values/strings.xml b/app/src/main/res/values/strings.xml
+index 56c0cb4..7986d70 100644
+--- a/app/src/main/res/values/strings.xml
++++ b/app/src/main/res/values/strings.xml
+@@ -1418,4 +1418,7 @@
+   <string name="amx_library_count">%1$d songs with mixing data, %2$d ready to mix</string>
+   <string name="amx_library_allow">Allow access</string>
+   <string name="amx_library_refresh">Refresh</string>
++  <string name="automix_import_stems_summary">%1$d songs with mixing data imported</string>
++  <string name="automix_import_stems_note">Saved in Music/mixing.</string>
++  <string name="automix_fail_no_storage_access">To import stems, the app needs “All files access”. Open AutoMix settings in the lyrics menu, tap “Allow access”, then import again.</string>
+ </resources>
